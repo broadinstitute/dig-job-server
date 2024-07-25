@@ -1,0 +1,7 @@
+alembic==1.13.2
+fastapi==0.111.1
+mysql-connector-python==9.0.0
+mysqlclient==2.2.4
+SQLAlchemy==2.0.31
+uvicorn==0.30.3
+pyjwt[crypto]==2.8.0
