@@ -5,3 +5,4 @@ mysqlclient==2.2.4
 SQLAlchemy==2.0.31
 uvicorn==0.30.3
 pyjwt[crypto]==2.8.0
+streaming-form-data==1.15.0
