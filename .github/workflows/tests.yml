@@ -30,7 +30,7 @@ jobs:
 
       - name: Start MySQL
         run: |
-          sh docker_db/docker_db.sh start
+          sh docker_db/docker_db.sh start 3308
 
       - name: Test with pytest with coverage
         run: |
