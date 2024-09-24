@@ -3,15 +3,15 @@ import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
-import api
-from jwt_utils import JWT_SECRET_KEY, ALGORITHM
+from job_server import api
+from job_server import jwt_utils
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, jwt_utils.JWT_SECRET_KEY, algorithms=[jwt_utils.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token")

@@ -5,18 +5,24 @@ from starlette.requests import Request
 from streaming_form_data import StreamingFormDataParser
 from streaming_form_data.targets import S3Target
 
-import s3
-from database import get_db
-from database_utils import authenticate_user
-from jwt_utils import create_access_token
-from model import UserCredentials
+from job_server import s3
+from job_server.auth_backend import AuthBackend
+from job_server.database import get_db
+from job_server.database_utils import authenticate_user
+from job_server.jwt_utils import create_access_token
+from job_server.model import UserCredentials
 
 router = fastapi.APIRouter()
 
+def get_auth_backend() -> AuthBackend:
+    # Replace with logic to select the appropriate backend
+    from job_server.auth_mysql import MySQLAuthBackend
+    from job_server.database import get_db
+    return MySQLAuthBackend(get_db())
 
 @router.post("/login")
-def login(credentials: UserCredentials, db=Depends(get_db)):
-    if not authenticate_user(db, credentials.username, credentials.password):
+def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
+    if not auth_backend.authenticate_user(credentials.username, credentials.password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
     access_token = create_access_token(data={"sub": credentials.username})
