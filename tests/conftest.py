@@ -26,7 +26,7 @@ def before_each_test():
         con.execute(text("TRUNCATE TABLE users"))
         # password is change.me
         con.execute(text("INSERT INTO users (id, user_name, password, created_at) "
-                         "values (1, 'testuser@broadinstitute.org', "
+                         "values (1, 'testuser', "
                          "'$2b$12$oA9o05xM7N9RQoJ1bYYXBumucprQC6D2U2Buzi1/vuryfI9W8QrlC', NOW())"))
         con.commit()
         con.execute(text("SET FOREIGN_KEY_CHECKS = 1"))

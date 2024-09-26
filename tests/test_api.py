@@ -1,13 +1,14 @@
-from unittest.mock import patch
-from moto import mock_aws
-
 import boto3
 import pytest
+from moto import mock_aws
 from starlette.testclient import TestClient
+
+BUCKET = "dig-ldsc-server"
+USER = "testuser"
 
 
 def test_login(api_client: TestClient):
-    res = api_client.post("/api/login", json={"username": "testuser@broadinstitute.org", "password": "change.me"})
+    res = api_client.post("/api/login", json={"username": f"{USER}", "password": "change.me"})
     assert res.status_code == 200
     assert "access_token" in res.json()
     return res.json()["access_token"]
@@ -19,7 +20,7 @@ def auth_token(api_client: TestClient):
 def set_up_moto_bucket():
     # We need to create the bucket since this is all in Moto's 'virtual' AWS account
     conn = boto3.resource("s3", region_name="us-east-1")
-    conn.create_bucket(Bucket="dig-ld-score-qa")
+    conn.create_bucket(Bucket="dig-ldsc-server")
 
 @mock_aws
 def test_file_upload_success(api_client: TestClient, auth_token: str):
@@ -28,7 +29,7 @@ def test_file_upload_success(api_client: TestClient, auth_token: str):
     headers = {'Filename': 'testfile.gz', 'Authorization': f"Bearer {auth_token}"}
     res = api_client.post("/api/upload", files=files, headers=headers)
     assert res.status_code == 200
-    assert res.json() == {"s3_path": "s3://dig-ld-score-qa/ldscore/uploads/testfile.gz"}
+    assert res.json() == {"s3_path": f"s3://{BUCKET}/userdata/{USER}/testfile.gz"}
 
 @mock_aws
 def test_file_upload_no_filename(api_client: TestClient, auth_token: str):
@@ -38,11 +39,11 @@ def test_file_upload_no_filename(api_client: TestClient, auth_token: str):
     res = api_client.post("/api/upload", files=files, headers=headers)
     assert res.status_code == 422
 
+@mock_aws
 def test_file_upload_empty_file(api_client: TestClient, auth_token: str):
-    with patch("job_server.api.s3.get_bucket_path") as mock_get_bucket_path:
-        mock_get_bucket_path.return_value = "s3://dig-ld-score-qa/ldscore/uploads/testfile.gz"
-        files = {'file': ('testfile.gz', b'')}
-        headers = {'Filename': 'testfile.gz', 'Authorization': f"Bearer {auth_token}"}
-        res = api_client.post("/api/upload", files=files, headers=headers)
-        assert res.status_code == 200
-        assert res.json() == {"s3_path": "s3://dig-ld-score-qa/ldscore/uploads/testfile.gz"}
+    set_up_moto_bucket()
+    files = {'file': ('testfile.gz', b'')}
+    headers = {'Filename': 'testfile.gz', 'Authorization': f"Bearer {auth_token}"}
+    res = api_client.post("/api/upload", files=files, headers=headers)
+    assert res.status_code == 200
+    assert res.json() == {"s3_path": f"s3://{BUCKET}/userdata/{USER}/testfile.gz"}
