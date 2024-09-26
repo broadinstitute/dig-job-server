@@ -7,8 +7,6 @@ from streaming_form_data.targets import S3Target
 
 from job_server import s3
 from job_server.auth_backend import AuthBackend
-from job_server.database import get_db
-from job_server.database_utils import authenticate_user
 from job_server.jwt_utils import create_access_token
 from job_server.model import UserCredentials
 
@@ -32,13 +30,13 @@ def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_
 @router.post("/upload")
 async def upload_file(request: Request):
     filename = request.headers.get('Filename')
+    if not filename:
+        raise HTTPException(status_code=422, detail="Filename header is required")
     parser = StreamingFormDataParser(request.headers)
     parser.register("file", GzipS3Target(s3.get_bucket_path("ldscore/uploads", filename), mode='wb'))
-    file_size = 0
     async for chunk in request.stream():
-        file_size += len(chunk)
         parser.data_received(chunk)
-    return {"file_size": file_size, "s3_path": s3.get_bucket_path("ldscore/uploads", filename)}
+    return {"s3_path": s3.get_bucket_path("ldscore/uploads", filename)}
 
 
 class GzipS3Target(S3Target):

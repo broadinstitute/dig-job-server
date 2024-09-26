@@ -7,7 +7,7 @@ start() {
     docker rm -f $CONTAINER
 
     # start up mysql
-    echo "starting up dataregistry mysql container..."
+    echo "starting up dig-job-server mysql container..."
     BASEDIR=$(dirname "$0")
     docker create --name $CONTAINER --health-cmd="mysqladmin ping" --health-start-period="2s" --health-interval="1s" \
     -e MYSQL_ALLOW_EMPTY_PASSWORD=true -p $PORT:3306 mysql:$MYSQL_VERSION --local-infile=1
