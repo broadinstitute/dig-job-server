@@ -21,8 +21,17 @@ def get_auth_backend() -> AuthBackend:
     from job_server.database import get_db
     return MySQLAuthBackend(get_db())
 
+
+@router.get("/hello")
+async def hello():
+    return {"message": "Hello World"}
+
+@router.get("/goodbye")
+async def goodbye():
+    return {"message": "Goodbye World"}
+
 @router.post("/login")
-def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
+async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
     if not auth_backend.authenticate_user(credentials.username, credentials.password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
