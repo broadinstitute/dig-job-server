@@ -21,15 +21,6 @@ def get_auth_backend() -> AuthBackend:
     from job_server.database import get_db
     return MySQLAuthBackend(get_db())
 
-
-@router.get("/hello")
-async def hello():
-    return {"message": "Hello World"}
-
-@router.get("/goodbye")
-async def goodbye():
-    return {"message": "Goodbye World"}
-
 @router.post("/login")
 async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
     if not auth_backend.authenticate_user(credentials.username, credentials.password):
@@ -63,7 +54,7 @@ async def upload_file(request: Request, user: User = Depends(get_current_user)):
     if not filename:
         raise HTTPException(status_code=422, detail="Filename header is required")
     parser = StreamingFormDataParser(request.headers)
-    parser.register("file", GzipS3Target(s3.get_bucket_path("ldscore/uploads", filename), mode='wb'))
+    parser.register("file", GzipS3Target(s3.get_bucket_path(f"userdata/{user.username}", filename), mode='wb'))
     async for chunk in request.stream():
         parser.data_received(chunk)
     return {"s3_path": s3.get_bucket_path(f"userdata/{user.username}", filename)}

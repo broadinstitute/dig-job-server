@@ -14,3 +14,4 @@ bcrypt
 typer
 boto3
 mangum
+httpx

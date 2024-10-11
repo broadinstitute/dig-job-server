@@ -7,7 +7,7 @@ BUCKET = "dig-ldsc-server"
 USER = "testuser"
 
 
-def test_login(api_client: TestClient):
+def get_token(api_client: TestClient):
     res = api_client.post("/api/login", json={"username": f"{USER}", "password": "change.me"})
     assert res.status_code == 200
     assert "access_token" in res.json()
@@ -15,7 +15,7 @@ def test_login(api_client: TestClient):
 
 @pytest.fixture
 def auth_token(api_client: TestClient):
-    return test_login(api_client)
+    return get_token(api_client)
 
 def set_up_moto_bucket():
     # We need to create the bucket since this is all in Moto's 'virtual' AWS account

@@ -13,8 +13,6 @@ engine = create_engine(
 
 @contextmanager
 def get_db():
-    print("Creating connection")
-    print(f"DB URL: {SQLALCHEMY_DATABASE_URL}")
     connection = engine.connect()
     try:
         yield connection

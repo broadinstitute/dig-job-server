@@ -1,8 +1,8 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "dig-job-server-qa"
+stack_name = "dig-job-server-prod"
 s3_bucket = "dig-sam-artifacts-bucket"
 region = "us-east-1"
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "Environment=prod"
+parameter_overrides = "Environment=prod JobServerBucket=dig-ldsc-server-qa"

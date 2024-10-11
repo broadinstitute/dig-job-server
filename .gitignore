@@ -12,9 +12,11 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+.aws-sam/
 develop-eggs/
 dist/
 downloads/
+lambda_build/
 eggs/
 .eggs/
 lib/
@@ -105,7 +107,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+job_server/.env.qa
 .venv
 env/
 venv/
