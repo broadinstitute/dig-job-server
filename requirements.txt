@@ -15,3 +15,4 @@ typer
 boto3
 mangum
 httpx
+moto
