@@ -1,5 +1,5 @@
 # dig-job-server
-![Coverage](https://img.shields.io/badge/coverage-82%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-62%25-brightgreen)
 
 ## Project Setup and Running Server Locally
 1. Set up python virtual env using version 3.9 or later.  With [pyenv](https://github.com/pyenv/pyenv) installed you can do the following:
