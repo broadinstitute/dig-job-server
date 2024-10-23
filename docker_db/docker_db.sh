@@ -28,7 +28,7 @@ stop() {
 
 CONTAINER=dig-job-server
 COMMAND=$1
-PORT=${2:-"3307"}
+PORT=${2:-"3308"}
 
 if [ ${#@} == 0 ]; then
     echo "Usage: $0 stop|start"
