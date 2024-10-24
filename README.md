@@ -1,8 +1,8 @@
 # dig-job-server
-![Coverage](https://img.shields.io/badge/coverage-62%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-63%25-brightgreen)
 
 ## Project Setup and Running Server Locally
-1. Set up python virtual env using version 3.9 or later.  With [pyenv](https://github.com/pyenv/pyenv) installed you can do the following:
+1. Set up python virtual env using version 3.9 or later.  With [pyenv](https://github.com/pyenv/pyenv) and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) installed you can do the following:
 ```bash 
 pyenv install 3.9
 pyenv local 3.9
@@ -40,7 +40,9 @@ curl -H "Content-Type: application/json" -X POST http://localhost:8000/api/login
 curl -X POST http://localhost:8000/api/upload \
      -F "file=@/<path_to_local_file>" \
      -H "Content-Type: multipart/form-data" \
-     -H "FileName: <file_name>" -H "Authorization: bearer <token_provided_by_login_response>"
+     -H "FileName: <file_name>" \
+     -H "DatasetName: <dataset_name>" \
+     -H "Authorization: bearer <token_provided_by_login_response>"
 ```
 
 ## Deployment
