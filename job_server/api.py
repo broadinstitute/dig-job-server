@@ -51,16 +51,17 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
 @router.post("/upload")
 async def upload_file(request: Request, user: User = Depends(get_current_user)):
     filename = request.headers.get('Filename')
+    dataset = request.headers.get('DatasetName')
     if not filename:
         raise HTTPException(status_code=422, detail="Filename header is required")
+    if not dataset:
+        raise HTTPException(status_code=422, detail="Dataset name header is required")
     parser = StreamingFormDataParser(request.headers)
-    parser.register("file", GzipS3Target(s3.get_bucket_path(f"userdata/{user.username}", filename), mode='wb'))
+    s3_path = s3.get_bucket_path(f"userdata/{user.username}/genetic/{dataset}/raw", filename)
+    parser.register("file", GzipS3Target(s3_path, mode='wb'))
     async for chunk in request.stream():
         parser.data_received(chunk)
-    return {"s3_path": s3.get_bucket_path(f"userdata/{user.username}", filename)}
-
-
-
+    return {"s3_path": s3_path}
 
 
 class GzipS3Target(S3Target):

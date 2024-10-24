@@ -108,6 +108,7 @@ celerybeat.pid
 
 # Environments
 job_server/.env.qa
+dig-job-server.iml
 .venv
 env/
 venv/
