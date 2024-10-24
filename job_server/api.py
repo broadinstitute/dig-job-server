@@ -4,12 +4,13 @@ import fastapi
 import smart_open
 from fastapi import Depends, HTTPException, Header
 from starlette.requests import Request
+from starlette.responses import Response
 from streaming_form_data import StreamingFormDataParser
 from streaming_form_data.targets import S3Target
 
 from job_server import s3
 from job_server.auth_backend import AuthBackend
-from job_server.jwt_utils import create_access_token, get_decoded_jwt_data
+from job_server.jwt_utils import create_access_token, get_decoded_jwt_data, get_encoded_jwt_data
 from job_server.model import UserCredentials, User
 
 router = fastapi.APIRouter()
@@ -22,12 +23,18 @@ def get_auth_backend() -> AuthBackend:
     return MySQLAuthBackend(get_db())
 
 @router.post("/login")
-async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
+async def login(response: Response, credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
     if not auth_backend.authenticate_user(credentials.username, credentials.password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
+    response.set_cookie(key=JOB_SERVER_AUTH_COOKIE, httponly=True,
+                        value=get_encoded_jwt_data(User(username=credentials.username)),
+                        domain='localhost', samesite='strict',
+                        secure=False)
+
     access_token = create_access_token(data={"username": credentials.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 
 async def get_current_user(request: Request, authorization: Optional[str] = Header(None)):
@@ -36,7 +43,6 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
         data = get_decoded_jwt_data(auth_cookie)
         if data:
             user = User(**data)
-            user.api_token = auth_cookie
             return user
 
     if authorization:
@@ -47,6 +53,14 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
                 return User(**data)
 
     raise fastapi.HTTPException(status_code=401, detail='Not logged in')
+
+
+@router.get('/is-logged-in')
+def is_logged_in(user: User = Depends(get_current_user)):
+    if user:
+        return user
+    else:
+        raise fastapi.HTTPException(status_code=401, detail='Not logged in')
 
 @router.post("/upload")
 async def upload_file(request: Request, user: User = Depends(get_current_user)):
