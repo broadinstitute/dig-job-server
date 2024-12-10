@@ -30,6 +30,24 @@ export const useUserStore = defineStore("UserStore", {
                 return false;
             }
         },
+        async sampleTextFile(file) {
+            const part = await readFilePart(file, 2048);
+            const formData = new FormData();
+            formData.append("file", new Blob([part]), file.name);
+
+            const { data } = await this.axios.post(
+                "/api/preview-delimited-file",
+                formData,
+                {
+                    headers: { "Content-Type": "multipart/form-data" },
+                },
+            );
+            return data;
+        },
+        async retrieveDatasets(){
+            const { data } = await this.axios.get("/api/datasets");
+            return data;
+        },
         async login(username, password) {
             if (!this.axios) {
                 this.init();
@@ -39,5 +57,22 @@ export const useUserStore = defineStore("UserStore", {
                 JSON.stringify({ username, password }),
             );
         },
+        async getPresignedUrl(fileName, dataset){
+            const {data} = await this.axios.get(`/api/get-pre-signed-url/${dataset}?filename=${fileName}`);
+            return data;
+        },
+        async finalizeUpload(dataset){
+            console.log(JSON.stringify(dataset));
+            await this.axios.post('/api/finalize-upload', JSON.stringify(dataset));
+        }
     },
 });
+
+function readFilePart(file, partSize) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file.slice(0, partSize));
+    });
+}
