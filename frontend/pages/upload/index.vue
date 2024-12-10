@@ -7,7 +7,7 @@
   </div>
   <div class="grid">
     <div class="col p-8">
-      <div class="field mb">
+      <div class="field">
         <label for="dataset" class="block text-900 text-l font-medium mb-2">Dataset Name</label>
         <InputText
             id="dataset"
@@ -16,8 +16,16 @@
             v-model="dataSetName"
             placeholder="Enter dataset name"
             class="w-full"
-            style="padding: 1rem"
         />
+      </div>
+      <div class="field">
+        <label for="ancestry" class="block text-900 text-l font-medium mb-2">Ancestry</label>
+        <Select id="ancestry" v-model="ancestry" :options="ancestryOptions" class="w-full" option-value="value"
+                option-label="name" placeholder="Select ancestry"/>
+      </div>
+      <div class="field">
+        <label for="genomeBuild" class="block text-900 text-l font-medium mb-2">Genome Build</label>
+        <Select id="genomeBuild" v-model="genomeBuild" :options="['GRCh37', 'GRCh38']" class="w-full"  placeholder="Select genome build"/>
       </div>
       <div class="field">
         <label for="file" class="block text-900 text-l font-medium mb-2">File</label>
@@ -38,7 +46,7 @@
             icon="pi pi-upload"
             :disabled="formIncomplete"
             @click="uploadData" />
-        <p v-if="formIncomplete">{{`You must specify a dataset name, gwas file, and column mapping that
+        <p v-if="formIncomplete">{{`You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
           includes ${requiredFields.join(", ")} and either beta or odds ratio before you can upload.`}}</p>
       </div>
 
@@ -93,6 +101,10 @@ const uploadProgress = ref(0);
 let file = ref(null);
 const selectedFields = ref({});
 const missingMappingError = ref('');
+const ancestry = ref('');
+const genomeBuild = ref('');
+const ancestryOptions = [{'name': 'European', 'value': 'EUR'}, {'name': 'African', 'value': 'AFR'},
+  {'name': 'East Asian', 'value': 'EAS'}, {'name': 'South Asian', 'value': 'SAS'}, {'name': 'Native American', 'value': 'AMR'}];
 const colOptions = [{'name': 'chromosome', 'value': 'chromosome'},
 {'name': 'position', 'value': 'position'},
 {'name': 'reference', 'value': 'reference'},
@@ -139,7 +151,7 @@ const colMap = computed(() => {
 const formIncomplete = computed(() => {
   return !file.value || !dataSetName.value
       || !requiredFields.every((field) => field in colMap.value && colMap.value[field])
-      || !('beta' in colMap.value || 'oddsRatio' in colMap.value);
+      || !('beta' in colMap.value || 'oddsRatio' in colMap.value) || !ancestry.value || !genomeBuild.value;
 });
 
 async function uploadData() {
@@ -162,8 +174,8 @@ async function uploadData() {
        {
          'file': fileName,
          'name': dataSetName.value,
-         'ancestry': 'EUR',
-         'separator': '\t',
+         'ancestry': ancestry.value,
+         'separator': fileInfo.value.delimiter,
          'genome_build': 'GRCh37',
          col_map
        });
