@@ -5,16 +5,16 @@ import fastapi
 import re
 import smart_open
 from botocore.exceptions import ClientError
-from fastapi import Depends, HTTPException, Header, UploadFile, Query
+from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import Response
 from streaming_form_data import StreamingFormDataParser
 from streaming_form_data.targets import S3Target
 
-from job_server import s3, file_utils
+from job_server import s3, file_utils, batch
 from job_server.auth_backend import AuthBackend
 from job_server.jwt_utils import create_access_token, get_decoded_jwt_data, get_encoded_jwt_data
-from job_server.model import UserCredentials, User, DatasetInfo
+from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest
 
 router = fastapi.APIRouter()
 JOB_SERVER_AUTH_COOKIE = 'js_auth'
@@ -71,23 +71,8 @@ async def get_datasets(user: User = Depends(get_current_user)):
     data_set_folders = s3.get_datasets(user.username)
     return [{'dataset': d} for d in data_set_folders]
 
-@router.post("/upload")
-async def upload_file(request: Request, user: User = Depends(get_current_user)):
-    filename = request.headers.get('Filename')
-    dataset = request.headers.get('DatasetName')
-    if not filename:
-        raise HTTPException(status_code=422, detail="Filename header is required")
-    if not dataset:
-        raise HTTPException(status_code=422, detail="Dataset name header is required")
-    parser = StreamingFormDataParser(request.headers)
-    s3_path = s3.get_bucket_path(f"userdata/{user.username}/genetic/{dataset}/raw", filename)
-    parser.register("file", GzipS3Target(s3_path, mode='wb'))
-    async for chunk in request.stream():
-        parser.data_received(chunk)
-    return {"s3_path": s3_path}
-
 @router.post("/preview-delimited-file")
-async def preview_files(file: UploadFile):
+async def preview_file(file: UploadFile):
     contents = await file.read(100)
     await file.seek(0)
 
@@ -101,7 +86,7 @@ async def preview_files(file: UploadFile):
     if len(dupes) > 0:
         duped_col_str = ', '.join(set([re.sub(r"\.\d+$", '', dupe) for dupe in dupes]))
         raise fastapi.HTTPException(detail=f"{duped_col_str} specified more than once", status_code=400)
-    return {"columns": [column for column in df.columns]}
+    return {"columns": [column for column in df.columns], "delimiter": "\t" if ".tsv" in file.filename else ","}
 
 
 def get_s3_path(dataset: str, user: User, filename: str=None) -> str:
@@ -130,17 +115,17 @@ async def finalize_upload(request: DatasetInfo, user: User = Depends(get_current
     return Response(status_code=200)
 
 
-
-class GzipS3Target(S3Target):
-    def __init__(self, path, mode='wb', transport_params=None):
-        super().__init__(path, mode, transport_params)
-
-    def on_start(self):
-        self._fd = smart_open.open(
-            self._file_path,
-            self._mode,
-            compression='disable',
-            transport_params=self._transport_params,
-        )
-
+@router.post("/start-analysis")
+async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
+                         user: User = Depends(get_current_user)):
+    background_tasks.add_task(batch.submit_and_await_job, {
+        'jobName': 'dig-ldsc-methods',
+        'jobQueue': 'ldsc-methods-job-queue',
+        'jobDefinition': 'dig-ldsc-methods',
+        'parameters': {
+            'username': user.username,
+            'dataset': request.dataset,
+            'method': request.method.value,
+        }})
+    return Response(status_code=202)
 

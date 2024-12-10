@@ -64,6 +64,9 @@ export const useUserStore = defineStore("UserStore", {
         async finalizeUpload(dataset){
             console.log(JSON.stringify(dataset));
             await this.axios.post('/api/finalize-upload', JSON.stringify(dataset));
+        },
+        async startAnalysis(dataset, method){
+            await this.axios.post('/api/start-analysis', JSON.stringify({dataset, method}));
         }
     },
 });

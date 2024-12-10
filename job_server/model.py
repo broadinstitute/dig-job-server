@@ -1,3 +1,5 @@
+from enum import Enum
+
 from pydantic import BaseModel
 
 
@@ -15,3 +17,13 @@ class DatasetInfo(BaseModel):
     separator: str
     genome_build: str
     col_map: dict
+
+class AnalysisMethod(str, Enum):
+    sumstats = "sumstats"
+    sldsc = "sldsc"
+
+
+class AnalysisRequest(BaseModel):
+    dataset: str
+    method: AnalysisMethod
+
