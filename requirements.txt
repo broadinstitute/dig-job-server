@@ -5,7 +5,6 @@ mysqlclient
 SQLAlchemy
 uvicorn
 pyjwt[crypto]
-streaming-form-data
 pytest
 pytest-cov
 starlette
