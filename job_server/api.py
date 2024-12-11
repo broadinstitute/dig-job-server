@@ -3,13 +3,10 @@ from typing import Optional
 
 import fastapi
 import re
-import smart_open
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import Response
-from streaming_form_data import StreamingFormDataParser
-from streaming_form_data.targets import S3Target
 
 from job_server import s3, file_utils, batch
 from job_server.auth_backend import AuthBackend
