@@ -8,7 +8,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return;
     }
     const nuxtApp = useNuxtApp();
-    if(to.path.startsWith('/login') || to.path.startsWith('/maja-upload')) {
+    if(to.path.startsWith('/login')){
         return;
     }
     const userStore = useUserStore();
