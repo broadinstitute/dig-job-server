@@ -1,5 +1,5 @@
 # dig-job-server
-![Coverage](https://img.shields.io/badge/coverage-63%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-67%25-brightgreen)
 
 ## Project Setup and Running Server Locally
 1. Set up python virtual env using version 3.9 or later.  With [pyenv](https://github.com/pyenv/pyenv) and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) installed you can do the following:
@@ -37,12 +37,11 @@ curl -H "Content-Type: application/json" -X POST http://localhost:8000/api/login
 -d '{"username": "testuser", "password": "change.me"}'
 ```
 ```bash
-curl -X POST http://localhost:8000/api/upload \
-     -F "file=@/<path_to_local_file>" \
-     -H "Content-Type: multipart/form-data" \
-     -H "FileName: <file_name>" \
-     -H "DatasetName: <dataset_name>" \
-     -H "Authorization: bearer <token_provided_by_login_response>"
+DATASET=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''<data-set-name>'''))")
+PRESIGNED_URL=$(curl "http://localhost:8000/api/get-pre-signed-url/$DATASET" \
+     -H "Authorization: bearer <token_provided_by_login_response>" \
+     | python3 -c "import sys, json; print(json.load(sys.stdin)['presigned_url'])")
+curl -X PUT --upload-file <local-file-to-upload> $PRESIGNED_URL  
 ```
 
 ## Deployment
