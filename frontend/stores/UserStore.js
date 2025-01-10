@@ -58,6 +58,9 @@ export const useUserStore = defineStore("UserStore", {
             );
         },
         async getPresignedUrl(fileName, dataset){
+            if (!this.axios) {
+                this.init();
+            }
             const {data} = await this.axios.get(`/api/get-pre-signed-url/${dataset}?filename=${fileName}`);
             return data;
         },
