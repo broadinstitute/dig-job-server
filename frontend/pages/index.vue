@@ -28,8 +28,9 @@ async function runSldsc(dataset) {
       <Column header="Analyses">
         <template #body="{ data }">
           <span>
-            <a href="#" @click.prevent="runSumstats(data.dataset)">Run Sum Stats</a> |
-            <a href="#" @click.prevent="runSldsc(data.dataset)">Run SLDSC</a>
+            <Button @click.prevent="runSumstats(data.dataset)" label="Run Sum Stats"></Button> |
+            <Button @click.prevent="runSldsc(data.dataset)" label="Run SLDSC"></Button> |
+            <Button @click="router.push(`/results?dataset=${data.dataset}`)" label="Results"></Button>
           </span>
         </template>
       </Column>

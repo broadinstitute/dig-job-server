@@ -33,3 +33,8 @@ def generate_presigned_url(param, params, expires_in):
 def upload_metadata(metadata, path):
     s3_client = boto3.client('s3')
     s3_client.put_object(Bucket=BUCKET_NAME, Key=f"{path}/metadata", Body=json.dumps(metadata.dict()).encode('utf-8'))
+
+
+def get_results(path):
+    s3_client = boto3.client('s3')
+    return s3_client.get_object(Bucket=BUCKET_NAME, Key=f"{path}/tissue.output.tsv")

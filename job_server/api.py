@@ -1,4 +1,5 @@
 import io
+import json
 from typing import Optional
 
 import fastapi
@@ -126,3 +127,21 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
         }})
     return Response(status_code=202)
 
+
+def get_s3_results_path(dataset: str, user: User) -> str:
+    return f"userdata/{user.username}/genetic/{dataset}/sldsc/sldsc"
+
+
+@router.get("/results/{dataset}")
+async def get_results(dataset: str, user: User = Depends(get_current_user)):
+    s3_path = get_s3_results_path(dataset, user)
+    output = []
+    try:
+        wrapped_text = io.TextIOWrapper(s3.get_results(s3_path)['Body'])
+        header = ['annotation', 'tissue', 'biosample', 'enrichment', 'pValue']
+        for line in wrapped_text:
+            output.append(dict(zip(header, line.strip().split('\t'))))
+    except ClientError as e:
+        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch tissue results") from e
+    # TODO: Once the table is more reasonably sortable this won't be necessary
+    return sorted(output, key=lambda d: float(d['pValue']))
