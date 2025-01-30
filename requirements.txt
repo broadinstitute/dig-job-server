@@ -17,3 +17,6 @@ httpx
 moto
 pandas
 python-multipart
+click
+load_dotenv
+fabric

@@ -45,13 +45,4 @@ curl -X PUT --upload-file <local-file-to-upload> $PRESIGNED_URL
 ```
 
 ## Deployment
-This project uses [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) to deploy this project as an AWS Lambda. 
-Install it locally if you haven't already.
-1. Run build_lambda.py 
-```bash
- python scripts/build_lambda.py
-```
-2. Deploy the lambda using the AWS SAM CLI using one of the two samconfig-<env>.toml files in the deployment directory.
-```bash
-cd deployment; sam deploy --config-file samconfig-<env>.toml 
-```
+
