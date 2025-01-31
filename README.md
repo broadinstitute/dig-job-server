@@ -47,4 +47,5 @@ curl -X PUT --upload-file <local-file-to-upload> $PRESIGNED_URL
 ```
 
 ## Deployment
-
+Both the front end and API deploy via github actions that fire upon a push to the main branch.  The front end deploys as a static site
+served by our nginx server, and the API deploys to EC2 instance that runs the server as a python process.  The front end talks to the API via an nginx proxy.
