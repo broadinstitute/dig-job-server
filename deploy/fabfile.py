@@ -23,16 +23,7 @@ def update_source(c, commit=None):
     """
     directory = get_checkout_directory()
     with c.cd(directory):
-        if commit:
-            c.run("git fetch --all --tags")
-            is_tag = c.run(f"git tag -l {commit}", warn=True).ok
-
-            if is_tag:
-                c.run(f"git checkout {commit}")
-            else:
-                c.run(f"git checkout {commit} && git pull")
-        else:
-            c.run("git checkout main && git pull")
+        c.run("git pull")
 
 
 @task
@@ -66,5 +57,5 @@ def migrate(c):
     """
     directory = get_checkout_directory()
     with c.cd(directory):
-        c.run("python3 -m pip install -r requirements.txt")
-        c.run("python3 -m alembic upgrade head")
+        c.run("./venv/bin/pip install -r requirements.txt")
+        c.run("./venv/bin/python -m alembic upgrade head")
