@@ -113,8 +113,6 @@ async def finalize_upload(request: DatasetInfo, user: User = Depends(get_current
     s3.upload_metadata(request, s3_path)
     return Response(status_code=200)
 
-
-
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
                          user: User = Depends(get_current_user)):
