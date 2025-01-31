@@ -94,6 +94,7 @@ def get_s3_path(dataset: str, user: User, filename: str=None) -> str:
     else:
         return f"userdata/{user.username}/genetic/{dataset}/raw"
 
+
 @router.get("/get-pre-signed-url/{dataset}")
 async def get_hermes_pre_signed_url(dataset: str, filename: str = Query(None), user: User = Depends(get_current_user)):
     s3_path = get_s3_path(dataset, user, filename)
