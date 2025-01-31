@@ -1,4 +1,4 @@
-name: Run Tests and Deploy
+name: API CI/CD
 
 on:
   push:
@@ -60,7 +60,7 @@ jobs:
 
   deploy:
     needs: [ test ]
-    name: Deploy
+    name: Deploy API
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

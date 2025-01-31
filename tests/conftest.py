@@ -12,7 +12,7 @@ from job_server.server import create_app
 if environ.get('TEST_DIG_JOB_SERVER_DB'):
     environ['DIG_JOB_SERVER_DB'] = environ['TEST_DIG_JOB_SERVER_DB']
 else:
-    environ['DIG_JOB_SERVER_DB'] = 'mysql+mysqlconnector://job_server:job_server@localhost:3308/job_server'
+    environ['DIG_JOB_SERVER_DB'] = 'mysql://job_server:job_server@localhost:3308/job_server'
 
 client = TestClient(create_app())
 
