@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from job_server import api
+from job_server.api import router
 from job_server.api import get_current_user
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -14,11 +14,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 def create_app():
     app = fastapi.FastAPI(title='Dig Job Server', redoc_url=None)
 
-    for route in api.router.routes:
+    for route in router.routes:
         if route.name not in {'login'}:
             route.dependencies.append(Depends(get_current_user))
 
-    app.include_router(api.router, prefix='/api', tags=['api'])
+    app.include_router(router, prefix='/api', tags=['api'])
 
     return app
 

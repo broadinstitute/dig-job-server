@@ -44,7 +44,7 @@ def restart(c):
             f"screen -ls | grep -o '[0-9]*\.{screen_session}' | while read -r line; do screen -S \"${{line}}\" -X quit; done")
         c.run("./venv/bin/python -m pip install -r requirements.txt")
         c.run(
-            f"screen -dmS {screen_session} bash -c './venv/bin/python -m job_server.server serve --port {port}'")
+            f"screen -dmS {screen_session} bash -c './venv/bin/python -m job_server.server -e .env serve --port {port}'")
 
 
 def get_checkout_directory():
