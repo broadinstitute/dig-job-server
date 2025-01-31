@@ -107,7 +107,6 @@ async def get_hermes_pre_signed_url(dataset: str, filename: str = Query(None), u
         raise fastapi.HTTPException(status_code=500, detail="Failed to generate presigned URL") from e
     return {"presigned_url": presigned_url, "s3_path": s3_path}
 
-
 @router.post("/finalize-upload")
 async def finalize_upload(request: DatasetInfo, user: User = Depends(get_current_user)):
     s3_path = get_s3_path(request.name, user)
