@@ -1,14 +1,16 @@
-name: Run Tests
+name: API CI/CD
 
 on:
   push:
     branches:
       - "*"
+    paths:
+      - 'job_server/**'
+      - 'requirements.txt'
 
 jobs:
   test:
     name: Run tests
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -56,5 +58,15 @@ jobs:
             git push
           fi
 
-
-  
+  deploy:
+    needs: [ test ]
+    name: Deploy API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/deploy
+        with:
+          python-version: '3.12'
+          deploy-environment: 'dev'
+          host: ${{ secrets.DEPLOY_HOST }}
+          private-key: ${{ secrets.SSH_PRIVATE_KEY }}
