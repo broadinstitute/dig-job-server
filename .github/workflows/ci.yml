@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "*"
+    paths:
+      - 'job_server/**'
+      - 'requirements.txt'
 
 jobs:
   test:
@@ -55,9 +58,8 @@ jobs:
             git push
           fi
 
-  deploy-qa:
+  deploy:
     needs: [ test ]
-    if: github.event_name == 'push' && contains(github.event.head_commit.modified, 'job_server/')
     name: Deploy
     runs-on: ubuntu-latest
     steps:
