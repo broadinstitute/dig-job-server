@@ -1,4 +1,5 @@
 import io
+import os
 from typing import Optional
 
 import fastapi
@@ -15,6 +16,7 @@ from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest
 
 router = fastapi.APIRouter()
 JOB_SERVER_AUTH_COOKIE = 'js_auth'
+cookie_domain = os.getenv('COOKIE_DOMAIN', 'localhost')
 
 def get_auth_backend() -> AuthBackend:
     # Replace with logic to select the appropriate backend
@@ -30,7 +32,7 @@ async def login(response: Response, credentials: UserCredentials, auth_backend: 
 
     response.set_cookie(key=JOB_SERVER_AUTH_COOKIE, httponly=True,
                         value=get_encoded_jwt_data(User(username=credentials.username)),
-                        domain='localhost', samesite='strict',
+                        domain=cookie_domain, samesite='strict',
                         secure=False)
 
     access_token = create_access_token(data={"username": credentials.username})
@@ -110,7 +112,6 @@ async def finalize_upload(request: DatasetInfo, user: User = Depends(get_current
     s3_path = get_s3_path(request.name, user)
     s3.upload_metadata(request, s3_path)
     return Response(status_code=200)
-
 
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
