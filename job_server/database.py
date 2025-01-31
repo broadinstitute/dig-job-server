@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 
 SQLALCHEMY_DATABASE_URL = os.getenv('DIG_JOB_SERVER_DB',
-                                    'mysql://job_server:job_server@localhost:3308/job_server')
+                                    'mysql+pymysql://job_server:job_server@localhost:3308/job_server')
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL
