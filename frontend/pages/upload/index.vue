@@ -94,7 +94,7 @@ const missingFileError = ref('');
 const fileInfo = ref({});
 const dataSetName = ref('');
 
-const route = useRoute();
+const route = useRouter();
 const store = useUserStore();
 let fileName = null;
 const uploadProgress = ref(0);
@@ -179,6 +179,7 @@ async function uploadData() {
          'genome_build': 'GRCh37',
          col_map
        });
+    await route.push({ path: "/" });
   } catch (error) {
     console.error("File upload failed:", error);
     throw error;

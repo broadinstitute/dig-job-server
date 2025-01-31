@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from typing import Optional
 
 import fastapi
@@ -24,6 +25,14 @@ def get_auth_backend() -> AuthBackend:
     return MySQLAuthBackend(get_db())
 
 
+_cookie_domain_cache = None
+
+def get_cookie_domain():
+    global _cookie_domain_cache
+    if _cookie_domain_cache is None:
+        _cookie_domain_cache = os.getenv('COOKIE_DOMAIN', 'localhost')
+    return _cookie_domain_cache
+
 @router.post("/login")
 async def login(response: Response, credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
     if not auth_backend.authenticate_user(credentials.username, credentials.password):
@@ -31,7 +40,7 @@ async def login(response: Response, credentials: UserCredentials, auth_backend: 
 
     response.set_cookie(key=JOB_SERVER_AUTH_COOKIE, httponly=True,
                         value=get_encoded_jwt_data(User(username=credentials.username)),
-                        domain='localhost', samesite='strict',
+                        domain=get_cookie_domain(), samesite='strict',
                         secure=False)
 
     access_token = create_access_token(data={"username": credentials.username})
@@ -111,7 +120,6 @@ async def finalize_upload(request: DatasetInfo, user: User = Depends(get_current
     s3_path = get_s3_path(request.name, user)
     s3.upload_metadata(request, s3_path)
     return Response(status_code=200)
-
 
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
