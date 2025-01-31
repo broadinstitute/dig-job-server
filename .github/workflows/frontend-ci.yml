@@ -20,29 +20,35 @@ jobs:
           node-version: "20"
 
       - name: Clear npm cache
+        working-directory: ./frontend
         run: npm cache clean --force
 
       - name: Remove node_modules and package-lock.json
+        working-directory: ./frontend
         run: rm -rf node_modules package-lock.json
 
       - name: Install dependencies
+        working-directory: ./frontend
         run: npm i
 
       - name: Run tests
+        working-directory: ./frontend
         run: npm run test
 
       - name: Create .env file
+        working-directory: ./frontend
         run: |
           echo "NUXT_PUBLIC_API_BASE_URL=https://api.ldserver.kpndataregistry.org" >> .env
 
       - name: Build
+        working-directory: ./frontend
         run: npx nuxt generate -v
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nuxt-build
-          path: .output/public
+          path: frontend/.output/public
 
 
   deploy:
