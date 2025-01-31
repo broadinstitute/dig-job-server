@@ -49,15 +49,14 @@ def restart(c):
 
     with c.cd(directory):
         # terminate running screen sessions
-        c.run(
-            f"screen -ls | grep -o '[0-9]*\.{screen_session}' | while read -r line; do screen -S \"${{line}}\" -X quit; done")
+        c.run(rf"screen -ls | grep -o '[0-9]*\.{screen_session}' | while read -r line; do screen -S \"${{line}}\" -X quit; done")
         c.run("python3 -m pip install -r requirements.txt")
         c.run(
             f"screen -dmS {screen_session} bash -c 'python3 -m job_server.server serve --port {port}'")
 
 
 def get_checkout_directory():
-    return "/home/ec2-user/lsserver-api"
+    return "/home/ec2-user/ldserver-api"
 
 
 @task
