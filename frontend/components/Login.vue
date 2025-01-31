@@ -14,7 +14,7 @@ const submitForm = async () => {
     try {
         await userStore.login(username.value, password.value);
         await userStore.isUserLoggedIn();
-        const defaultUrl = "/datasets";
+        const defaultUrl = "/";
         navigateTo(route.query.redirect ? route.query.redirect : defaultUrl);
     } catch (error) {
         console.log(error);

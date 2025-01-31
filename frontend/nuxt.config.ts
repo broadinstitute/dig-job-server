@@ -11,6 +11,9 @@ export default defineNuxtConfig({
     "@nuxt/devtools",
     "@primevue/nuxt-module",
   ],
+  app: {
+    buildAssetsDir: `/_nuxt/${Date.now()}/`,
+  },
   primevue: {
     options: {
       ripple: true,
