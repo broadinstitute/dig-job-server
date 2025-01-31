@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - "*"
-    tags:
-      - "V*.*.*"
+    paths:
+      - 'frontend/**'
 
 jobs:
   build:
@@ -60,9 +60,9 @@ jobs:
       - name: Clear Remote Directory
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.FRONT_END_DEPLOY_HOST }}
           username: ec2-user
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.FRONT_END_SSH_PRIVATE_KEY }}
           port: 22
           script: |
             rm -rf /home/ec2-user/ldserver-frontend/.output/*
@@ -70,9 +70,9 @@ jobs:
       - name: Deploy to Server
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.FRONT_END_DEPLOY_HOST }}
           username: ec2-user
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.FRONT_END_SSH_PRIVATE_KEY }}
           port: 22
           source: "*"
           debug: true
