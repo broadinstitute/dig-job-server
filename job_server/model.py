@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Union
 
 from pydantic import BaseModel
 
@@ -16,6 +17,7 @@ class DatasetInfo(BaseModel):
     ancestry: str
     separator: str
     genome_build: str
+    effective_n: Union[float, None]
     col_map: dict
 
 class AnalysisMethod(str, Enum):
