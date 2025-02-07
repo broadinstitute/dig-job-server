@@ -9,7 +9,6 @@ const password = ref("");
 const route = useRoute();
 const userStore = useUserStore();
 
-
 const submitForm = async () => {
     try {
         await userStore.login(username.value, password.value);
@@ -42,18 +41,21 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="flex align-items-center justify-content-center min-h-screen min-w-screen overflow-hidden">
+    <div
+        class="flex align-items-center justify-content-center min-h-screen min-w-screen overflow-hidden"
+    >
         <div class="flex flex-column align-items-center justify-content-center">
-
-                <div class="w-full surface-card" >
-                    <div class="text-center">
-                      <img src="/images/logo.png" alt="Logo"/>
-                    </div>
+            <div class="w-full surface-card">
+                <div class="text-center">
+                    <img src="/images/logo.png" alt="Logo" />
+                </div>
+                <form>
                     <div class="field">
                         <label
                             for="username"
                             class="block text-900 text-l font-medium mb-2"
-                            >Username</label>
+                            >Username</label
+                        >
                         <InputText
                             id="username"
                             autofocus
@@ -62,42 +64,44 @@ onMounted(() => {
                             placeholder="Enter username"
                             class="w-full"
                             style="padding: 1rem"
+                            autocomplete="username"
                         />
                     </div>
-                        <div class="field">
-                          <label
-                              for="password"
-                              class="block text-900 font-medium text-l mb-2"
-                          >Password</label>
-                          <Password
-                              id="password"
-                              v-model="password"
-                              placeholder="Enter password"
-                              :toggleMask="true"
-                              class="w-full"
-                              inputClass="w-full"
-                              :inputStyle="{ padding: '1rem' }"
-                              @keydown.enter="submitForm()"
-                              :feedback="false"
-                          ></Password>
-                        </div>
-
-
-                        <Button
-                            label="Sign In"
-                            class="w-full p-3 text-xl mt-3"
-                            icon="bi-person"
-                            @click="submitForm()"
-                        ></Button>
+                    <div class="field">
+                        <label
+                            for="password"
+                            class="block text-900 font-medium text-l mb-2"
+                            >Password</label
+                        >
+                        <Password
+                            id="password"
+                            v-model="password"
+                            placeholder="Enter password"
+                            :toggleMask="true"
+                            class="w-full"
+                            inputClass="w-full"
+                            :inputStyle="{ padding: '1rem' }"
+                            @keydown.enter="submitForm()"
+                            :feedback="false"
+                            autocomplete="current-password"
+                        ></Password>
                     </div>
-                </div>
+
+                    <Button
+                        label="Sign In"
+                        class="w-full p-3 text-xl mt-3"
+                        icon="bi-person"
+                        @click="submitForm()"
+                    ></Button>
+                </form>
             </div>
-        <Toast position="top-center" />
+        </div>
+    </div>
+    <Toast position="top-center" />
 </template>
 
 <style scoped>
 label {
     white-space: nowrap;
 }
-
 </style>
