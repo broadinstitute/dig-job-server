@@ -100,7 +100,6 @@
 import {useToast} from "primevue/usetoast";
 import {useUserStore} from "~/stores/UserStore";
 import axios from 'axios';
-const toast = useToast();
 const missingFileError = ref('');
 const fileInfo = ref({});
 const dataSetName = ref('');

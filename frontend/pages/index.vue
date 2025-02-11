@@ -1,9 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useUserStore } from "~/stores/UserStore.js";
+import {useToast} from "primevue/usetoast";
 const userStore = useUserStore();
 const router = useRouter();
-
+const toast = useToast();
 const datasets = ref([]);
 
 onMounted(async () => {
@@ -12,11 +13,13 @@ onMounted(async () => {
 
 async function runSumstats(dataset) {
   await userStore.startAnalysis(dataset, 'sumstats');
+  toast.add({severity: 'success', summary: 'Success', detail: 'sumstats started successfully'});
   console.log('Running sumstats for dataset:', dataset);
 }
 
 async function runSldsc(dataset) {
   await userStore.startAnalysis(dataset, 'sldsc');
+  toast.add({severity: 'success', summary: 'Success', detail: 'SLDSC started successfully'});
   console.log('Running sldsc for dataset:', dataset);
 }
 
@@ -36,5 +39,6 @@ async function runSldsc(dataset) {
       </Column>
     </DataTable>
    <Button @click="router.push('/upload')" icon="pi pi-upload" label="Upload Dataset"></Button>
+    <Toast position="top-center" />
   </div>
 </template>
