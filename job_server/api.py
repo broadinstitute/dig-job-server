@@ -2,14 +2,17 @@ import hashlib
 import io
 import json
 import os
+from functools import cache, lru_cache
 from typing import Optional
 
 import fastapi
 import re
+
+import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse, RedirectResponse
 
 from job_server import s3, file_utils, batch, database_utils
 from job_server.auth_backend import AuthBackend
@@ -160,17 +163,58 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
 def get_s3_results_path(dataset: str, user: User) -> str:
     return f"userdata/{user.username}/genetic/{dataset}/sldsc/sldsc"
 
-
-@router.get("/results/{dataset}")
-async def get_results(dataset: str, user: User = Depends(get_current_user)):
+@router.get("/download/{dataset}")
+async def download_hermes_file(dataset: str, user: User = Depends(get_current_user)):
     s3_path = get_s3_results_path(dataset, user)
-    output = []
+    df = get_cached_results(s3_path)
+    return Response(content=df.to_csv(sep='\t', index=False),
+                       media_type='text/tab-separated-values',
+                       headers={
+                           'Content-Disposition': f'attachment; filename="{dataset}_results.tsv"'
+                       })
+
+
+@lru_cache(maxsize=16)
+def get_cached_results(s3_path: str) -> pd.DataFrame:
     try:
         wrapped_text = io.TextIOWrapper(s3.get_results(s3_path)['Body'])
-        header = ['annotation', 'tissue', 'biosample', 'enrichment', 'pValue']
-        for line in wrapped_text:
-            output.append(dict(zip(header, line.strip().split('\t'))))
+        df = pd.read_csv(wrapped_text, sep='\t',
+                         names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
+        df['pValue'] = pd.to_numeric(df['pValue'])
+        return df
     except ClientError as e:
         raise fastapi.HTTPException(status_code=500, detail="Failed to fetch tissue results") from e
-    # TODO: Once the table is more reasonably sortable this won't be necessary
-    return sorted(output, key=lambda d: float(d['pValue']))
+
+@router.get("/results/{dataset}")
+async def get_results(
+        dataset: str,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user)
+
+    try:
+        df = get_cached_results(s3_path)
+
+        if sort_field:
+            ascending = sort_order == 1
+            df = df.sort_values(by=sort_field, ascending=ascending)
+        else:
+            df = df.sort_values(by='pValue')
+
+        total_records = len(df)
+
+        df = df.iloc[first:first + rows]
+
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records
+        })
+
+    except Exception as e:
+        raise fastapi.HTTPException(status_code=500, detail=str(e))
