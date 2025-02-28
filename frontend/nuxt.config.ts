@@ -10,6 +10,7 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "@nuxt/devtools",
     "@primevue/nuxt-module",
+    "nuxt-shiki",
   ],
   app: {
     buildAssetsDir: `/_nuxt/${Date.now()}/`,
@@ -47,6 +48,12 @@ export default defineNuxtConfig({
       apiBaseUrl: "",
       skipAuth: false,
     },
+  },
+  shiki: {
+    bundledLangs: [
+      "python",
+      "log",
+    ],
   },
 
 

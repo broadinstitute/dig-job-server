@@ -71,7 +71,15 @@ export const useUserStore = defineStore("UserStore", {
         async getResults(dataset){
             const {data} = await this.axios.get(`/api/results/${dataset}`);
             return data;
-        }
+        },
+        async deleteDataset(dataset){
+            await this.axios.delete(`/api/delete-dataset/${dataset}`);
+        },
+        async getLogInfo(job_id){
+            const {data} = await this.axios.get(`/api/log-info/${job_id}`);
+            return data;
+        },
+
     },
 });
 
