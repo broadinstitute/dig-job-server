@@ -1,9 +1,11 @@
+import asyncio
 import hashlib
 import io
 import json
 import os
+from asyncio import Queue
 from functools import cache, lru_cache
-from typing import Optional
+from typing import Optional, Dict
 
 import fastapi
 import re
@@ -11,6 +13,7 @@ import re
 import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
+from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse, RedirectResponse
 
@@ -141,6 +144,35 @@ async def delete_dataset(dataset: str, user: User = Depends(get_current_user)):
     database_utils.delete_dataset(get_db(), user.username, dataset)
     return Response(status_code=200)
 
+job_queues: Dict[str, Queue] = {}
+
+@router.get("/job-status/{job_id}")
+async def job_status(job_id: str):
+    if job_id not in job_queues:
+        job_queues[job_id] = Queue()
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(job_queues[job_id].get(), timeout=30.0)
+                    yield {
+                        "event": "message",
+                        "data": json.dumps(data)
+                    }
+                    if data["status"].endswith("SUCCEEDED") or data["status"].endswith("FAILED"):
+                        break
+                except asyncio.TimeoutError:
+                    yield {
+                        "event": "keepalive",
+                        "data": ""
+                    }
+        finally:
+            if job_queues.get(job_id) and job_queues[job_id].empty():
+                del job_queues[job_id]
+
+    return EventSourceResponse(event_generator())
+
 async def start_job(user: User, dataset: str, method: str, background_tasks: BackgroundTasks):
     database_utils.log_job_start(get_db(), user.username, dataset, f"RUNNING {method}")
     background_tasks.add_task(batch.submit_and_await_job, {
@@ -151,13 +183,16 @@ async def start_job(user: User, dataset: str, method: str, background_tasks: Bac
             'username': user.username,
             'dataset': dataset,
             'method': method
-        }}, user.username, dataset, method)
+        }}, user.username, dataset, method, job_queues)
 
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
                          user: User = Depends(get_current_user)):
+    job_id = database_utils.get_dataset_hash(request.dataset, user.username)
+    if job_id not in job_queues:
+        job_queues[job_id] = Queue()
     await start_job(user, request.dataset, request.method.value, background_tasks)
-    return Response(status_code=202)
+    return {"job_id": job_id}
 
 
 def get_s3_results_path(dataset: str, user: User) -> str:
