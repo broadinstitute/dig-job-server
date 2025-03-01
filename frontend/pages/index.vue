@@ -6,20 +6,71 @@ const userStore = useUserStore();
 const router = useRouter();
 const toast = useToast();
 const datasets = ref([]);
+const config = useRuntimeConfig();
+const eventSources = ref({});
 
 onMounted(async () => {
   datasets.value = await userStore.retrieveDatasets();
+  datasets.value.forEach(data => {
+    if (data.status?.includes('RUNNING')) {
+      console.log(`Connecting to running job for dataset: ${data.dataset}`);
+      listenForJobStatus(data.id, data);
+    }
+  });
 });
 
+onUnmounted(() => {
+  Object.values(eventSources.value).forEach(es => es.close());
+  eventSources.value = {};
+});
+
+const listenForJobStatus = (jobId, data) => {
+  // Close existing connection for this job if it exists
+  if (eventSources.value[jobId]) {
+    eventSources.value[jobId].close();
+  }
+
+  const eventSource = new EventSource(`${config.public.apiBaseUrl}/api/job-status/${jobId}`);
+  eventSources.value[jobId] = eventSource;
+
+  eventSource.onmessage = async (event) => {
+    if (!event.data) return; // Ignore keepalive messages
+
+    const statusData = JSON.parse(event.data);
+    console.log('Job status update:', statusData);
+
+    // Update the status in the datasets table
+    data.status = statusData.status;
+
+    if (statusData.status.endsWith('SUCCEEDED')) {
+      eventSource.close();
+      delete eventSources.value[jobId];
+      toast.add({severity: 'success', summary: 'Success', detail: `${statusData.method} completed successfully`});
+    } else if (statusData.status.endsWith('FAILED')) {
+      eventSource.close();
+      delete eventSources.value[jobId];
+      toast.add({severity: 'error', summary: 'Error', detail: `${statusData.method} failed`});
+    }
+  };
+
+  eventSource.onerror = (error) => {
+    console.error('EventSource failed:', error);
+    eventSource?.close();
+    delete eventSources.value[jobId];
+  };
+};
+
 async function runSumstats(data) {
-  await userStore.startAnalysis(data.dataset, 'sumstats');
+  const {job_id} = await userStore.startAnalysis(data.dataset, 'sumstats');
   data.status = "RUNNING sumstats";
+  listenForJobStatus(job_id, data);
   toast.add({severity: 'success', summary: 'Success', detail: 'sumstats started successfully'});
 }
 
 async function runSldsc(data) {
-  await userStore.startAnalysis(data.dataset, 'sldsc');
+  const {job_id} = await userStore.startAnalysis(data.dataset, 'sldsc');
   data.status = "RUNNING sldsc";
+  listenForJobStatus(job_id, data);
   toast.add({severity: 'success', summary: 'Success', detail: 'SLDSC started successfully'});
 }
 

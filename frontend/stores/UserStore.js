@@ -66,7 +66,8 @@ export const useUserStore = defineStore("UserStore", {
             await this.axios.post('/api/finalize-upload', JSON.stringify(dataset));
         },
         async startAnalysis(dataset, method){
-            await this.axios.post('/api/start-analysis', JSON.stringify({dataset, method}));
+            const {data} = await this.axios.post('/api/start-analysis', JSON.stringify({dataset, method}));
+            return data;
         },
         async deleteDataset(dataset){
             await this.axios.delete(`/api/delete-dataset/${dataset}`);
