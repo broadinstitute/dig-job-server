@@ -1,19 +1,27 @@
+import asyncio
+import hashlib
 import io
 import json
 import os
-from typing import Optional
+from asyncio import Queue
+from functools import cache, lru_cache
+from typing import Optional, Dict
 
 import fastapi
 import re
+
+import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
+from sse_starlette import EventSourceResponse
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse, RedirectResponse
 
-from job_server import s3, file_utils, batch
+from job_server import s3, file_utils, batch, database_utils
 from job_server.auth_backend import AuthBackend
 from job_server.jwt_utils import create_access_token, get_decoded_jwt_data, get_encoded_jwt_data
-from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest
+from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod
+from job_server.database import get_db
 
 router = fastapi.APIRouter()
 JOB_SERVER_AUTH_COOKIE = 'js_auth'
@@ -21,7 +29,6 @@ JOB_SERVER_AUTH_COOKIE = 'js_auth'
 def get_auth_backend() -> AuthBackend:
     # Replace with logic to select the appropriate backend
     from job_server.auth_mysql import MySQLAuthBackend
-    from job_server.database import get_db
     return MySQLAuthBackend(get_db())
 
 
@@ -76,7 +83,15 @@ def is_logged_in(user: User = Depends(get_current_user)):
 @router.get("/datasets")
 async def get_datasets(user: User = Depends(get_current_user)):
     data_set_folders = s3.get_datasets(user.username)
-    return [{'dataset': d} for d in data_set_folders]
+    jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
+    return [{'dataset': d,
+             'status': jobs_for_user.get(database_utils.get_dataset_hash(d, user.username), {}).get('status'),
+             'id': database_utils.get_dataset_hash(d, user.username)
+             } for d in data_set_folders]
+
+@router.get("/log-info/{job_id}")
+async def get_log_info(job_id: str, user: User = Depends(get_current_user)):
+    return database_utils.get_log_info(get_db(), user.username, job_id)
 
 @router.post("/preview-delimited-file")
 async def preview_file(file: UploadFile):
@@ -116,40 +131,125 @@ async def get_hermes_pre_signed_url(dataset: str, filename: str = Query(None), u
     return {"presigned_url": presigned_url, "s3_path": s3_path}
 
 @router.post("/finalize-upload")
-async def finalize_upload(request: DatasetInfo, user: User = Depends(get_current_user)):
+async def finalize_upload(request: DatasetInfo, background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
     s3_path = get_s3_path(request.name, user)
     s3.upload_metadata(request, s3_path)
+    await start_job(user, request.name, AnalysisMethod.sumstats.value, background_tasks)
     return Response(status_code=200)
 
-@router.post("/start-analysis")
-async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
-                         user: User = Depends(get_current_user)):
+@router.delete("/delete-dataset/{dataset}")
+async def delete_dataset(dataset: str, user: User = Depends(get_current_user)):
+    s3_path = get_s3_path(dataset, user).replace('/raw', '')
+    s3.clear_dir(s3_path)
+    database_utils.delete_dataset(get_db(), user.username, dataset)
+    return Response(status_code=200)
+
+job_queues: Dict[str, Queue] = {}
+
+@router.get("/job-status/{job_id}")
+async def job_status(job_id: str):
+    if job_id not in job_queues:
+        job_queues[job_id] = Queue()
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(job_queues[job_id].get(), timeout=30.0)
+                    yield {
+                        "event": "message",
+                        "data": json.dumps(data)
+                    }
+                    if data["status"].endswith("SUCCEEDED") or data["status"].endswith("FAILED"):
+                        break
+                except asyncio.TimeoutError:
+                    yield {
+                        "event": "keepalive",
+                        "data": ""
+                    }
+        finally:
+            if job_queues.get(job_id) and job_queues[job_id].empty():
+                del job_queues[job_id]
+
+    return EventSourceResponse(event_generator())
+
+async def start_job(user: User, dataset: str, method: str, background_tasks: BackgroundTasks):
+    database_utils.log_job_start(get_db(), user.username, dataset, f"RUNNING {method}")
     background_tasks.add_task(batch.submit_and_await_job, {
         'jobName': 'dig-ldsc-methods',
         'jobQueue': 'ldsc-methods-job-queue',
         'jobDefinition': 'dig-ldsc-methods',
         'parameters': {
             'username': user.username,
-            'dataset': request.dataset,
-            'method': request.method.value,
-        }})
-    return Response(status_code=202)
+            'dataset': dataset,
+            'method': method
+        }}, user.username, dataset, method, job_queues)
+
+@router.post("/start-analysis")
+async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
+                         user: User = Depends(get_current_user)):
+    job_id = database_utils.get_dataset_hash(request.dataset, user.username)
+    if job_id not in job_queues:
+        job_queues[job_id] = Queue()
+    await start_job(user, request.dataset, request.method.value, background_tasks)
+    return {"job_id": job_id}
 
 
 def get_s3_results_path(dataset: str, user: User) -> str:
     return f"userdata/{user.username}/genetic/{dataset}/sldsc/sldsc"
 
-
-@router.get("/results/{dataset}")
-async def get_results(dataset: str, user: User = Depends(get_current_user)):
+@router.get("/download/{dataset}")
+async def download_hermes_file(dataset: str, user: User = Depends(get_current_user)):
     s3_path = get_s3_results_path(dataset, user)
-    output = []
+    df = get_cached_results(s3_path)
+    return Response(content=df.to_csv(sep='\t', index=False),
+                       media_type='text/tab-separated-values',
+                       headers={
+                           'Content-Disposition': f'attachment; filename="{dataset}_results.tsv"'
+                       })
+
+
+@lru_cache(maxsize=16)
+def get_cached_results(s3_path: str) -> pd.DataFrame:
     try:
         wrapped_text = io.TextIOWrapper(s3.get_results(s3_path)['Body'])
-        header = ['annotation', 'tissue', 'biosample', 'enrichment', 'pValue']
-        for line in wrapped_text:
-            output.append(dict(zip(header, line.strip().split('\t'))))
+        df = pd.read_csv(wrapped_text, sep='\t',
+                         names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
+        df['pValue'] = pd.to_numeric(df['pValue'])
+        return df
     except ClientError as e:
         raise fastapi.HTTPException(status_code=500, detail="Failed to fetch tissue results") from e
-    # TODO: Once the table is more reasonably sortable this won't be necessary
-    return sorted(output, key=lambda d: float(d['pValue']))
+
+@router.get("/results/{dataset}")
+async def get_results(
+        dataset: str,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user)
+
+    try:
+        df = get_cached_results(s3_path)
+
+        if sort_field:
+            ascending = sort_order == 1
+            df = df.sort_values(by=sort_field, ascending=ascending)
+        else:
+            df = df.sort_values(by='pValue')
+
+        total_records = len(df)
+
+        df = df.iloc[first:first + rows]
+
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records
+        })
+
+    except Exception as e:
+        raise fastapi.HTTPException(status_code=500, detail=str(e))
