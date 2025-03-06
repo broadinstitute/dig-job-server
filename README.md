@@ -1,6 +1,6 @@
 # dig-job-server
 
-![Coverage](https://img.shields.io/badge/coverage-63%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-62%25-brightgreen)
 
 
 ## Project Setup and Running Server Locally
