@@ -52,10 +52,13 @@ export const useUserStore = defineStore("UserStore", {
             if (!this.axios) {
                 this.init();
             }
-            await this.axios.post(
+            const response = await this.axios.post(
                 "/api/login",
                 JSON.stringify({ username, password }),
             );
+            if (response.data && response.data.access_token) {
+                localStorage.setItem('authToken', response.data.access_token);
+            }
         },
         async getPresignedUrl(fileName, dataset){
             const {data} = await this.axios.get(`/api/get-pre-signed-url/${dataset}?filename=${fileName}`);
