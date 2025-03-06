@@ -19,7 +19,7 @@ from starlette.responses import Response, JSONResponse, RedirectResponse
 
 from job_server import s3, file_utils, batch, database_utils
 from job_server.auth_backend import AuthBackend
-from job_server.jwt_utils import create_access_token, get_decoded_jwt_data, get_encoded_jwt_data
+from job_server.jwt_utils import create_access_token, get_decoded_jwt_data
 from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod
 from job_server.database import get_db
 
@@ -31,14 +31,6 @@ def get_auth_backend() -> AuthBackend:
     from job_server.auth_mysql import MySQLAuthBackend
     return MySQLAuthBackend(get_db())
 
-
-_cookie_domain_cache = None
-
-def get_cookie_domain():
-    global _cookie_domain_cache
-    if _cookie_domain_cache is None:
-        _cookie_domain_cache = os.getenv('COOKIE_DOMAIN', 'localhost')
-    return _cookie_domain_cache
 
 @router.post("/login")
 async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
