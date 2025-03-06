@@ -41,26 +41,15 @@ def get_cookie_domain():
     return _cookie_domain_cache
 
 @router.post("/login")
-async def login(response: Response, credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
+async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depends(get_auth_backend)):
     if not auth_backend.authenticate_user(credentials.username, credentials.password):
         raise HTTPException(status_code=403, detail="Incorrect username or password")
-
-    response.set_cookie(key=JOB_SERVER_AUTH_COOKIE, httponly=True,
-                        value=get_encoded_jwt_data(User(username=credentials.username)),
-                        domain=get_cookie_domain(), samesite='strict',
-                        secure=False)
 
     access_token = create_access_token(data={"username": credentials.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 async def get_current_user(request: Request, authorization: Optional[str] = Header(None)):
-    auth_cookie = request.cookies.get(JOB_SERVER_AUTH_COOKIE)
-    if auth_cookie:
-        data = get_decoded_jwt_data(auth_cookie)
-        if data:
-            user = User(**data)
-            return user
 
     if authorization:
         schema, _, token = authorization.partition(' ')
@@ -68,6 +57,13 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
             data = get_decoded_jwt_data(token)
             if data:
                 return User(**data)
+
+    auth_cookie = request.cookies.get(JOB_SERVER_AUTH_COOKIE)
+    if auth_cookie:
+        data = get_decoded_jwt_data(auth_cookie)
+        if data:
+            user = User(**data)
+            return user
 
     raise fastapi.HTTPException(status_code=401, detail='Not logged in')
 
