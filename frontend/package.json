@@ -10,14 +10,14 @@
         "postinstall": "nuxt prepare"
     },
     "dependencies": {
-        "@pinia/nuxt": "^0.9.0",
-        "@primevue/themes": "^4.2.5",
-        "axios": "^1.7.9",
-        "nuxt": "^3.15.4",
+        "@pinia/nuxt": "^0.10.1",
+        "@primevue/themes": "^4.3.1",
+        "axios": "^1.8.2",
+        "nuxt": "^3.16.0",
         "nuxt-primevue": "^3.0.0",
-        "primeflex": "^3.3.1",
+        "primeflex": "^4.0.0",
         "primeicons": "^7.0.0",
-        "primevue": "^4.2.5",
+        "primevue": "^4.3.1",
         "vue": "latest",
         "vue-router": "latest"
     },
@@ -25,10 +25,10 @@
         "vue": "latest"
     },
     "devDependencies": {
-        "@primevue/nuxt-module": "^4.2.5",
+        "@primevue/nuxt-module": "^4.3.1",
         "autoprefixer": "^10.4.20",
-        "postcss": "^8.5.1",
-        "sass": "^1.84.0",
-        "sass-loader": "^16.0.4"
+        "postcss": "^8.5.3",
+        "sass": "^1.85.1",
+        "sass-loader": "^16.0.5"
     }
 }
