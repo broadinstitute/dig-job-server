@@ -49,7 +49,7 @@ onMounted(() => {
                 <div class="text-center">
                     <img src="/images/logo.png" alt="Logo" />
                 </div>
-                <form>
+                <form id="login-form" class="p-5">
                     <div class="field">
                         <label
                             for="username"
@@ -75,6 +75,7 @@ onMounted(() => {
                         >
                         <Password
                             id="password"
+                            type="password"
                             v-model="password"
                             placeholder="Enter password"
                             :toggleMask="true"
@@ -84,6 +85,7 @@ onMounted(() => {
                             @keydown.enter="submitForm()"
                             :feedback="false"
                             autocomplete="current-password"
+                            :inputProps="{ autocomplete: 'current-password' }"
                         ></Password>
                     </div>
 
