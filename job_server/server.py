@@ -15,7 +15,7 @@ def create_app():
     app = fastapi.FastAPI(title='Dig Job Server', redoc_url=None)
 
     for route in router.routes:
-        if route.name not in {'login'}:
+        if route.name not in {'login', 'job_status'}:
             route.dependencies.append(Depends(get_current_user))
 
     app.include_router(router, prefix='/api', tags=['api'])
@@ -38,6 +38,7 @@ def cli_serve(port):
     app = create_app()
     origins = [
         "http://localhost:3000",
+        "https://local.kpndataregistry.org:8000",
         "https://ldserver.kpndataregistry.org"
     ]
     app.add_middleware(
