@@ -24,6 +24,16 @@
                 option-label="name" placeholder="Select ancestry"/>
       </div>
       <div class="field">
+        <label for="effectiveN" class="block text-900 text-l font-medium mb-2">Effective N</label>
+        <InputText
+            id="effectiveN"
+            v-model="effectiveN"
+            type="number"
+            placeholder="Enter effective N(optional)"
+            class="w-full"
+        />
+      </div>
+      <div class="field">
         <label for="genomeBuild" class="block text-900 text-l font-medium mb-2">Genome Build</label>
         <Select id="genomeBuild" v-model="genomeBuild" :options="['GRCh37', 'GRCh38']" class="w-full"  placeholder="Select genome build"/>
       </div>
@@ -47,7 +57,8 @@
             :disabled="formIncomplete"
             @click="uploadData" />
         <p v-if="formIncomplete">{{`You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
-          includes ${requiredFields.join(", ")} and either beta or odds ratio before you can upload.`}}</p>
+          includes ${requiredFields.join(", ")} , and either beta or odds ratio.  You also must specify n in your column mapping
+          or provide an effective n before you can upload.`}}</p>
       </div>
 
     </div>
@@ -89,7 +100,6 @@
 import {useToast} from "primevue/usetoast";
 import {useUserStore} from "~/stores/UserStore";
 import axios from 'axios';
-const toast = useToast();
 const missingFileError = ref('');
 const fileInfo = ref({});
 const dataSetName = ref('');
@@ -102,6 +112,7 @@ let file = ref(null);
 const selectedFields = ref({});
 const missingMappingError = ref('');
 const ancestry = ref('');
+const effectiveN = ref(null);
 const genomeBuild = ref('');
 const ancestryOptions = [{'name': 'European', 'value': 'EUR'}, {'name': 'African', 'value': 'AFR'},
   {'name': 'East Asian', 'value': 'EAS'}, {'name': 'South Asian', 'value': 'SAS'}, {'name': 'Native American', 'value': 'AMR'}];
@@ -113,7 +124,7 @@ const colOptions = [{'name': 'chromosome', 'value': 'chromosome'},
 {'name': 'beta', 'value': 'beta'},
 {'name': 'oddsRatio', 'value': 'oddsRatio'},
 {'name': 'n', 'value': 'n'}];
-const requiredFields = ['chromosome', 'position', 'reference', 'alt', 'pValue', 'n'];
+const requiredFields = ['chromosome', 'position', 'reference', 'alt', 'pValue'];
 
 const tableRows = computed(() => {
   return fileInfo.value.columns
@@ -151,7 +162,9 @@ const colMap = computed(() => {
 const formIncomplete = computed(() => {
   return !file.value || !dataSetName.value
       || !requiredFields.every((field) => field in colMap.value && colMap.value[field])
-      || !('beta' in colMap.value || 'oddsRatio' in colMap.value) || !ancestry.value || !genomeBuild.value;
+      || !('beta' in colMap.value || 'oddsRatio' in colMap.value)
+      || !ancestry.value || !genomeBuild.value
+      || !('n' in colMap.value || effectiveN.value);
 });
 
 async function uploadData() {
@@ -175,6 +188,7 @@ async function uploadData() {
          'file': fileName,
          'name': dataSetName.value,
          'ancestry': ancestry.value,
+         'effective_n': effectiveN.value,
          'separator': fileInfo.value.delimiter,
          'genome_build': 'GRCh37',
          col_map

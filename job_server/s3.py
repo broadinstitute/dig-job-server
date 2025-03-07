@@ -38,3 +38,14 @@ def upload_metadata(metadata, path):
 def get_results(path):
     s3_client = boto3.client('s3')
     return s3_client.get_object(Bucket=BUCKET_NAME, Key=f"{path}/tissue.output.tsv")
+
+
+def clear_dir(s3_path):
+    s3 = boto3.client('s3')
+    paginator = s3.get_paginator('list_objects_v2')
+    page_iterator = paginator.paginate(Bucket=BUCKET_NAME, Prefix=s3_path)
+
+    for page in page_iterator:
+        if "Contents" in page:
+            delete_keys = {'Objects': [{'Key': obj['Key']} for obj in page['Contents']]}
+            s3.delete_objects(Bucket=BUCKET_NAME, Delete=delete_keys)
