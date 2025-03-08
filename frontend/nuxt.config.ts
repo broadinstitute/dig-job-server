@@ -1,11 +1,28 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import Lara from "@primeuix/themes/lara";
+import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
+const IndigoAura = definePreset(Aura, {
+    semantic: {
+        primary: {
+            50: "{indigo.50}",
+            100: "{indigo.100}",
+            200: "{indigo.200}",
+            300: "{indigo.300}",
+            400: "{indigo.400}",
+            500: "{indigo.500}",
+            600: "{indigo.600}",
+            700: "{indigo.700}",
+            800: "{indigo.800}",
+            900: "{indigo.900}",
+            950: "{indigo.950}",
+        },
+    },
+});
 export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
     devtools: { enabled: true },
     ssr: false,
-    css: ["primeflex/primeflex.scss", "primeicons/primeicons.css"],
+    css: ["primeicons/primeicons.css"],
     modules: [
         "@pinia/nuxt",
         "@nuxt/devtools",
@@ -19,28 +36,17 @@ export default defineNuxtConfig({
         options: {
             ripple: true,
             theme: {
-                preset: definePreset(Lara, {
-                    semantic: {
-                        primary: {
-                            50: "{stone.50}",
-                            100: "{stone.100}",
-                            200: "{stone.200}",
-                            300: "{stone.300}",
-                            400: "{stone.400}",
-                            500: "{stone.500}",
-                            600: "{stone.600}",
-                            700: "{stone.700}",
-                            800: "{stone.800}",
-                            900: "{stone.900}",
-                            950: "{stone.950}",
-                        },
-                    },
-                }),
+                preset: IndigoAura,
                 options: {
-                    // darkModeSelector: false
+                    darkModeSelector: "dark",
+                    cssLayer: {
+                        name: "primevue",
+                        //order: "tailwind-base, primevue, tailwind-utilities",
+                    },
                 },
             },
         },
+        autoImport: true,
     },
 
     runtimeConfig: {
