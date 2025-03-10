@@ -22,14 +22,20 @@ export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
     devtools: { enabled: true },
     ssr: false,
-    css: ["primeicons/primeicons.css"],
+    css: ["primeicons/primeicons.css", "~/assets/css/tailwind.css"],
     modules: [
         "@pinia/nuxt",
         "@nuxt/devtools",
         "@primevue/nuxt-module",
         "nuxt-shiki",
-        "@nuxtjs/tailwindcss",
+        //"@nuxtjs/tailwindcss", //not yet compatible with tailwind 4
     ],
+    postcss: {
+        plugins: {
+            "@tailwindcss/postcss": {},
+            autoprefixer: {},
+        },
+    },
     app: {
         buildAssetsDir: `/_nuxt/${Date.now()}/`,
     },
