@@ -28,6 +28,7 @@ export default defineNuxtConfig({
         "@nuxt/devtools",
         "@primevue/nuxt-module",
         "nuxt-shiki",
+        "@nuxtjs/tailwindcss",
     ],
     app: {
         buildAssetsDir: `/_nuxt/${Date.now()}/`,
@@ -38,10 +39,11 @@ export default defineNuxtConfig({
             theme: {
                 preset: IndigoAura,
                 options: {
-                    darkModeSelector: "dark",
+                    darkModeSelector: ".app-dark",
                     cssLayer: {
                         name: "primevue",
                         //order: "tailwind-base, primevue, tailwind-utilities",
+                        order: "theme, base, primevue",
                     },
                 },
             },
