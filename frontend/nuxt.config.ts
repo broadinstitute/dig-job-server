@@ -30,12 +30,7 @@ export default defineNuxtConfig({
         "nuxt-shiki",
         //"@nuxtjs/tailwindcss", //not yet compatible with tailwind 4
     ],
-    postcss: {
-        plugins: {
-            "@tailwindcss/postcss": {},
-            autoprefixer: {},
-        },
-    },
+
     app: {
         buildAssetsDir: `/_nuxt/${Date.now()}/`,
     },
@@ -65,5 +60,12 @@ export default defineNuxtConfig({
     },
     shiki: {
         bundledLangs: ["python", "log"],
+    },
+
+    postcss: {
+        plugins: {
+            "@tailwindcss/postcss": {},
+            autoprefixer: {},
+        },
     },
 });
