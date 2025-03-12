@@ -12,6 +12,7 @@
     "dependencies": {
         "@pinia/nuxt": "^0.10.1",
         "@primeuix/themes": "^1.0.0",
+        "@primevue/forms": "^4.3.2",
         "axios": "^1.8.2",
         "nuxt": "^3.16.0",
         "nuxt-primevue": "^3.0.0",
