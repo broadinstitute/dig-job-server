@@ -80,6 +80,7 @@ async function runSumstats(data) {
         severity: "success",
         summary: "Success",
         detail: "sumstats started successfully",
+        life: 5000,
     });
 }
 
@@ -91,6 +92,7 @@ async function runSldsc(data) {
         severity: "success",
         summary: "Success",
         detail: "SLDSC started successfully",
+        life: 5000,
     });
 }
 
@@ -103,6 +105,7 @@ async function handleDelete(dataSet) {
         severity: "success",
         summary: "Success",
         detail: "Dataset deleted successfully",
+        life: 5000,
     });
 }
 </script>
@@ -126,31 +129,23 @@ async function handleDelete(dataSet) {
                         rowHover
                         :rows="10"
                         :rowsPerPageOptions="[5, 10, 20]"
+                        stripedRows
                     >
-                        <Column field="dataset" header="Dataset Name"></Column>
+                        <Column field="dataset" header="Dataset"></Column>
                         <Column header="Uploader">
                             <template #body="{ data }">
                                 {{ data.uploader }}
                             </template>
                         </Column>
-                        <Column header="Analysis">
+                        <Column header="Uploaded At">
                             <template #body="{ data }">
-                                <span>
-                                    <Button
-                                        v-if="!data.status"
-                                        @click.prevent="runSumstats(data)"
-                                        label="Run Sum Stats"
-                                        size="small"
-                                    ></Button>
-                                    <Button
-                                        v-if="
-                                            data.status === 'sumstats SUCCEEDED'
-                                        "
-                                        @click.prevent="runSldsc(data)"
-                                        label="Run SLDSC"
-                                        size="small"
-                                    ></Button>
-                                </span>
+                                {{
+                                    data.uploaded_at
+                                        ? new Date(
+                                              data.uploaded_at,
+                                          ).toLocaleString()
+                                        : ""
+                                }}
                             </template>
                         </Column>
                         <Column header="Status">
@@ -174,6 +169,7 @@ async function handleDelete(dataSet) {
                                                     ? 'success'
                                                     : 'danger'
                                             "
+                                            rounded
                                         >
                                             {{ data.status }}
                                         </Tag>
@@ -184,21 +180,41 @@ async function handleDelete(dataSet) {
                                 </template>
                             </template>
                         </Column>
-                        <Column header="Results">
+                        <Column header="Analysis">
                             <template #body="{ data }">
-                                <Button
-                                    v-if="data.status === 'sldsc SUCCEEDED'"
-                                    @click="
-                                        router.push(
-                                            `/results?dataset=${data.dataset}`,
-                                        )
-                                    "
-                                    label="View"
-                                    size="small"
-                                    outlined
-                                ></Button>
+                                <span>
+                                    <Button
+                                        v-if="!data.status"
+                                        @click.prevent="runSumstats(data)"
+                                        label="Run Sum Stats"
+                                        size="small"
+                                        icon="pi pi-play"
+                                    ></Button>
+                                    <Button
+                                        v-if="
+                                            data.status === 'sumstats SUCCEEDED'
+                                        "
+                                        @click.prevent="runSldsc(data)"
+                                        label="Run SLDSC"
+                                        size="small"
+                                        icon="pi pi-forward"
+                                    ></Button>
+                                    <Button
+                                        v-if="data.status === 'sldsc SUCCEEDED'"
+                                        @click="
+                                            router.push(
+                                                `/results?dataset=${data.dataset}`,
+                                            )
+                                        "
+                                        label="View Results"
+                                        size="small"
+                                        outlined
+                                        icon="pi pi-eye"
+                                    ></Button>
+                                </span>
                             </template>
                         </Column>
+
                         <Column header="Delete" :style="{ width: '8rem' }">
                             <template #body="{ data }">
                                 <Button

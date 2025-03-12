@@ -36,7 +36,14 @@
                             />
                         </div>
                     </template>
-                    <Column field="annotation" header="Annotation" sortable />
+                    <Column field="annotation" header="Annotation" sortable>
+                        <template #body="{ data }">
+                            <Chip
+                                :label="data.annotation"
+                                :class="'chip_' + data.annotation"
+                            />
+                        </template>
+                    </Column>
                     <Column field="tissue" header="Tissue" sortable />
                     <Column field="biosample" header="Biosample" sortable />
                     <Column field="enrichment" header="Enrichment" sortable>
@@ -152,5 +159,34 @@ onMounted(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+/* Annotation chip colors */
+:deep(.chip_binding_sites) {
+    border: 2px solid #2196f3;
+    color: #2196f3;
+    background-color: transparent;
+    padding-block: 0.125rem;
+}
+
+:deep(.chip_accessible_chromatin) {
+    border: 2px solid #4caf50;
+    color: #4caf50;
+    background-color: transparent;
+    padding-block: 0.125rem;
+}
+
+:deep(.chip_enhancer) {
+    border: 2px solid #ff9800;
+    color: #ff9800;
+    background-color: transparent;
+    padding-block: 0.125rem;
+}
+
+:deep(.chip_promoter) {
+    border: 2px solid #e91e63;
+    color: #e91e63;
+    background-color: transparent;
+    padding-block: 0.125rem;
 }
 </style>
