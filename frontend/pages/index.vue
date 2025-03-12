@@ -119,24 +119,18 @@ async function handleDelete(dataSet) {
                     ></Button>
                 </template>
                 <template #content>
-                    <DataTable :value="datasets" class="mb-3">
+                    <DataTable
+                        :value="datasets"
+                        class="mb-3"
+                        :paginator="true"
+                        rowHover
+                        :rows="10"
+                        :rowsPerPageOptions="[5, 10, 20]"
+                    >
                         <Column field="dataset" header="Dataset Name"></Column>
-                        <Column header="Status">
+                        <Column header="Uploader">
                             <template #body="{ data }">
-                                <template
-                                    v-if="
-                                        data.status &&
-                                        (data.status.endsWith('SUCCEEDED') ||
-                                            data.status.endsWith('FAILED'))
-                                    "
-                                >
-                                    <router-link :to="`/log/${data.id}`">{{
-                                        data.status
-                                    }}</router-link>
-                                </template>
-                                <template v-else>
-                                    {{ data.status }}
-                                </template>
+                                {{ data.uploader }}
                             </template>
                         </Column>
                         <Column header="Analysis">
@@ -146,6 +140,7 @@ async function handleDelete(dataSet) {
                                         v-if="!data.status"
                                         @click.prevent="runSumstats(data)"
                                         label="Run Sum Stats"
+                                        size="small"
                                     ></Button>
                                     <Button
                                         v-if="
@@ -153,26 +148,66 @@ async function handleDelete(dataSet) {
                                         "
                                         @click.prevent="runSldsc(data)"
                                         label="Run SLDSC"
-                                    ></Button>
-                                    <Button
-                                        v-if="data.status === 'sldsc SUCCEEDED'"
-                                        @click="
-                                            router.push(
-                                                `/results?dataset=${data.dataset}`,
-                                            )
-                                        "
-                                        label="Results"
+                                        size="small"
                                     ></Button>
                                 </span>
                             </template>
                         </Column>
-                        <Column header="" :style="{ width: '8rem' }">
+                        <Column header="Status">
+                            <template #body="{ data }">
+                                <template
+                                    v-if="
+                                        data.status &&
+                                        (data.status.endsWith('SUCCEEDED') ||
+                                            data.status.endsWith('FAILED'))
+                                    "
+                                >
+                                    <router-link
+                                        :to="`/log/${data.id}`"
+                                        v-tooltip.top="'View log'"
+                                    >
+                                        <Tag
+                                            :severity="
+                                                data.status.endsWith(
+                                                    'SUCCEEDED',
+                                                )
+                                                    ? 'success'
+                                                    : 'danger'
+                                            "
+                                        >
+                                            {{ data.status }}
+                                        </Tag>
+                                    </router-link>
+                                </template>
+                                <template v-else>
+                                    {{ data.status }}
+                                </template>
+                            </template>
+                        </Column>
+                        <Column header="Results">
+                            <template #body="{ data }">
+                                <Button
+                                    v-if="data.status === 'sldsc SUCCEEDED'"
+                                    @click="
+                                        router.push(
+                                            `/results?dataset=${data.dataset}`,
+                                        )
+                                    "
+                                    label="View"
+                                    size="small"
+                                    outlined
+                                ></Button>
+                            </template>
+                        </Column>
+                        <Column header="Delete" :style="{ width: '8rem' }">
                             <template #body="{ data }">
                                 <Button
                                     icon="pi pi-trash"
                                     size="small"
                                     @click="handleDelete(data.dataset)"
-                                    v-tooltip.top="'Delete Dataset'"
+                                    v-tooltip.top="'Delete this dataset?'"
+                                    outlined
+                                    severity="danger"
                                 />
                             </template>
                         </Column>
