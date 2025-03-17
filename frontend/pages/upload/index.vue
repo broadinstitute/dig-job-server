@@ -1,157 +1,191 @@
 <template>
-    <Form v-slot="$form">
-        <div v-if="uploadProgress > 0" class="overlay">
-            <div class="content">
-                <ProgressBar :value="uploadProgress" class="progress-bar" />
-                <p class="text-white">Uploading...</p>
-            </div>
-        </div>
-
-        <div class="grid">
-            <div class="col p-8">
-                <Card>
-                    <template #header>
-                        <h1 class="text-900 text-3xl font-bold">
-                            Upload Dataset
-                        </h1>
-                    </template>
+    <!-- Fix the container width and ensure proper display -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <Stepper value="1" class="basis-[50rem] my-6" linear>
+            <StepList>
+                <Step value="1">Enter Metadata</Step>
+                <Step value="2">Select File</Step>
+                <Step value="3">Map Columns</Step>
+                <Step value="4">Upload</Step>
+            </StepList>
+        </Stepper>
+        <!-- Improved flex container with more explicit responsive control -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Left Column -->
+            <div class="col-span-1">
+                <Card class="h-full shadow-sm">
                     <template #content>
-                        <div class="field">
-                            <label
-                                for="dataset"
-                                class="block text-900 text-l font-medium mb-2"
-                                >Dataset Name</label
-                            >
-                            <InputText
-                                id="dataset"
-                                autofocus
-                                type="text"
-                                v-model="dataSetName"
-                                placeholder="Enter dataset name"
+                        <Fieldset legend="Metadata" class="mb-4">
+                            <div class="field">
+                                <label
+                                    for="dataset"
+                                    class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
+                                    >Dataset Name</label
+                                >
+                                <InputText
+                                    id="dataset"
+                                    autofocus
+                                    type="text"
+                                    v-model="dataSetName"
+                                    placeholder="Enter dataset name"
+                                    class="w-full"
+                                />
+                            </div>
+                            <div class="field">
+                                <label
+                                    for="ancestry"
+                                    class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
+                                    >Ancestry</label
+                                >
+                                <Select
+                                    id="ancestry"
+                                    v-model="ancestry"
+                                    :options="ancestryOptions"
+                                    class="w-full"
+                                    option-value="value"
+                                    option-label="name"
+                                    placeholder="Select ancestry"
+                                />
+                            </div>
+                            <div class="field">
+                                <label
+                                    for="effectiveN"
+                                    class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
+                                    >Effective N</label
+                                >
+                                <InputText
+                                    id="effectiveN"
+                                    v-model="effectiveN"
+                                    type="number"
+                                    placeholder="Enter effective N(optional)"
+                                    class="w-full"
+                                />
+                            </div>
+                            <div class="field">
+                                <label
+                                    for="genomeBuild"
+                                    class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
+                                    >Genome Build</label
+                                >
+                                <Select
+                                    id="genomeBuild"
+                                    v-model="genomeBuild"
+                                    :options="['GRCh37', 'GRCh38']"
+                                    class="w-full"
+                                    placeholder="Select genome build"
+                                />
+                            </div>
+                        </Fieldset>
+                        <Fieldset legend="File Upload" class="mb-4">
+                            <div class="field">
+                                <label
+                                    for="file"
+                                    class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
+                                    >Select a file</label
+                                >
+                                <FileUpload
+                                    id="file"
+                                    accept=".csv, .tsv, .gz, .bgzip, .gzip"
+                                    @select="sampleFile"
+                                    @clear="resetFile"
+                                    @remove="resetFile"
+                                    :previewWidth="0"
+                                    :show-upload-button="false"
+                                    class="file-upload"
+                                />
+                            </div>
+                        </Fieldset>
+                    </template>
+                </Card>
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-span-1">
+                <Card class="h-full shadow-sm">
+                    <template #content>
+                        <Fieldset legend="Column Mapping" class="mb-4">
+                            <DataTable
+                                :value="tableRows"
+                                v-if="fileInfo.columns"
+                                rowHover
                                 class="w-full"
-                            />
-                        </div>
-                        <div class="field">
-                            <label
-                                for="ancestry"
-                                class="block text-900 text-l font-medium mb-2"
-                                >Ancestry</label
+                                responsiveLayout="scroll"
                             >
-                            <Select
-                                id="ancestry"
-                                v-model="ancestry"
-                                :options="ancestryOptions"
-                                class="w-full"
-                                option-value="value"
-                                option-label="name"
-                                placeholder="Select ancestry"
-                            />
-                        </div>
-                        <div class="field">
-                            <label
-                                for="effectiveN"
-                                class="block text-900 text-l font-medium mb-2"
-                                >Effective N</label
+                                <Column
+                                    field="column"
+                                    header="Column"
+                                    class="col-span-4"
+                                ></Column>
+                                <Column header=">>" class="col-span-1"></Column>
+                                <Column header="Represents" class="col-span-7">
+                                    <template #body="{ data }">
+                                        <Dropdown
+                                            data-cy="column-dropdown"
+                                            class="w-full"
+                                            :options="colOptions"
+                                            option-label="name"
+                                            option-value="value"
+                                            :option-disabled="
+                                                (option) => {
+                                                    return (
+                                                        Object.values(
+                                                            selectedFields,
+                                                        ).includes(
+                                                            option.value,
+                                                        ) &&
+                                                        option.value !==
+                                                            selectedFields[
+                                                                data.column
+                                                            ]
+                                                    );
+                                                }
+                                            "
+                                            v-model="
+                                                selectedFields[data.column]
+                                            "
+                                            showClear
+                                        />
+                                    </template>
+                                </Column>
+                            </DataTable>
+                            <div
+                                v-if="!fileInfo.columns"
+                                class="p-4 text-center text-gray-500"
                             >
-                            <InputText
-                                id="effectiveN"
-                                v-model="effectiveN"
-                                type="number"
-                                placeholder="Enter effective N(optional)"
-                                class="w-full"
-                            />
-                        </div>
+                                <i class="pi pi-file text-3xl mb-2"></i>
+                                <p>Upload a file to map columns</p>
+                            </div>
+                        </Fieldset>
                         <div class="field">
-                            <label
-                                for="genomeBuild"
-                                class="block text-900 text-l font-medium mb-2"
-                                >Genome Build</label
-                            >
-                            <Select
-                                id="genomeBuild"
-                                v-model="genomeBuild"
-                                :options="['GRCh37', 'GRCh38']"
-                                class="w-full"
-                                placeholder="Select genome build"
-                            />
-                        </div>
-                        <div class="field">
-                            <label
-                                for="file"
-                                class="block text-900 text-l font-medium mb-2"
-                                >File</label
-                            >
-                            <FileUpload
-                                id="file"
-                                accept=".csv, .tsv, .gz, .bgzip, .gzip"
-                                @select="sampleFile"
-                                @clear="resetFile"
-                                @remove="resetFile"
-                                :previewWidth="0"
-                                :show-upload-button="false"
-                                class="file-upload"
-                            />
-                        </div>
-                        <div class="field">
+                            <p v-if="formIncomplete" class="mb-2 text-sm">
+                                {{
+                                    `You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
+              includes ${requiredFields.join(
+                  ", ",
+              )} , and either beta or odds ratio.  You also must specify n in your column mapping
+              or provide an effective n before you can upload.`
+                                }}
+                            </p>
                             <Button
                                 label="Upload Dataset"
-                                class="w-full p-3 text-xl mt-3"
+                                class="w-full mt-4"
                                 icon="pi pi-upload"
                                 :disabled="formIncomplete"
                                 @click="uploadData"
                             />
-                            <p v-if="formIncomplete">
-                                {{
-                                    `You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
-          includes ${requiredFields.join(
-              ", ",
-          )} , and either beta or odds ratio.  You also must specify n in your column mapping
-          or provide an effective n before you can upload.`
-                                }}
-                            </p>
                         </div>
                     </template>
                 </Card>
             </div>
-            <div class="col p-8">
-                <DataTable :value="tableRows" v-if="fileInfo.columns" rowHover>
-                    <Column
-                        field="column"
-                        header="Column"
-                        class="col-4"
-                    ></Column>
-                    <Column header=">>" class="col-1"></Column>
-                    <Column header="Represents" class="col-7">
-                        <template #body="{ data }">
-                            <Dropdown
-                                data-cy="column-dropdown"
-                                class="w-full"
-                                :options="colOptions"
-                                option-label="name"
-                                option-value="value"
-                                :option-disabled="
-                                    (option) => {
-                                        return (
-                                            Object.values(
-                                                selectedFields,
-                                            ).includes(option.value) &&
-                                            option.value !==
-                                                selectedFields[data.column]
-                                        );
-                                    }
-                                "
-                                v-model="selectedFields[data.column]"
-                                showClear
-                            />
-                        </template>
-                    </Column>
-                </DataTable>
-            </div>
         </div>
-        <Fieldset legend="Form States" class="h-80 overflow-auto">
-            <pre class="whitespace-pre-wrap">{{ $form }}</pre>
-        </Fieldset>
-    </Form>
+    </div>
+
+    <div v-if="uploadProgress > 0" class="overlay">
+        <div class="content">
+            <ProgressBar :value="uploadProgress" class="progress-bar" />
+            <p class="text-white">Uploading...</p>
+        </div>
+    </div>
 </template>
 
 <script setup>
@@ -332,5 +366,44 @@ async function sampleFile(e) {
 
 .text-white {
     color: white;
+}
+
+/* Force column sizing for PrimeVue tables */
+:deep(.p-datatable-wrapper) {
+    overflow-x: auto;
+}
+
+/* Make sure the Card components take the full height */
+:deep(.p-card) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+:deep(.p-card-body) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+:deep(.p-card-content) {
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .grid-cols-1 > div {
+        margin-bottom: 1.5rem;
+    }
+}
+
+.card {
+    background: var(--surface-card);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-radius: var(--content-border-radius);
+
+    &:last-child {
+        margin-bottom: 0;
+    }
 }
 </style>

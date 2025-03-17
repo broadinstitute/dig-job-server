@@ -2,13 +2,28 @@
     <div class="results-container">
         <div
             v-if="error"
-            class="error-message p-4 bg-red-100 text-red-700 rounded"
+            class="error-message p-6 bg-red-100 text-red-700 rounded"
         >
             {{ error }}
             <Button label="Retry" @click="loadResults" class="ml-2" />
         </div>
+
+        <div>
+            <h2 class="text-2xl font-bold mb-4 text-center">
+                Analysis Results for Dataset: {{ dataset }}
+            </h2>
+        </div>
+
+        <div class="text-end pb-6">
+            <Button
+                icon="pi pi-download"
+                label="Download Results"
+                @click="openDownloadLink"
+                size="small"
+            />
+        </div>
+
         <Card>
-            <template #title>Results</template>
             <template #content>
                 <DataTable
                     :first="first"
@@ -27,15 +42,6 @@
                     stripedRows
                     class="p-datatable-sm"
                 >
-                    <template #header>
-                        <div class="text-end pb-4">
-                            <Button
-                                icon="pi pi-external-link"
-                                label="Export"
-                                @click="openDownloadLink"
-                            />
-                        </div>
-                    </template>
                     <Column field="annotation" header="Annotation" sortable>
                         <template #body="{ data }">
                             <Chip
