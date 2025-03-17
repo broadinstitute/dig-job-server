@@ -110,26 +110,31 @@ async function handleDelete(dataSet) {
 }
 </script>
 <template>
-    <div class="grid grid-cols-12 gap-4">
-        <div class="col-span-8">
+    <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 my-6">
+        <div class="col-span-12">
             <Toast position="top-center" />
-            <Card class="form col-start-2 col-span-2">
-                <template #header>
-                    <Button
-                        @click="router.push('/upload')"
-                        icon="pi pi-upload"
-                        label="Upload Dataset"
-                    ></Button>
-                </template>
+            <h2 class="text-2xl font-bold text-center mb-4">Datasets</h2>
+            <div class="flex justify-between items-center">
+                <Button
+                    @click="router.push('/upload')"
+                    icon="pi pi-upload"
+                    label="Upload Dataset"
+                    size="small"
+                    class="mx-4"
+                ></Button>
+            </div>
+            <Card class="m-4">
+                <template #header> </template>
                 <template #content>
                     <DataTable
                         :value="datasets"
-                        class="mb-3"
+                        class="mb-4"
                         :paginator="true"
                         rowHover
                         :rows="10"
                         :rowsPerPageOptions="[5, 10, 20]"
                         stripedRows
+                        size="small"
                     >
                         <Column field="dataset" header="Dataset"></Column>
                         <Column header="Uploader">
@@ -163,11 +168,14 @@ async function handleDelete(dataSet) {
                                     >
                                         <Tag
                                             :severity="
-                                                data.status.endsWith(
-                                                    'SUCCEEDED',
-                                                )
-                                                    ? 'success'
-                                                    : 'danger'
+                                                data.status ===
+                                                'sumstats SUCCEEDED'
+                                                    ? 'info'
+                                                    : data.status.endsWith(
+                                                            'SUCCEEDED',
+                                                        )
+                                                      ? 'success'
+                                                      : 'danger'
                                             "
                                             rounded
                                         >

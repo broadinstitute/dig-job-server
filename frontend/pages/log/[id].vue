@@ -17,7 +17,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="columns-1 mt-4">
+    <div class="columns-1 mt-6">
         <Card>
             <template #title>Log Output</template>
             <template #content>

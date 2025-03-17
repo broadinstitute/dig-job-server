@@ -42,18 +42,18 @@ onMounted(() => {
 
 <template>
     <div
-        class="flex align-items-center justify-content-center min-h-screen min-w-screen overflow-hidden"
+        class="flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden"
     >
-        <div class="flex flex-column align-items-center justify-content-center">
-            <div class="w-full surface-card">
+        <div class="flex flex-col items-center justify-center">
+            <div class="w-full bg-surface-0 dark:bg-surface-900">
                 <div class="text-center">
                     <img src="/images/logo.png" alt="Logo" />
                 </div>
-                <form id="login-form" class="p-5">
+                <form id="login-form" class="p-8">
                     <div class="field">
                         <label
                             for="username"
-                            class="block text-900 text-l font-medium mb-2"
+                            class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
                             >Username</label
                         >
                         <InputText
@@ -70,7 +70,7 @@ onMounted(() => {
                     <div class="field">
                         <label
                             for="password"
-                            class="block text-900 font-medium text-l mb-2"
+                            class="block text-surface-900 dark:text-surface-0 font-medium text-l mb-2"
                             >Password</label
                         >
                         <Password
@@ -91,7 +91,7 @@ onMounted(() => {
 
                     <Button
                         label="Sign In"
-                        class="w-full p-3 text-xl mt-3"
+                        class="w-full p-4 text-xl mt-4"
                         icon="bi-person"
                         @click="submitForm()"
                     ></Button>
