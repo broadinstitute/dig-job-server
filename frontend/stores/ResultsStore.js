@@ -62,7 +62,7 @@ export const useResultsStore = defineStore("results", {
                 }
 
                 const queryParams = new URLSearchParams({
-                    offset: params.first || 0,
+                    first: params.first || 0,
                     limit: params.rows || 10,
                     sort_field: params.sort_field || "pValue",
                     sort_order: params.sort_order || -1,
