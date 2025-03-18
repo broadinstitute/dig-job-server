@@ -57,7 +57,7 @@
                         :showFilterMenu="false"
                     >
                         <template #filter="{ filterModel }">
-                            <Dropdown
+                            <Select
                                 v-model="filters['annotation'].value"
                                 :options="annotationOptions"
                                 optionLabel="label"
@@ -82,7 +82,7 @@
                         :showFilterMenu="false"
                     >
                         <template #filter="{ filterModel }">
-                            <Dropdown
+                            <Select
                                 v-model="filters['tissue'].value"
                                 :options="tissueOptions"
                                 optionLabel="label"
@@ -168,11 +168,6 @@ import { ref, onMounted, computed } from "vue";
 import { useResultsStore } from "~/stores/ResultsStore.js";
 const route = useRoute();
 import { storeToRefs } from "pinia";
-import Column from "primevue/column";
-import Button from "primevue/button";
-import InputText from "primevue/inputtext";
-import InputNumber from "primevue/inputnumber";
-import Dropdown from "primevue/dropdown";
 
 const resultsStore = useResultsStore();
 const {
@@ -336,12 +331,12 @@ onMounted(() => {
     font-size: 0.875rem;
 }
 
-:deep(.p-dropdown-label) {
+:deep(.p-select-label) {
     text-overflow: ellipsis;
     font-size: 0.875rem;
 }
 
-:deep(.p-dropdown-panel .p-dropdown-items) {
+:deep(.p-select-panel .p-select-items) {
     font-size: 0.875rem;
 }
 
