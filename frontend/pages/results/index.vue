@@ -39,10 +39,34 @@
                     :rows-per-page-options="[10, 20, 50]"
                     @page="onPage"
                     @sort="onSort"
+                    :filters="filters"
+                    @filter="onFilter"
                     stripedRows
                     class="p-datatable-sm"
+                    filterDisplay="row"
+                    :showFilterOperator="false"
+                    :showFilterMatchModes="false"
+                    :showFilterMenu="false"
+                    :showClearButton="false"
                 >
-                    <Column field="annotation" header="Annotation" sortable>
+                    <Column
+                        field="annotation"
+                        header="Annotation"
+                        sortable
+                        filterMatchMode="equals"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <Dropdown
+                                v-model="filters['annotation'].value"
+                                :options="annotationOptions"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Select annotation"
+                                class="p-column-filter w-full"
+                                @change="onFilter"
+                            />
+                        </template>
                         <template #body="{ data }">
                             <Chip
                                 :label="data.annotation"
@@ -50,18 +74,89 @@
                             />
                         </template>
                     </Column>
-                    <Column field="tissue" header="Tissue" sortable />
-                    <Column field="biosample" header="Biosample" sortable />
-                    <Column field="enrichment" header="Enrichment" sortable>
+                    <Column
+                        field="tissue"
+                        header="Tissue"
+                        sortable
+                        filterMatchMode="equals"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <Dropdown
+                                v-model="filters['tissue'].value"
+                                :options="tissueOptions"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Select tissue"
+                                class="p-column-filter w-full"
+                                @change="onFilter"
+                            />
+                        </template>
+                    </Column>
+                    <Column
+                        field="biosample"
+                        header="Biosample"
+                        sortable
+                        filterMatchMode="contains"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <InputText
+                                v-model="filters['biosample'].value"
+                                type="text"
+                                class="p-column-filter"
+                                placeholder="Search biosample"
+                            />
+                        </template>
+                    </Column>
+                    <Column
+                        field="enrichment"
+                        header="Enrichment"
+                        sortable
+                        filterMatchMode="lte"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <div class="flex items-center gap-2">
+                                <InputNumber
+                                    v-model="filters['enrichment'].value"
+                                    placeholder="≤ Value"
+                                    class="p-column-filter w-full"
+                                />
+                            </div>
+                        </template>
                         <template #body="slotProps">
                             {{ formatNumber(slotProps.data.enrichment) }}
                         </template>
                     </Column>
-                    <Column field="pValue" header="P-Value" sortable>
+                    <Column
+                        field="pValue"
+                        header="P-Value"
+                        sortable
+                        filterMatchMode="lte"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <div class="flex items-center gap-2">
+                                <InputNumber
+                                    inputId="pValue"
+                                    v-model="filters['pValue'].value"
+                                    placeholder="≤ Value"
+                                    class="p-column-filter w-full"
+                                />
+                            </div>
+                        </template>
                         <template #body="slotProps">
                             {{ formatPValue(slotProps.data.pValue) }}
                         </template>
                     </Column>
+
+                    <template #empty>
+                        <div class="text-center p-4">No results found.</div>
+                    </template>
+                    <template #loading>
+                        <div class="text-center p-4">Loading data...</div>
+                    </template>
                 </DataTable>
             </template>
         </Card>
@@ -69,12 +164,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useResultsStore } from "~/stores/ResultsStore.js";
 const route = useRoute();
 import { storeToRefs } from "pinia";
 import Column from "primevue/column";
 import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import InputNumber from "primevue/inputnumber";
+import Dropdown from "primevue/dropdown";
 
 const resultsStore = useResultsStore();
 const {
@@ -114,6 +212,41 @@ const formatPValue = (value) => {
     return value.toFixed(3);
 };
 
+// Define options for dropdowns
+const annotationOptions = ref([
+    { label: "All Annotations", value: null },
+    { label: "Binding Sites", value: "binding_sites" },
+    { label: "Accessible Chromatin", value: "accessible_chromatin" },
+    { label: "Enhancer", value: "enhancer" },
+    { label: "Promoter", value: "promoter" },
+]);
+
+// Get unique tissues from results
+const tissueOptions = computed(() => {
+    if (!results.value?.length) return [{ label: "All Tissues", value: null }];
+
+    const uniqueTissues = [
+        ...new Set(results.value.map((item) => item.tissue)),
+    ];
+    return [
+        { label: "All Tissues", value: null },
+        ...uniqueTissues.map((tissue) => ({ label: tissue, value: tissue })),
+    ];
+});
+
+const filters = ref({
+    annotation: { value: null, matchMode: "equals" },
+    tissue: { value: null, matchMode: "equals" },
+    biosample: { value: null, matchMode: "contains" },
+    enrichment: { value: null, matchMode: "lte" },
+    pValue: { value: null, matchMode: "lte" },
+});
+
+const onFilter = (event) => {
+    first.value = 0;
+    loadResults();
+};
+
 const loadResults = async () => {
     try {
         await resultsStore.getResults(dataset.value, {
@@ -121,6 +254,7 @@ const loadResults = async () => {
             rows: rows.value,
             sort_field: sortField.value,
             sort_order: sortOrder.value,
+            filters: filters.value,
         });
     } catch (err) {
         console.error("Failed to load results:", err);
@@ -194,5 +328,40 @@ onMounted(() => {
     color: #e91e63;
     background-color: transparent;
     padding-block: 0.125rem;
+}
+
+:deep(.p-column-filter) {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+:deep(.p-dropdown-label) {
+    text-overflow: ellipsis;
+    font-size: 0.875rem;
+}
+
+:deep(.p-dropdown-panel .p-dropdown-items) {
+    font-size: 0.875rem;
+}
+
+:deep(.p-column-header-content) {
+    flex-direction: column;
+}
+
+:deep(.p-datatable .p-datatable-tbody > tr > td) {
+    padding: 0.5rem;
+}
+
+:deep(.p-datatable .p-datatable-thead > tr > th) {
+    padding-bottom: 0.5rem;
+}
+
+:deep(.p-inputtext, .p-inputnumber) {
+    font-size: 0.875rem;
+}
+
+:deep(.p-datatable-filter-row) {
+    background-color: #f8f9fa;
 }
 </style>
