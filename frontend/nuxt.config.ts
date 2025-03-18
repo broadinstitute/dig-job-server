@@ -1,6 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
+import { rollup as unwasm } from "unwasm/plugin";
 const IndigoAura = definePreset(Aura, {
     semantic: {
         primary: {
@@ -80,5 +81,21 @@ export default defineNuxtConfig({
             "@tailwindcss/postcss": {},
             autoprefixer: {},
         },
+    },
+
+    nitro: {
+        experimental: {
+            // fix #29 inject onig.wasm warning
+            wasm: true,
+        },
+        // fix #45 cannot find module core.mjs
+        externals: { traceInclude: ["shiki/dist/core.mjs"] },
+    },
+    vite: {
+        // fix #41 [vite:wasm-fallback] Could not load
+        plugins:
+            import.meta.env.NODE_ENV === "production"
+                ? [unwasm({})]
+                : undefined,
     },
 });
