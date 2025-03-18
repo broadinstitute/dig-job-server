@@ -35,6 +35,19 @@
 
         <div class="layout-footer">
             <span> Powered by KPN Data Registry </span>
+            <Button
+                :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
+                :aria-label="
+                    isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'
+                "
+                class="p-button-rounded p-button-text theme-toggle-btn"
+                :class="{ 'sun-icon': isDarkMode }"
+                @click="toggleDarkMode"
+                v-tooltip.top="
+                    isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'
+                "
+                size="small"
+            />
         </div>
     </div>
 </template>
@@ -86,8 +99,16 @@
     gap: 0.5rem;
     border-top: 1px solid var(--surface-border);
 }
+
+.theme-toggle-btn.sun-icon :deep(.pi-sun) {
+    color: #ffd700;
+}
 </style>
 <script setup>
+import { useTheme } from "~/composables/useTheme";
+
+const { isDarkMode, toggleDarkMode } = useTheme();
+
 function signOut() {
     // Perform sign out logic here, e.g., clear session, redirect to login page, etc.
     // This is a placeholder function and should be implemented as per your authentication flow.

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tailwindcss-primeui";
-@custom-variant dark (&:where(.app-dark, .app-dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @tailwind base;
 @tailwind components;
