@@ -108,12 +108,28 @@ async function handleDelete(dataSet) {
         life: 5000,
     });
 }
+
+function progress(data) {
+    if (data.status === "sumstats SUCCEEDED") {
+        return 50; // Example progress for sumstats
+    } else if (data.status === "sldsc SUCCEEDED") {
+        return 100; // Example progress for SLDSC
+    }
+    return 0; // Default progress
+}
 </script>
 <template>
-    <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 my-6">
+    <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
         <div class="col-span-12">
             <Toast position="top-center" />
-            <h2 class="text-2xl font-bold text-center mb-4">Datasets</h2>
+            <Stepper class="basis-[50rem] mb-8" linear>
+                <StepList>
+                    <Step value="1">Upload</Step>
+                    <Step value="2">Run SumStats</Step>
+                    <Step value="3">Run SLDSC</Step>
+                    <Step value="4">View Results</Step>
+                </StepList>
+            </Stepper>
             <div class="flex justify-between items-center">
                 <Button
                     @click="router.push('/upload')"
@@ -222,8 +238,20 @@ async function handleDelete(dataSet) {
                                 </span>
                             </template>
                         </Column>
-
-                        <Column header="Delete" :style="{ width: '8rem' }">
+                        <Column header="Progress" :style="{ width: '10rem' }">
+                            <template #body="{ data }">
+                                <ProgressBar
+                                    :showValue="false"
+                                    :value="progress(data)"
+                                    style="height: 6px"
+                                />
+                            </template>
+                        </Column>
+                        <Column
+                            header="Delete"
+                            :style="{ width: '4rem' }"
+                            class="ml-4"
+                        >
                             <template #body="{ data }">
                                 <Button
                                     icon="pi pi-trash"
