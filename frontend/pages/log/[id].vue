@@ -1,6 +1,8 @@
 <script setup>
 import { useUserStore } from "~/stores/UserStore.js";
 import pako from "pako";
+import { useTheme } from "~/composables/useTheme";
+const { isDarkMode, toggleDarkMode } = useTheme();
 
 const route = useRoute();
 const id = route.params.id;
@@ -24,7 +26,6 @@ onMounted(async () => {
                 <Shiki
                     :code="log"
                     lang="log"
-                    theme="nord"
                     style="
                         height: 400px;
                         overflow-y: scroll;

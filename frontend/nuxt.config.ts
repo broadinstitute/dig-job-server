@@ -22,7 +22,11 @@ export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
     devtools: { enabled: true },
     ssr: false,
-    css: ["primeicons/primeicons.css", "~/assets/css/tailwind.css"],
+    css: [
+        "primeicons/primeicons.css",
+        "~/assets/css/tailwind.css",
+        "~/assets/css/shiki.css",
+    ],
     modules: [
         "@pinia/nuxt",
         "@nuxt/devtools",
@@ -33,6 +37,11 @@ export default defineNuxtConfig({
 
     app: {
         buildAssetsDir: `/_nuxt/${Date.now()}/`,
+        head: {
+            htmlAttrs: {
+                lang: "en",
+            },
+        },
     },
     primevue: {
         options: {
@@ -40,10 +49,9 @@ export default defineNuxtConfig({
             theme: {
                 preset: IndigoAura,
                 options: {
-                    darkModeSelector: ".app-dark",
+                    darkModeSelector: "html.dark",
                     cssLayer: {
                         name: "primevue",
-                        //order: "tailwind-base, primevue, tailwind-utilities",
                         order: "theme, base, primevue",
                     },
                 },
@@ -60,6 +68,11 @@ export default defineNuxtConfig({
     },
     shiki: {
         bundledLangs: ["python", "log"],
+        bundledThemes: ["min-light", "min-dark"],
+        defaultTheme: {
+            light: "min-light",
+            dark: "min-dark",
+        },
     },
 
     postcss: {
