@@ -1,27 +1,23 @@
 import asyncio
-import hashlib
 import io
 import json
-import os
+import re
 from asyncio import Queue
-from functools import cache, lru_cache
+from functools import lru_cache
 from typing import Optional, Dict
 
 import fastapi
-import re
-
 import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
 from sse_starlette import EventSourceResponse
-from starlette.requests import Request
-from starlette.responses import Response, JSONResponse, RedirectResponse
+from starlette.responses import Response, JSONResponse
 
 from job_server import s3, file_utils, batch, database_utils
 from job_server.auth_backend import AuthBackend
+from job_server.database import get_db
 from job_server.jwt_utils import create_access_token, get_decoded_jwt_data
 from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod
-from job_server.database import get_db
 
 router = fastapi.APIRouter()
 JOB_SERVER_AUTH_COOKIE = 'js_auth'
@@ -41,7 +37,7 @@ async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-async def get_current_user(request: Request, authorization: Optional[str] = Header(None)):
+async def get_current_user(authorization: Optional[str] = Header(None), token: Optional[str] = Query(None)):
 
     if authorization:
         schema, _, token = authorization.partition(' ')
@@ -50,12 +46,10 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
             if data:
                 return User(**data)
 
-    auth_cookie = request.cookies.get(JOB_SERVER_AUTH_COOKIE)
-    if auth_cookie:
-        data = get_decoded_jwt_data(auth_cookie)
+    if token:
+        data = get_decoded_jwt_data(token)
         if data:
-            user = User(**data)
-            return user
+            return User(**data)
 
     raise fastapi.HTTPException(status_code=401, detail='Not logged in')
 

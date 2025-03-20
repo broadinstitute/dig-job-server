@@ -197,7 +197,7 @@ const downloadUrl = computed(
 );
 
 function openDownloadLink() {
-    window.open(downloadUrl.value, "_blank");
+  window.open(downloadUrl.value + `?token=${localStorage.getItem('authToken')}`, '_blank');
 }
 
 const formatPValue = (value) => {
