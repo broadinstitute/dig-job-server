@@ -110,9 +110,8 @@ import { useTheme } from "~/composables/useTheme";
 const { isDarkMode, toggleDarkMode } = useTheme();
 
 function signOut() {
-    // Perform sign out logic here, e.g., clear session, redirect to login page, etc.
-    // This is a placeholder function and should be implemented as per your authentication flow.
     console.log("Signing out...");
-    // Example: window.location.href = '/login';
+    localStorage.removeItem("authToken");
+    window.location.href = "/login";
 }
 </script>

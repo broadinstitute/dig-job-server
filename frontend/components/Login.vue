@@ -26,7 +26,16 @@ const submitForm = async () => {
     }
 };
 
-onMounted(() => {
+onMounted(async () => {
+    // Check if the user is already logged in
+    const isLoggedIn = await userStore.isUserLoggedIn();
+    if (isLoggedIn) {
+        // If already logged in, redirect to homepage
+        navigateTo("/");
+        return;
+    }
+
+    // Otherwise continue with normal login form behavior
     document.getElementById("username").focus();
     if (userStore.loginError) {
         toast.add({
