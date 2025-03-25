@@ -67,7 +67,7 @@ def get_log_info(db, username, job_id):
                      "on dj.id = d.id WHERE dj.id=:id and dj.user=:username")
         row = connection.execute(query, {"id": job_id, "username": username}).fetchone()
         log_content, dataset = row if row else (None, None)
-        return {'log': log_content.decode('latin1'), 'dataset': dataset}
+        return {'log': log_content.decode('latin1') if log_content else None, 'dataset': dataset}
 
 
 def get_dataset_metadata(db, username) -> dict:
