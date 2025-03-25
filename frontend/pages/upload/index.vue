@@ -186,6 +186,7 @@
             <p class="text-white">Uploading...</p>
         </div>
     </div>
+    <Toast position="top-center" />
 </template>
 
 <script setup>
@@ -195,7 +196,8 @@ import { useUserStore } from "~/stores/UserStore";
 import axios from "axios";
 const missingFileError = ref("");
 const fileInfo = ref({});
-const dataSetName = ref("");
+const dataSetName = ref('');
+const toast = useToast();
 
 const route = useRouter();
 const store = useUserStore();
@@ -274,38 +276,41 @@ const formIncomplete = computed(() => {
 });
 
 async function uploadData() {
-    const { presigned_url } = await store.getPresignedUrl(
-        fileName,
-        dataSetName.value,
-    );
-    const strippedFile = new Blob([file.value], { type: "" });
-    try {
-        await axios.put(presigned_url, strippedFile, {
-            headers: {
-                "Content-Type": "",
-            },
-            onUploadProgress: (progressEvent) => {
-                const percentCompleted = Math.round(
-                    (progressEvent.loaded * 100) / progressEvent.total,
-                );
-                onProgress(percentCompleted);
-            },
-        });
-        const col_map = JSON.parse(JSON.stringify(colMap.value));
-        await store.finalizeUpload({
-            file: fileName,
-            name: dataSetName.value,
-            ancestry: ancestry.value,
-            effective_n: effectiveN.value,
-            separator: fileInfo.value.delimiter,
-            genome_build: "GRCh37",
-            col_map,
-        });
-        await route.push({ path: "/" });
-    } catch (error) {
-        console.error("File upload failed:", error);
-        throw error;
+  const {presigned_url} = await store.getPresignedUrl(fileName, dataSetName.value);
+  const strippedFile = new Blob([file.value], {type: ''});
+  try {
+    await axios.put(presigned_url, strippedFile, {
+      headers: {
+        'Content-Type': '',
+      },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+        );
+        onProgress(percentCompleted);
+      }
+    });
+    const col_map = JSON.parse(JSON.stringify(colMap.value));
+   await store.finalizeUpload(
+       {
+         'file': fileName,
+         'name': dataSetName.value,
+         'ancestry': ancestry.value,
+         'effective_n': effectiveN.value,
+         'separator': fileInfo.value.delimiter,
+         'genome_build': 'GRCh37',
+         col_map
+       });
+    console.log("File uploaded successfully");
+    await route.push("/");
+  } catch (error) {
+    if(error.response.status === 409){
+      toast.add({severity: 'error', summary: 'Error', detail: 'Dataset name already exists'});
+      return;
     }
+    console.error("File upload failed:", error);
+    throw error;
+  }
 }
 
 function onProgress(percentCompleted) {
