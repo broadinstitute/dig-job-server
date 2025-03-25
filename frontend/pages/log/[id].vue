@@ -8,9 +8,10 @@ const userStore = useUserStore();
 const log = ref(null);
 
 onMounted(async () => {
-  const rawLog = await userStore.getLogInfo(id);
-  const compressed = new Uint8Array(rawLog.log.split('').map(char => char.charCodeAt(0)));
+  const {log:rawLog, dataset} = await userStore.getLogInfo(id);
+  const compressed = new Uint8Array(rawLog.split('').map(char => char.charCodeAt(0)));
   log.value = pako.inflate(compressed, { to: 'string' });
+  console.log(dataset);
 });
 </script>
 

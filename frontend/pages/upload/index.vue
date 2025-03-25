@@ -93,6 +93,7 @@
       </DataTable>
 
     </div>
+    <Toast position="top-center" />
   </div>
 </template>
 
@@ -103,6 +104,7 @@ import axios from 'axios';
 const missingFileError = ref('');
 const fileInfo = ref({});
 const dataSetName = ref('');
+const toast = useToast();
 
 const route = useRouter();
 const store = useUserStore();
@@ -193,8 +195,13 @@ async function uploadData() {
          'genome_build': 'GRCh37',
          col_map
        });
-    await route.push({ path: "/" });
+    console.log("File uploaded successfully");
+    await route.push("/");
   } catch (error) {
+    if(error.response.status === 409){
+      toast.add({severity: 'error', summary: 'Error', detail: 'Dataset name already exists'});
+      return;
+    }
     console.error("File upload failed:", error);
     throw error;
   }

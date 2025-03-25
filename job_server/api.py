@@ -11,6 +11,7 @@ import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
 from sse_starlette import EventSourceResponse
+from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
 from job_server import s3, file_utils, batch, database_utils
@@ -66,7 +67,12 @@ def is_logged_in(user: User = Depends(get_current_user)):
 async def get_datasets(user: User = Depends(get_current_user)):
     data_set_folders = s3.get_datasets(user.username)
     jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
+    data_set_metadata = database_utils.get_dataset_metadata(get_db(), user.username)
     return [{'dataset': d,
+             'uploaded_at': data_set_metadata.get(d, {}).get('uploaded_at', ''),
+             'ancestry': data_set_metadata.get(d, {}).get('ancestry', ''),
+             'genome_build': data_set_metadata.get(d, {}).get('genome_build', ''),
+             'uploaded_by': user.username,
              'status': jobs_for_user.get(database_utils.get_dataset_hash(d, user.username), {}).get('status'),
              'id': database_utils.get_dataset_hash(d, user.username)
              } for d in data_set_folders]
@@ -116,6 +122,8 @@ async def get_hermes_pre_signed_url(dataset: str, filename: str = Query(None), u
 async def finalize_upload(request: DatasetInfo, background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
     s3_path = get_s3_path(request.name, user)
     s3.upload_metadata(request, s3_path)
+    if not database_utils.insert_dataset(get_db(), user.username, request):
+        raise fastapi.HTTPException(status_code=409, detail="Failed to insert dataset")
     await start_job(user, request.name, AnalysisMethod.sumstats.value, background_tasks)
     return Response(status_code=200)
 
@@ -205,6 +213,7 @@ def get_cached_results(s3_path: str) -> pd.DataFrame:
 @router.get("/results/{dataset}")
 async def get_results(
         dataset: str,
+        request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
         sort_field: Optional[str] = Query(None, description="Field to sort by"),
@@ -216,6 +225,31 @@ async def get_results(
     try:
         df = get_cached_results(s3_path)
 
+        filter_params = {}
+        for param, value in request.query_params.items():
+            if param.startswith("filter_") and value:
+                column_name = param.replace("filter_", "")
+                filter_params[column_name] = value
+
+        for column, value in filter_params.items():
+            if column in df.columns:
+                if df[column].dtype.kind in 'ifc':  # integer, float, complex
+                    try:
+                        if value.startswith(">="):
+                            df = df[df[column] >= float(value[2:])]
+                        elif value.startswith("<="):
+                            df = df[df[column] <= float(value[2:])]
+                        elif value.startswith(">"):
+                            df = df[df[column] > float(value[1:])]
+                        elif value.startswith("<"):
+                            df = df[df[column] < float(value[1:])]
+                        else:
+                            df = df[df[column] == float(value)]
+                    except ValueError:
+                        pass
+                else:
+                    df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
+
         if sort_field:
             ascending = sort_order == 1
             df = df.sort_values(by=sort_field, ascending=ascending)
@@ -223,9 +257,7 @@ async def get_results(
             df = df.sort_values(by='pValue')
 
         total_records = len(df)
-
         df = df.iloc[first:first + rows]
-
         results = df.to_dict('records')
 
         return JSONResponse({
@@ -234,4 +266,4 @@ async def get_results(
         })
 
     except Exception as e:
-        raise fastapi.HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))

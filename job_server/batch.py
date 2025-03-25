@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 import boto3
@@ -36,5 +37,5 @@ async def submit_and_await_job(job_config, user, dataset, method, job_queues):
                 })
             return
 
-        time.sleep(60)
+        await asyncio.sleep(60)
 
