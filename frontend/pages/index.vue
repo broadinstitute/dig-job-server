@@ -111,11 +111,11 @@ async function handleDelete(dataSet) {
 
 function progress(data) {
     if (data.status === "sumstats SUCCEEDED") {
-        return 50; // Example progress for sumstats
+        return 50;
     } else if (data.status === "sldsc SUCCEEDED") {
-        return 100; // Example progress for SLDSC
+        return 100;
     }
-    return 0; // Default progress
+    return 0; // Default
 }
 </script>
 <template>
@@ -152,10 +152,32 @@ function progress(data) {
                         stripedRows
                         size="small"
                     >
-                        <Column field="dataset" header="Dataset"></Column>
+                        <Column field="dataset" header="Dataset">
+                            <template #body="{ data }">
+                                <span
+                                    class="filename"
+                                    v-tooltip.right="{
+                                        value: `${data.file_name}`,
+                                        class: 'filename-tooltip',
+                                    }"
+                                    >{{ data.dataset }}</span
+                                >
+                            </template>
+                        </Column>
+
+                        <Column field="ancestry" header="Ancestry">
+                            <template #body="{ data }">
+                                {{ data.ancestry }}
+                            </template>
+                        </Column>
+                        <Column field="genome_build" header="Genome Build">
+                            <template #body="{ data }">
+                                {{ data.genome_build }}
+                            </template>
+                        </Column>
                         <Column header="Uploader">
                             <template #body="{ data }">
-                                {{ data.uploader }}
+                                {{ data.uploaded_by }}
                             </template>
                         </Column>
                         <Column header="Uploaded At">
@@ -164,7 +186,7 @@ function progress(data) {
                                     data.uploaded_at
                                         ? new Date(
                                               data.uploaded_at,
-                                          ).toLocaleString()
+                                          ).toLocaleDateString()
                                         : ""
                                 }}
                             </template>
@@ -174,7 +196,8 @@ function progress(data) {
                                 <template
                                     v-if="
                                         data.status &&
-                                        (data.status.endsWith('SUCCEEDED') ||
+                                        (data.status.includes('RUNNING') ||
+                                            data.status.endsWith('SUCCEEDED') ||
                                             data.status.endsWith('FAILED'))
                                     "
                                 >
@@ -183,6 +206,19 @@ function progress(data) {
                                         v-tooltip.top="'View log'"
                                     >
                                         <Tag
+                                            v-if="
+                                                data.status.includes('RUNNING')
+                                            "
+                                            severity="secondary"
+                                            rounded
+                                        >
+                                            <i
+                                                class="pi pi-spin pi-spinner mr-2"
+                                            ></i>
+                                            {{ data.status }}
+                                        </Tag>
+                                        <Tag
+                                            v-else
                                             :severity="
                                                 data.status ===
                                                 'sumstats SUCCEEDED'
@@ -250,7 +286,7 @@ function progress(data) {
                         <Column
                             header="Delete"
                             :style="{ width: '4rem' }"
-                            class="ml-4"
+                            class="ml-4 text-right"
                         >
                             <template #body="{ data }">
                                 <Button
