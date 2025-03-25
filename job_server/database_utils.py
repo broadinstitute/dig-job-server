@@ -1,10 +1,13 @@
 import hashlib
+import json
 import zlib
 
 import bcrypt
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from job_server.compress import LogCompressor
+from job_server.model import DatasetInfo
 
 
 def authenticate_user(db, username, password):
@@ -13,6 +16,19 @@ def authenticate_user(db, username, password):
         db_password = connection.execute(query, {"username": username}).fetchone()
         if db_password and bcrypt.checkpw(password.encode('utf-8'), db_password[0].encode('utf-8')):
             return True
+        return False
+
+def insert_dataset(db, username: str, dataset: DatasetInfo) -> bool:
+    try:
+        with db as connection:
+            query = text("INSERT INTO datasets (id, uploaded_by, metadata, uploaded_at) "
+                         "VALUES (:id, :username, :metadata, NOW())")
+            connection.execute(query, {"id": get_dataset_hash(dataset.name, username),
+                                       "username": username,
+                                       "metadata": dataset.model_dump_json()})
+            connection.commit()
+            return True
+    except IntegrityError:
         return False
 
 def log_job_start(db, username, dataset, status):
@@ -47,6 +63,15 @@ def delete_dataset(db, username, dataset):
 
 def get_log_info(db, username, job_id):
     with db as connection:
-        query = text("SELECT job_log FROM dataset_jobs WHERE id=:id and user=:username")
-        log_content = connection.execute(query, {"id": job_id, "username": username}).fetchone()[0]
-        return {'log': log_content.decode('latin1')}
+        query = text("SELECT job_log, metadata->>'$.name' as ds_name FROM dataset_jobs dj join datasets d "
+                     "on dj.id = d.id WHERE dj.id=:id and dj.user=:username")
+        row = connection.execute(query, {"id": job_id, "username": username}).fetchone()
+        log_content, dataset = row if row else (None, None)
+        return {'log': log_content.decode('latin1'), 'dataset': dataset}
+
+
+def get_dataset_metadata(db, username) -> dict:
+    with db as connection:
+        query = text("SELECT metadata, metadata->>'$.name' as ds_name FROM datasets WHERE uploaded_by = :username")
+        results = connection.execute(query, {"username": username}).fetchall()
+        return {row[1]: dict(json.loads(row[0])) for row in results}
