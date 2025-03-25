@@ -72,6 +72,6 @@ def get_log_info(db, username, job_id):
 
 def get_dataset_metadata(db, username) -> dict:
     with db as connection:
-        query = text("SELECT metadata, metadata->>'$.name' as ds_name FROM datasets WHERE uploaded_by = :username")
+        query = text("SELECT metadata, metadata->>'$.name', uploaded_at as ds_name FROM datasets WHERE uploaded_by = :username")
         results = connection.execute(query, {"username": username}).fetchall()
-        return {row[1]: dict(json.loads(row[0])) for row in results}
+        return {row[1]: {**json.loads(row[0]), "uploaded_at": row[2]} for row in results}
