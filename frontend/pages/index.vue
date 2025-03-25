@@ -25,7 +25,6 @@ onUnmounted(() => {
 });
 
 const listenForJobStatus = (jobId, data) => {
-  // Close existing connection for this job if it exists
   if (eventSources.value[jobId]) {
     eventSources.value[jobId].close();
   }
@@ -34,12 +33,11 @@ const listenForJobStatus = (jobId, data) => {
   eventSources.value[jobId] = eventSource;
 
   eventSource.onmessage = async (event) => {
-    if (!event.data) return; // Ignore keepalive messages
+    if (!event.data) return;
 
     const statusData = JSON.parse(event.data);
     console.log('Job status update:', statusData);
 
-    // Update the status in the datasets table
     data.status = statusData.status;
 
     if (statusData.status.endsWith('SUCCEEDED')) {
