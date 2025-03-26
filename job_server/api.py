@@ -255,11 +255,12 @@ async def get_results(
                         df = df[df[column].astype(str).str.contains(value[9:], case=False, na=False)]
                     else:
                         df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
-                if sort_field:
-                    ascending = sort_order == 1
-                    df = df.sort_values(by=sort_field, ascending=ascending)
-                else:
-                    df = df.sort_values(by='pValue')
+
+        if sort_field:
+            ascending = sort_order == 1
+            df = df.sort_values(by=sort_field, ascending=ascending)
+        else:
+            df = df.sort_values(by='pValue')
 
         total_records = len(df)
         df = df.iloc[first:first + rows]
