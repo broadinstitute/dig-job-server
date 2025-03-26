@@ -24,7 +24,14 @@
                 <div class="col-span-1">
                     <Card class="h-full shadow-sm">
                         <template #content>
-                            <Fieldset legend="Metadata" class="mb-4">
+                            <Fieldset
+                                legend="Metadata"
+                                class="mb-4"
+                                :class="{
+                                    'border-primary-500 border-2':
+                                        currentStep === '1',
+                                }"
+                            >
                                 <div class="field">
                                     <label
                                         for="dataset"
@@ -72,7 +79,7 @@
                                         id="effectiveN"
                                         v-model="effectiveN"
                                         type="number"
-                                        placeholder="Enter effective N (optional)"
+                                        placeholder="Enter effective N (optional if already in data file)"
                                         class="w-full"
                                     />
                                 </div>
@@ -100,7 +107,14 @@
                                     Required fields</small
                                 >
                             </div>
-                            <Fieldset legend="File Upload" class="mb-4">
+                            <Fieldset
+                                legend="File Upload"
+                                class="mb-4"
+                                :class="{
+                                    'border-primary-500 border-2':
+                                        currentStep === '2',
+                                }"
+                            >
                                 <div class="field">
                                     <label
                                         for="file"
@@ -127,7 +141,14 @@
                 <div class="col-span-1">
                     <Card class="h-full shadow-sm">
                         <template #content>
-                            <Fieldset legend="Column Mapping" class="mb-4">
+                            <Fieldset
+                                legend="Column Mapping"
+                                class="mb-4"
+                                :class="{
+                                    'border-primary-500 border-2':
+                                        currentStep === '3',
+                                }"
+                            >
                                 <DataTable
                                     :value="tableRows"
                                     v-if="fileInfo.columns"
@@ -192,7 +213,7 @@
                                         `You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
                   includes ${requiredFields.join(
                       ", ",
-                  )} , and either beta or odds ratio.  You also must specify n in your column mapping
+                  )}, and either beta or odds ratio.  You also must specify n in your column mapping
                   or provide an effective n before you can upload.`
                                     }}
                                 </p>
@@ -275,7 +296,9 @@ watch(
         );
         const hasEffectSize =
             "beta" in colMap.value || "oddsRatio" in colMap.value;
-        const hasSampleSize = "n" in colMap.value || effectiveN.value;
+        const hasSampleSize =
+            "n" in colMap.value ||
+            (effectiveN.value && effectiveN.value.trim !== "");
 
         if (!hasRequiredFields || !hasEffectSize || !hasSampleSize) {
             currentStep.value = "3";
