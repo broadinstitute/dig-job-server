@@ -67,11 +67,11 @@ def get_log_info(db, username, job_id):
                      "on dj.id = d.id WHERE dj.id=:id and dj.user=:username")
         row = connection.execute(query, {"id": job_id, "username": username}).fetchone()
         log_content, dataset = row if row else (None, None)
-        return {'log': log_content.decode('latin1'), 'dataset': dataset}
+        return {'log': log_content.decode('latin1') if log_content else None, 'dataset': dataset}
 
 
 def get_dataset_metadata(db, username) -> dict:
     with db as connection:
-        query = text("SELECT metadata, metadata->>'$.name' as ds_name FROM datasets WHERE uploaded_by = :username")
+        query = text("SELECT metadata, metadata->>'$.name', uploaded_at as ds_name FROM datasets WHERE uploaded_by = :username")
         results = connection.execute(query, {"username": username}).fetchall()
-        return {row[1]: dict(json.loads(row[0])) for row in results}
+        return {row[1]: {**json.loads(row[0]), "uploaded_at": row[2]} for row in results}
