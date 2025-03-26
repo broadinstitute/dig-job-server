@@ -138,3 +138,5 @@ dmypy.json
 .pyre/
 
 frontend/package-lock.json
+
+.github/prompts/
