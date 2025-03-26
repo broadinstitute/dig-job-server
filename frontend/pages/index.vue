@@ -2,12 +2,41 @@
 import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
 import { useToast } from "primevue/usetoast";
+
 const userStore = useUserStore();
 const router = useRouter();
 const toast = useToast();
 const datasets = ref([]);
 const config = useRuntimeConfig();
 const eventSources = ref({});
+const helpPopover = ref(null);
+const toggleHelp = (event) => {
+    helpPopover.value.toggle(event);
+};
+
+// Timeline events for the workflow steps
+const timelineEvents = [
+    {
+        title: "Upload",
+        description: "Upload your dataset to begin analysis",
+        icon: "pi pi-upload",
+    },
+    {
+        title: "Run SumStats",
+        description: "Process summary statistics for your dataset",
+        icon: "pi pi-play",
+    },
+    {
+        title: "Run SLDSC",
+        description: "Run stratified LD score regression analysis",
+        icon: "pi pi-forward",
+    },
+    {
+        title: "View Results",
+        description: "Analyze the output of the pipeline",
+        icon: "pi pi-eye",
+    },
+];
 
 onMounted(async () => {
     datasets.value = await userStore.retrieveDatasets();
@@ -122,15 +151,18 @@ function progress(data) {
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
         <div class="col-span-12">
             <Toast position="top-center" />
-            <Stepper class="basis-[50rem] mb-8" linear>
-                <StepList>
-                    <Step value="1">Upload</Step>
-                    <Step value="2">Run SumStats</Step>
-                    <Step value="3">Run SLDSC</Step>
-                    <Step value="4">View Results</Step>
-                </StepList>
-            </Stepper>
+
             <div class="flex justify-between items-center">
+                <Button
+                    icon="pi pi-question-circle"
+                    label="Help"
+                    size="small"
+                    class="help-button ml-4"
+                    aria-haspopup="true"
+                    aria-controls="help-popover"
+                    @click="toggleHelp"
+                    outlined
+                />
                 <Button
                     @click="router.push('/upload')"
                     icon="pi pi-upload"
@@ -139,6 +171,34 @@ function progress(data) {
                     class="mx-4"
                 ></Button>
             </div>
+
+            <!-- Popover with Timeline component -->
+            <Popover ref="helpPopover">
+                <div class="p-4 w-[500px]">
+                    <h3 class="mb-3 text-lg font-bold">Workflow Steps</h3>
+                    <Timeline :value="timelineEvents" class="w-full">
+                        <template #marker="slotProps">
+                            <span
+                                class="flex w-8 h-8 items-center justify-center text-white rounded-full shadow-md"
+                                :class="'bg-primary'"
+                            >
+                                <i :class="slotProps.item.icon"></i>
+                            </span>
+                        </template>
+                        <template #content="slotProps">
+                            <div class="flex flex-col ml-4">
+                                <span class="font-bold mb-1">{{
+                                    slotProps.item.title
+                                }}</span>
+                                <p class="text-sm">
+                                    {{ slotProps.item.description }}
+                                </p>
+                            </div>
+                        </template>
+                    </Timeline>
+                </div>
+            </Popover>
+
             <Card class="m-4">
                 <template #header> </template>
                 <template #content>
@@ -305,3 +365,27 @@ function progress(data) {
         </div>
     </div>
 </template>
+<style scoped>
+/* Timeline styling */
+:deep(.p-timeline-event-opposite) {
+    flex: 0;
+    padding: 0 1rem;
+}
+
+:deep(.p-timeline-event-content) {
+    padding: 0 1rem;
+}
+
+:deep(.p-timeline .p-timeline-event-marker) {
+    border-color: var(--primary-color);
+}
+
+/* :deep(.p-timeline .p-timeline-event-connector) {
+    background-color: var(--primary-color);
+} */
+
+/* Add additional styling for the popover itself */
+:deep(.p-popover) {
+    max-width: 550px;
+}
+</style>
