@@ -263,12 +263,18 @@ async def get_results(
             df = df.sort_values(by='pValue')
 
         total_records = len(df)
+        tissues = df['tissue'].unique().tolist()
+        biosamples = df['biosample'].unique().tolist()
+        annotations = df['annotation'].unique().tolist()
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         return JSONResponse({
             "items": results,
-            "totalRecords": total_records
+            "totalRecords": total_records,
+            "tissues": tissues,
+            "biosamples": biosamples,
+            "annotations": annotations
         })
 
     except Exception as e:
