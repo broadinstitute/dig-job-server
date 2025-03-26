@@ -27,6 +27,7 @@ export default defineNuxtConfig({
         "primeicons/primeicons.css",
         "~/assets/css/tailwind.css",
         "~/assets/css/shiki.css",
+        "~/assets/css/global.css",
     ],
     modules: [
         "@pinia/nuxt",
