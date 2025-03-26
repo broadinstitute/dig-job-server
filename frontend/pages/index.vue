@@ -7,6 +7,7 @@ const userStore = useUserStore();
 const router = useRouter();
 const toast = useToast();
 const datasets = ref([]);
+const totalRecords = ref(0);
 const config = useRuntimeConfig();
 const eventSources = ref({});
 const helpPopover = ref(null);
@@ -48,6 +49,7 @@ onMounted(async () => {
             listenForJobStatus(data.id, data);
         }
     });
+    totalRecords.value = datasets.value.length;
 });
 
 onUnmounted(() => {
@@ -200,7 +202,7 @@ function progress(data) {
             </Popover>
 
             <Card class="m-4">
-                <template #header> </template>
+                <template #header></template>
                 <template #content>
                     <DataTable
                         :value="datasets"
@@ -240,7 +242,7 @@ function progress(data) {
                                 {{ data.uploaded_by }}
                             </template>
                         </Column>
-                        <Column header="Uploaded At">
+                        <Column header="Date Uploaded">
                             <template #body="{ data }">
                                 {{
                                     data.uploaded_at
@@ -306,7 +308,7 @@ function progress(data) {
                                     <Button
                                         v-if="!data.status"
                                         @click.prevent="runSumstats(data)"
-                                        label="Run Sum Stats"
+                                        label="Run SumStats"
                                         size="small"
                                         icon="pi pi-play"
                                     ></Button>
@@ -361,6 +363,9 @@ function progress(data) {
                         </Column>
                     </DataTable>
                 </template>
+                <template #footer
+                    ><small>Total records: {{ totalRecords }}</small></template
+                >
             </Card>
         </div>
     </div>

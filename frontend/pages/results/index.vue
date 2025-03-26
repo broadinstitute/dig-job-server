@@ -178,6 +178,9 @@
                     </template>
                 </DataTable>
             </template>
+            <template #footer
+                ><small>Total records: {{ totalRecords }}</small></template
+            >
         </Card>
     </div>
 </template>
