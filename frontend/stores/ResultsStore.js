@@ -1,6 +1,5 @@
 // stores/resultsStore.js
 import { defineStore } from "pinia";
-import axios from "axios";
 
 export const useResultsStore = defineStore("results", {
     state: () => ({
@@ -9,6 +8,9 @@ export const useResultsStore = defineStore("results", {
         totalRecords: 0,
         loading: false,
         error: null,
+        tissues: [],
+        biosamples: [],
+        annotations: [],
     }),
 
     actions: {
@@ -44,8 +46,12 @@ export const useResultsStore = defineStore("results", {
                 const { data } = await this.axios.get(
                     `/api/results/${dataset}?${queryParams.toString()}`,
                 );
-                this.items = data.items;
-                this.totalRecords = data.totalRecords;
+                if (data.items) this.items = data.items;
+                if (data.totalRecords) this.totalRecords = data.totalRecords;
+                if (data.tissues) this.tissues = data.tissues;
+                if (data.biosamples) this.biosamples = data.biosamples;
+                if (data.annotations) this.annotations = data.annotations;
+
                 return data;
             } catch (error) {
                 this.error = "Failed to load results";

@@ -105,16 +105,21 @@
                         field="biosample"
                         header="Biosample"
                         sortable
-                        filterMatchMode="contains"
+                        filterMatchMode="equals"
                         :showFilterMenu="false"
                     >
                         <template #filter="{ filterModel }">
-                            <InputText
+                            <AutoComplete
                                 v-model="filters['biosample'].value"
-                                type="text"
-                                class="p-column-filter"
+                                :suggestions="filteredBiosamples"
+                                @complete="searchBiosamples"
                                 placeholder="Search biosample"
-                                @change="onFilter"
+                                class="p-column-filter w-full"
+                                @item-select="onBiosampleSelect"
+                                @clear="onBiosampleClear"
+                                :delay="300"
+                                dropdown
+                                forceSelection
                             />
                         </template>
                     </Column>
@@ -195,11 +200,11 @@ const resultsStore = useResultsStore();
 const {
     items: results,
     totalRecords,
-    annotations,
-    tissues,
-    biosamples,
     loading,
     error,
+    tissues: apiTissues,
+    biosamples: apiBiosamples,
+    annotations: apiAnnotations,
 } = storeToRefs(resultsStore);
 
 const first = ref(0);
@@ -208,6 +213,7 @@ const sortField = ref("pValue");
 const sortOrder = ref(-1);
 const dataset = ref(route.query.dataset);
 const dt = ref();
+const filteredBiosamples = ref([]);
 
 const formatNumber = (value) => {
     return new Intl.NumberFormat("en-US", {
@@ -236,31 +242,106 @@ const formatPValue = (value) => {
 };
 
 // Define options for dropdowns
-const annotationOptions = ref([
-    { label: "All Annotations", value: null },
-    { label: "Binding Sites", value: "binding_sites" },
-    { label: "Accessible Chromatin", value: "accessible_chromatin" },
-    { label: "Enhancer", value: "enhancer" },
-    { label: "Promoter", value: "promoter" },
-]);
+const annotationOptions = computed(() => {
+    if (!apiAnnotations.value || apiAnnotations.value.length === 0) {
+        return [
+            { label: "All Annotations", value: null },
+            { label: "Binding Sites", value: "binding_sites" },
+            { label: "Accessible Chromatin", value: "accessible_chromatin" },
+            { label: "Enhancer", value: "enhancer" },
+            { label: "Promoter", value: "promoter" },
+        ];
+    }
 
-// Get unique tissues from results
-const tissueOptions = computed(() => {
-    if (!results.value?.length) return [{ label: "All Tissues", value: null }];
-
-    const uniqueTissues = [
-        ...new Set(results.value.map((item) => item.tissue)),
-    ];
     return [
-        { label: "All Tissues", value: null },
-        ...uniqueTissues.map((tissue) => ({ label: tissue, value: tissue })),
+        { label: "All Annotations", value: null },
+        ...apiAnnotations.value.map((annotation) => ({
+            label: annotation,
+            value: annotation,
+        })),
     ];
 });
+
+// Get tissues from API response
+const tissueOptions = computed(() => {
+    if (!apiTissues.value || apiTissues.value.length === 0) {
+        if (!results.value?.length)
+            return [{ label: "All Tissues", value: null }];
+
+        // Fall back to generating from results if API didn't provide tissues
+        const uniqueTissues = [
+            ...new Set(results.value.map((item) => item.tissue)),
+        ];
+        return [
+            { label: "All Tissues", value: null },
+            ...uniqueTissues.map((tissue) => ({
+                label: tissue,
+                value: tissue,
+            })),
+        ];
+    }
+
+    return [
+        { label: "All Tissues", value: null },
+        ...apiTissues.value.map((tissue) => ({
+            label: tissue,
+            value: tissue,
+        })),
+    ];
+});
+
+// Search biosamples for autocomplete
+const searchBiosamples = (event) => {
+    const query = event.query.toLowerCase();
+
+    // When the query is empty, show all biosamples
+    if (query === "") {
+        if (apiBiosamples.value && apiBiosamples.value.length > 0) {
+            filteredBiosamples.value = apiBiosamples.value;
+        } else if (results.value?.length) {
+            // Fall back to generating from results if API didn't provide biosamples
+            filteredBiosamples.value = [
+                ...new Set(results.value.map((item) => item.biosample)),
+            ];
+        } else {
+            filteredBiosamples.value = [];
+        }
+        return;
+    }
+
+    if (apiBiosamples.value && apiBiosamples.value.length > 0) {
+        filteredBiosamples.value = apiBiosamples.value.filter((biosample) =>
+            biosample.toLowerCase().includes(query),
+        );
+    } else if (results.value?.length) {
+        // Fall back to filtering from results if API didn't provide biosamples
+        const uniqueBiosamples = [
+            ...new Set(results.value.map((item) => item.biosample)),
+        ];
+        filteredBiosamples.value = uniqueBiosamples.filter((biosample) =>
+            biosample.toLowerCase().includes(query),
+        );
+    } else {
+        filteredBiosamples.value = [];
+    }
+};
+
+// biosample selection
+const onBiosampleSelect = (event) => {
+    filters.value.biosample.value = event.value;
+    onFilter();
+};
+
+// clearing the autocomplete
+const onBiosampleClear = () => {
+    filters.value.biosample.value = null;
+    onFilter();
+};
 
 const filters = ref({
     annotation: { value: null, matchMode: "equals" },
     tissue: { value: null, matchMode: "equals" },
-    biosample: { value: null, matchMode: "contains" },
+    biosample: { value: null, matchMode: "equals" },
     enrichment: { value: null, matchMode: "gte" },
     pValue: { value: null, matchMode: "lte" },
 });
@@ -278,11 +359,15 @@ const transformFilters = (filters) => {
                 transformedFilters[`filter_${key}`] = `<=${filter.value}`;
             } else if (key === "enrichment") {
                 transformedFilters[`filter_${key}`] = `>=${filter.value}`;
-            } else if (key === "biosample") {
+            } else if (
+                key === "biosample" ||
+                key === "annotation" ||
+                key === "tissue"
+            ) {
+                transformedFilters[`filter_${key}`] = `eq:${filter.value}`;
+            } else {
                 transformedFilters[`filter_${key}`] =
                     `contains:${filter.value}`;
-            } else {
-                transformedFilters[`filter_${key}`] = filter.value;
             }
         }
     });
