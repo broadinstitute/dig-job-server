@@ -271,7 +271,7 @@ function progress(data) {
                                             v-if="
                                                 data.status.includes('RUNNING')
                                             "
-                                            severity="secondary"
+                                            severity="warn"
                                             rounded
                                         >
                                             <i
@@ -296,6 +296,11 @@ function progress(data) {
                                             {{ data.status }}
                                         </Tag>
                                     </router-link>
+                                </template>
+                                <template v-else-if="!data.status">
+                                    <Tag severity="secondary" rounded>
+                                        uploaded
+                                    </Tag>
                                 </template>
                                 <template v-else>
                                     {{ data.status }}
@@ -349,6 +354,7 @@ function progress(data) {
                             header="Delete"
                             :style="{ width: '4rem' }"
                             class="ml-4 text-right"
+                            v-if="userStore.user.username !== 'demo'"
                         >
                             <template #body="{ data }">
                                 <Button
