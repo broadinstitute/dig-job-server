@@ -17,6 +17,16 @@ onMounted(async () => {
     const { log: rawLog, dataset: datasetValue } =
         await userStore.getLogInfo(id);
     dataset.value = datasetValue;
+
+    if (!rawLog) {
+        log.value = "";
+        loadingLog.value = false;
+        return;
+    }
+    if (!datasetValue) {
+        dataset.value = "";
+    }
+
     const compressed = new Uint8Array(
         rawLog.split("").map((char) => char.charCodeAt(0)),
     );
