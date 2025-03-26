@@ -122,14 +122,14 @@
                         field="enrichment"
                         header="Enrichment"
                         sortable
-                        filterMatchMode="lte"
+                        filterMatchMode="gte"
                         :showFilterMenu="false"
                     >
                         <template #filter="{ filterModel }">
                             <div class="flex items-center gap-2">
                                 <InputNumber
                                     v-model="filters['enrichment'].value"
-                                    placeholder="≤ Value"
+                                    placeholder="≥ Value"
                                     class="p-column-filter w-full"
                                     :minFractionDigits="3"
                                     :maxFractionDigits="3"
@@ -195,6 +195,9 @@ const resultsStore = useResultsStore();
 const {
     items: results,
     totalRecords,
+    annotations,
+    tissues,
+    biosamples,
     loading,
     error,
 } = storeToRefs(resultsStore);
@@ -258,7 +261,7 @@ const filters = ref({
     annotation: { value: null, matchMode: "equals" },
     tissue: { value: null, matchMode: "equals" },
     biosample: { value: null, matchMode: "contains" },
-    enrichment: { value: null, matchMode: "lte" },
+    enrichment: { value: null, matchMode: "gte" },
     pValue: { value: null, matchMode: "lte" },
 });
 
@@ -271,10 +274,13 @@ const transformFilters = (filters) => {
     const transformedFilters = {};
     Object.entries(filters).forEach(([key, filter]) => {
         if (filter.value !== null && filter.value !== "") {
-            if (key === "enrichment" || key === "pValue") {
+            if (key === "pValue") {
                 transformedFilters[`filter_${key}`] = `<=${filter.value}`;
+            } else if (key === "enrichment") {
+                transformedFilters[`filter_${key}`] = `>=${filter.value}`;
             } else if (key === "biosample") {
-                transformedFilters[`filter_${key}`] = filter.value;
+                transformedFilters[`filter_${key}`] =
+                    `contains:${filter.value}`;
             } else {
                 transformedFilters[`filter_${key}`] = filter.value;
             }
