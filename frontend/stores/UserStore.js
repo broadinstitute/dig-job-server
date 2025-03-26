@@ -13,11 +13,6 @@ export const useUserStore = defineStore("UserStore", {
             const config = useRuntimeConfig();
             this.axios = useAxios(config);
         },
-        async logout(redirectUrl) {
-            await this.axios.post("/api/logout");
-            this.user = null;
-            navigateTo(redirectUrl);
-        },
         async isUserLoggedIn() {
             try {
                 if (!this.axios) {
