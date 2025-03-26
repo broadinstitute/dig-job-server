@@ -234,7 +234,7 @@ async def get_results(
 
         for column, value in filter_params.items():
             if column in df.columns:
-                if df[column].dtype.kind in 'ifc':  # integer, float, complex
+                if df[column].dtype.kind in 'ifc':
                     try:
                         if value.startswith(">="):
                             df = df[df[column] >= float(value[2:])]
@@ -249,7 +249,12 @@ async def get_results(
                     except ValueError:
                         pass
                 else:
-                    df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
+                    if value.startswith("eq:"):
+                        df = df[df[column].astype(str).str.lower() == value[3:].lower()]
+                    elif value.startswith("contains:"):
+                        df = df[df[column].astype(str).str.contains(value[9:], case=False, na=False)]
+                    else:
+                        df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
 
         if sort_field:
             ascending = sort_order == 1
@@ -258,12 +263,18 @@ async def get_results(
             df = df.sort_values(by='pValue')
 
         total_records = len(df)
+        tissues = df['tissue'].unique().tolist()
+        biosamples = df['biosample'].unique().tolist()
+        annotations = df['annotation'].unique().tolist()
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         return JSONResponse({
             "items": results,
-            "totalRecords": total_records
+            "totalRecords": total_records,
+            "tissues": tissues,
+            "biosamples": biosamples,
+            "annotations": annotations
         })
 
     except Exception as e:
