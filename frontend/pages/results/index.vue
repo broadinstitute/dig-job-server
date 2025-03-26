@@ -14,7 +14,15 @@
             </h2>
         </div>
 
-        <div class="text-end pb-6">
+        <div class="flex justify-between items-center">
+            <Button
+                label="Back to Datasets"
+                icon="pi pi-arrow-left"
+                @click="$router.push('/')"
+                class="mb-4"
+                outlined
+                size="small"
+            />
             <Button
                 icon="pi pi-download"
                 label="Download Results"
@@ -106,6 +114,7 @@
                                 type="text"
                                 class="p-column-filter"
                                 placeholder="Search biosample"
+                                @change="onFilter"
                             />
                         </template>
                     </Column>
@@ -122,6 +131,9 @@
                                     v-model="filters['enrichment'].value"
                                     placeholder="≤ Value"
                                     class="p-column-filter w-full"
+                                    :minFractionDigits="3"
+                                    :maxFractionDigits="3"
+                                    @keydown.enter="onFilter"
                                 />
                             </div>
                         </template>
@@ -139,10 +151,13 @@
                         <template #filter="{ filterModel }">
                             <div class="flex items-center gap-2">
                                 <InputNumber
-                                    inputId="pValue"
                                     v-model="filters['pValue'].value"
                                     placeholder="≤ Value"
                                     class="p-column-filter w-full"
+                                    mode="decimal"
+                                    :minFractionDigits="3"
+                                    :maxFractionDigits="3"
+                                    @keydown.enter="onFilter"
                                 />
                             </div>
                         </template>
@@ -155,7 +170,11 @@
                         <div class="text-center p-4">No results found.</div>
                     </template>
                     <template #loading>
-                        <div class="text-center p-4">Loading data...</div>
+                        <div class="p-4">
+                            <div class="mb-2" v-for="i in 5" :key="i">
+                                <Skeleton height="3rem" />
+                            </div>
+                        </div>
                     </template>
                 </DataTable>
             </template>
@@ -186,8 +205,8 @@ const dt = ref();
 
 const formatNumber = (value) => {
     return new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
     }).format(value);
 };
 
@@ -197,7 +216,10 @@ const downloadUrl = computed(
 );
 
 function openDownloadLink() {
-  window.open(downloadUrl.value + `?token=${localStorage.getItem('authToken')}`, '_blank');
+    window.open(
+        downloadUrl.value + `?token=${localStorage.getItem("authToken")}`,
+        "_blank",
+    );
 }
 
 const formatPValue = (value) => {
@@ -242,6 +264,22 @@ const onFilter = (event) => {
     loadResults();
 };
 
+const transformFilters = (filters) => {
+    const transformedFilters = {};
+    Object.entries(filters).forEach(([key, filter]) => {
+        if (filter.value !== null && filter.value !== "") {
+            if (key === "enrichment" || key === "pValue") {
+                transformedFilters[`filter_${key}`] = `<=${filter.value}`;
+            } else if (key === "biosample") {
+                transformedFilters[`filter_${key}`] = filter.value;
+            } else {
+                transformedFilters[`filter_${key}`] = filter.value;
+            }
+        }
+    });
+    return transformedFilters;
+};
+
 const loadResults = async () => {
     try {
         await resultsStore.getResults(dataset.value, {
@@ -249,7 +287,7 @@ const loadResults = async () => {
             rows: rows.value,
             sort_field: sortField.value,
             sort_order: sortOrder.value,
-            filters: filters.value,
+            ...transformFilters(filters.value),
         });
     } catch (err) {
         console.error("Failed to load results:", err);
@@ -301,28 +339,28 @@ onMounted(() => {
     border: 2px solid #2196f3;
     color: #2196f3;
     background-color: transparent;
-    padding-block: 0.125rem;
+    padding-block: 0.1rem;
 }
 
 :deep(.chip_accessible_chromatin) {
     border: 2px solid #4caf50;
     color: #4caf50;
     background-color: transparent;
-    padding-block: 0.125rem;
+    padding-block: 0.1rem;
 }
 
 :deep(.chip_enhancer) {
     border: 2px solid #ff9800;
     color: #ff9800;
     background-color: transparent;
-    padding-block: 0.125rem;
+    padding-block: 0.1rem;
 }
 
 :deep(.chip_promoter) {
     border: 2px solid #e91e63;
     color: #e91e63;
     background-color: transparent;
-    padding-block: 0.125rem;
+    padding-block: 0.1rem;
 }
 
 :deep(.p-column-filter) {

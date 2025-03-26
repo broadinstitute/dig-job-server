@@ -22,51 +22,23 @@ export const useResultsStore = defineStore("results", {
             this.error = null;
 
             try {
-                // Convert filter object to API-compatible format
-                const apiFilters = {};
-                if (params.filters) {
-                    Object.entries(params.filters).forEach(
-                        ([field, filter]) => {
-                            // Handle text search and dropdown equals filters
-                            if (
-                                filter.matchMode === "contains" &&
-                                filter.value
-                            ) {
-                                apiFilters[field] = filter.value;
-                            }
-                            // Handle dropdown equals filter
-                            else if (
-                                filter.matchMode === "equals" &&
-                                filter.value
-                            ) {
-                                apiFilters[field + "_exact"] = filter.value;
-                            }
-                            // Handle less than or equal filters
-                            else if (
-                                filter.matchMode === "lte" &&
-                                filter.value !== null
-                            ) {
-                                apiFilters[field + "_max"] = filter.value;
-                            }
-                            // Handle between filters
-                            else if (filter.matchMode === "between") {
-                                if (filter.value !== null) {
-                                    apiFilters[`${field}_min`] = filter.value;
-                                }
-                                if (filter.value2 !== null) {
-                                    apiFilters[`${field}_max`] = filter.value2;
-                                }
-                            }
-                        },
-                    );
-                }
-
+                // Create query params from the provided parameters
                 const queryParams = new URLSearchParams({
                     first: params.first || 0,
                     limit: params.rows || 10,
                     sort_field: params.sort_field || "pValue",
                     sort_order: params.sort_order || -1,
-                    ...apiFilters,
+                });
+
+                // Add any filter parameters that were passed
+                Object.entries(params).forEach(([key, value]) => {
+                    if (
+                        key.startsWith("filter_") &&
+                        value !== null &&
+                        value !== ""
+                    ) {
+                        queryParams.append(key, value);
+                    }
                 });
 
                 const { data } = await this.axios.get(
