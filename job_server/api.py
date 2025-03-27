@@ -152,6 +152,7 @@ async def job_status(job_id: str):
                         "data": json.dumps(data)
                     }
                     if data["status"].endswith("SUCCEEDED") or data["status"].endswith("FAILED"):
+                        await asyncio.sleep(1)
                         break
                 except asyncio.TimeoutError:
                     yield {
