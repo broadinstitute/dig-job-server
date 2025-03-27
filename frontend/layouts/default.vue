@@ -5,7 +5,11 @@
                 <div class="logo-container">
                     <a href="/">
                         <img
-                            src="https://kpndataregistry.org/tenants/default/dr-logo.png"
+                            :src="
+                                isDarkMode
+                                    ? '/images/dr-logo-dark.png'
+                                    : '/images/dr-logo.png'
+                            "
                             alt="Logo"
                             class="logo-image"
                         />
