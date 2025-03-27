@@ -316,6 +316,7 @@ function progress(data) {
                                         label="Run SumStats"
                                         size="small"
                                         icon="pi pi-play"
+                                        outlined
                                     ></Button>
                                     <Button
                                         v-if="
@@ -325,6 +326,7 @@ function progress(data) {
                                         label="Run SLDSC"
                                         size="small"
                                         icon="pi pi-forward"
+                                        outlined
                                     ></Button>
                                     <Button
                                         v-if="data.status === 'sldsc SUCCEEDED'"
@@ -341,7 +343,10 @@ function progress(data) {
                                 </span>
                             </template>
                         </Column>
-                        <Column header="Progress" :style="{ width: '10rem' }">
+                        <Column
+                            header="Steps Completed"
+                            :style="{ width: '10rem' }"
+                        >
                             <template #body="{ data }">
                                 <ProgressBar
                                     :showValue="false"
