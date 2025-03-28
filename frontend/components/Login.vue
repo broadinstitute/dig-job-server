@@ -9,7 +9,6 @@ const password = ref("");
 const route = useRoute();
 const userStore = useUserStore();
 
-
 const submitForm = async () => {
     try {
         await userStore.login(username.value, password.value);
@@ -27,7 +26,16 @@ const submitForm = async () => {
     }
 };
 
-onMounted(() => {
+onMounted(async () => {
+    // Check if the user is already logged in
+    const isLoggedIn = await userStore.isUserLoggedIn();
+    if (isLoggedIn) {
+        // If already logged in, redirect to homepage
+        navigateTo("/");
+        return;
+    }
+
+    // Otherwise continue with normal login form behavior
     document.getElementById("username").focus();
     if (userStore.loginError) {
         toast.add({
@@ -42,18 +50,21 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="flex align-items-center justify-content-center min-h-screen min-w-screen overflow-hidden">
-        <div class="flex flex-column align-items-center justify-content-center">
-
-                <div class="w-full surface-card" >
-                    <div class="text-center">
-                      <img src="/images/logo.png" alt="Logo"/>
-                    </div>
+    <div
+        class="flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden"
+    >
+        <div class="flex flex-col items-center justify-center">
+            <div class="w-full bg-surface-0 dark:bg-surface-900">
+                <div class="text-center">
+                    <img src="/images/logo.png" alt="Logo" />
+                </div>
+                <form id="login-form" class="p-8">
                     <div class="field">
                         <label
                             for="username"
-                            class="block text-900 text-l font-medium mb-2"
-                            >Username</label>
+                            class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
+                            >Username</label
+                        >
                         <InputText
                             id="username"
                             autofocus
@@ -62,42 +73,46 @@ onMounted(() => {
                             placeholder="Enter username"
                             class="w-full"
                             style="padding: 1rem"
+                            autocomplete="username"
                         />
                     </div>
-                        <div class="field">
-                          <label
-                              for="password"
-                              class="block text-900 font-medium text-l mb-2"
-                          >Password</label>
-                          <Password
-                              id="password"
-                              v-model="password"
-                              placeholder="Enter password"
-                              :toggleMask="true"
-                              class="w-full"
-                              inputClass="w-full"
-                              :inputStyle="{ padding: '1rem' }"
-                              @keydown.enter="submitForm()"
-                              :feedback="false"
-                          ></Password>
-                        </div>
-
-
-                        <Button
-                            label="Sign In"
-                            class="w-full p-3 text-xl mt-3"
-                            icon="bi-person"
-                            @click="submitForm()"
-                        ></Button>
+                    <div class="field">
+                        <label
+                            for="password"
+                            class="block text-surface-900 dark:text-surface-0 font-medium text-l mb-2"
+                            >Password</label
+                        >
+                        <Password
+                            id="password"
+                            type="password"
+                            v-model="password"
+                            placeholder="Enter password"
+                            :toggleMask="true"
+                            class="w-full"
+                            inputClass="w-full"
+                            :inputStyle="{ padding: '1rem' }"
+                            @keydown.enter="submitForm()"
+                            :feedback="false"
+                            autocomplete="current-password"
+                            :inputProps="{ autocomplete: 'current-password' }"
+                        ></Password>
                     </div>
-                </div>
+
+                    <Button
+                        label="Sign In"
+                        class="w-full p-4 text-xl mt-4"
+                        icon="bi-person"
+                        @click="submitForm()"
+                    ></Button>
+                </form>
             </div>
-        <Toast position="top-center" />
+        </div>
+    </div>
+    <Toast position="top-center" />
 </template>
 
 <style scoped>
 label {
     white-space: nowrap;
 }
-
 </style>

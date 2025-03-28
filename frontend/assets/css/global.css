@@ -1,0 +1,9 @@
+/* Global styles for the application */
+
+/* Tooltip styles */
+.p-tooltip.filename-tooltip .p-tooltip-text {
+    white-space: nowrap !important;
+    max-width: none !important;
+    font-size: 0.875rem;
+    overflow: visible;
+}
