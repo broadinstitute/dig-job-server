@@ -1,0 +1,35 @@
+/* Light mode styles */
+/* .shiki,
+.shiki span {
+    color: var(--shiki-light) !important;
+    background-color: transparent !important;
+    font-style: var(--shiki-light-font-style) !important;
+    font-weight: var(--shiki-light-font-weight) !important;
+    text-decoration: var(--shiki-light-text-decoration) !important;
+} */
+
+/* Dark mode styles */
+html.dark .shiki,
+html.dark .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: transparent !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+/* Common styles for code blocks */
+/* .shiki {
+    padding: 1rem;
+    border-radius: 0.375rem;
+    overflow-x: auto;
+} */
+
+/* Optional: Add a subtle background in both modes
+.shiki {
+    background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+html.dark .shiki {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+} */
