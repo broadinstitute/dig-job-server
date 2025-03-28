@@ -210,7 +210,7 @@ const {
 const first = ref(0);
 const rows = ref(10);
 const sortField = ref("pValue");
-const sortOrder = ref(-1);
+const sortOrder = ref(1);
 const dataset = ref(route.query.dataset);
 const dt = ref();
 const filteredBiosamples = ref([]);
