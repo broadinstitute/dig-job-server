@@ -146,13 +146,22 @@ async def job_status(job_id: str):
         try:
             while True:
                 try:
+                    if job_id not in job_queues:
+                        status = database_utils.get_job_status(get_db(), job_id)
+                        yield {
+                            "event": "message",
+                            "data": json.dumps({
+                                "status": status,
+                                "dataset": job_id,
+                            })
+                        }
+                        break
                     data = await asyncio.wait_for(job_queues[job_id].get(), timeout=30.0)
                     yield {
                         "event": "message",
                         "data": json.dumps(data)
                     }
                     if data["status"].endswith("SUCCEEDED") or data["status"].endswith("FAILED"):
-                        await asyncio.sleep(1)
                         break
                 except asyncio.TimeoutError:
                     yield {

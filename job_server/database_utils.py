@@ -56,8 +56,11 @@ def get_dataset_hash(dataset: str, username: str) -> str:
 
 def delete_dataset(db, username, dataset):
     with db as connection:
+        dataset_hash = get_dataset_hash(dataset, username)
         query = text("DELETE FROM dataset_jobs WHERE id=:id")
-        connection.execute(query, {"id": get_dataset_hash(dataset, username)})
+        connection.execute(query, {"id": dataset_hash})
+        query = text("DELETE FROM datasets WHERE id=:id")
+        connection.execute(query, {"id": dataset_hash})
         connection.commit()
 
 
@@ -75,3 +78,9 @@ def get_dataset_metadata(db, username) -> dict:
         query = text("SELECT metadata, metadata->>'$.name', uploaded_at as ds_name FROM datasets WHERE uploaded_by = :username")
         results = connection.execute(query, {"username": username}).fetchall()
         return {row[1]: {**json.loads(row[0]), "uploaded_at": row[2]} for row in results}
+
+
+def get_job_status(db, job_id):
+    with db as connection:
+        query = text("SELECT status FROM dataset_jobs WHERE id=:id")
+        return connection.execute(query, {"id": job_id}).fetchone()[0]
