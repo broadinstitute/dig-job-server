@@ -122,8 +122,9 @@
                                         >Select a file</label
                                     >
                                     <FileUpload
+                                        ref="fileInput"
                                         id="file"
-                                        accept=".csv, .tsv, .gz, .bgzip, .gzip"
+                                        accept=".csv, .tsv, .gz, .gzip"
                                         @select="sampleFile"
                                         @clear="resetFile"
                                         @remove="resetFile"
@@ -245,8 +246,8 @@
 import { useToast } from "primevue/usetoast";
 import { useUserStore } from "~/stores/UserStore";
 import axios from "axios";
-const missingFileError = ref("");
 const fileInfo = ref({});
+const fileInput = ref(null);
 const dataSetName = ref("");
 const toast = useToast();
 const route = useRouter();
@@ -384,7 +385,7 @@ async function uploadData() {
             ancestry: ancestry.value,
             effective_n: effectiveN.value,
             separator: fileInfo.value.delimiter,
-            genome_build: "GRCh37",
+            genome_build: genomeBuild.value,
             col_map,
         });
         console.log("File uploaded successfully");
@@ -410,7 +411,20 @@ function onProgress(percentCompleted) {
 async function sampleFile(e) {
     file.value = e.files[0];
     fileName = e.files[0].name;
-    missingFileError.value = "";
+
+    const lowercaseFileName = fileName.toLowerCase();
+    const isGzipped = lowercaseFileName.endsWith('.gz');
+    const baseFileName = isGzipped ? lowercaseFileName.slice(0, -3) : lowercaseFileName;
+
+    if (!baseFileName.endsWith('.csv') && !baseFileName.endsWith('.tsv')) {
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'File must be a .csv or .tsv file (optionally gzipped)'
+        });
+        fileInput.value.clear();
+        return;
+    }
     try {
         fileInfo.value = await store.sampleTextFile(e.files[0]);
         //copy fileInfo.columns to selectedFields
