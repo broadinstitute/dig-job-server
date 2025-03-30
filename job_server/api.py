@@ -65,8 +65,8 @@ def is_logged_in(user: User = Depends(get_current_user)):
 
 @router.get("/datasets")
 async def get_datasets(user: User = Depends(get_current_user),
-                       orderBy: str = Query("uploaded_at", description="Field to order by"),
-                       orderDir: str = Query("desc", description="Sort direction (asc or desc)")):
+                       orderBy: str = Query(None, description="Field to order by"),
+                       orderDir: str = Query(None, description="Sort direction (asc or desc)")):
     data_set_folders = s3.get_datasets(user.username)
     jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
     data_set_metadata = database_utils.get_dataset_metadata(get_db(), user.username)
@@ -82,10 +82,14 @@ async def get_datasets(user: User = Depends(get_current_user),
              'id': database_utils.get_dataset_hash(d, user.username)
              } for d in data_set_folders]
 
-    # Sort datasets based on requested order
-    reverse = orderDir.lower() == "desc"
-    if orderBy in datasets[0] if datasets else {}:
-        datasets.sort(key=lambda x: x.get(orderBy, ""), reverse=reverse)
+    # Sort datasets only if orderBy parameter is provided
+    if orderBy and datasets:
+        try:
+            reverse = orderDir and orderDir.lower() == "desc"
+            datasets.sort(key=lambda x: x.get(orderBy, ""), reverse=reverse)
+        except Exception as e:
+            # Log the error but continue without sorting
+            print(f"Error sorting datasets: {str(e)}")
 
     return datasets
 
