@@ -174,7 +174,6 @@ function progress(data) {
                 ></Button>
             </div>
 
-            <!-- Popover with Timeline component -->
             <Popover ref="helpPopover">
                 <div class="p-4 w-[500px]">
                     <h3 class="mb-3 text-lg font-bold">Workflow Steps</h3>
@@ -309,7 +308,7 @@ function progress(data) {
                                 </template>
                             </template>
                         </Column>
-                        <Column header="Analysis">
+                        <Column header="Analysis" :style="{ width: '10rem' }">
                             <template #body="{ data }">
                                 <span>
                                     <Button
@@ -350,11 +349,42 @@ function progress(data) {
                             :style="{ width: '10rem' }"
                         >
                             <template #body="{ data }">
-                                <ProgressBar
-                                    :showValue="false"
-                                    :value="progress(data)"
-                                    style="height: 6px"
-                                />
+                                <div class="flex items-center gap-2">
+                                    <div
+                                        class="step-dot step-completed"
+                                        v-tooltip.top="'Uploaded'"
+                                    ></div>
+                                    <div
+                                        class="step-dot"
+                                        :class="{
+                                            'step-completed':
+                                                data.status ===
+                                                    'sumstats SUCCEEDED' ||
+                                                data.status ===
+                                                    'sldsc SUCCEEDED',
+                                        }"
+                                        v-tooltip.top="
+                                            data.status ===
+                                                'sumstats SUCCEEDED' ||
+                                            data.status === 'sldsc SUCCEEDED'
+                                                ? 'SumStats Completed'
+                                                : null
+                                        "
+                                    ></div>
+                                    <div
+                                        class="step-dot"
+                                        :class="{
+                                            'step-completed':
+                                                data.status ===
+                                                'sldsc SUCCEEDED',
+                                        }"
+                                        v-tooltip.top="
+                                            data.status === 'sldsc SUCCEEDED'
+                                                ? 'SLDSC Completed'
+                                                : null
+                                        "
+                                    ></div>
+                                </div>
                             </template>
                         </Column>
                         <Column
@@ -395,12 +425,24 @@ function progress(data) {
 }
 
 :deep(.p-timeline .p-timeline-event-marker) {
-    border-color: var(--primary-color);
+    border-color: var(--p-primary-color);
 }
 
-/* :deep(.p-timeline .p-timeline-event-connector) {
-    background-color: var(--primary-color);
-} */
+/* Step dots styling */
+.step-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #e0e0e0;
+    border: 1px solid #bdbdbd;
+    transition: all 0.2s ease;
+}
+
+.step-dot.step-completed {
+    background-color: var(--p-primary-color);
+    border-color: var(--p-primary-color);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
 
 /* Add additional styling for the popover itself */
 :deep(.p-popover) {
