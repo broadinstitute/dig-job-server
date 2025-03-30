@@ -39,8 +39,10 @@ export const useUserStore = defineStore("UserStore", {
             );
             return data;
         },
-        async retrieveDatasets(){
-            const { data } = await this.axios.get("/api/datasets");
+        async retrieveDatasets(orderBy = "uploaded_at", orderDir = "desc") {
+            const { data } = await this.axios.get(
+                `/api/datasets?orderBy=${orderBy}&orderDir=${orderDir}`,
+            );
             return data;
         },
         async login(username, password) {
@@ -52,29 +54,36 @@ export const useUserStore = defineStore("UserStore", {
                 JSON.stringify({ username, password }),
             );
             if (response.data && response.data.access_token) {
-                localStorage.setItem('authToken', response.data.access_token);
+                localStorage.setItem("authToken", response.data.access_token);
             }
         },
-        async getPresignedUrl(fileName, dataset){
-            const {data} = await this.axios.get(`/api/get-pre-signed-url/${dataset}?filename=${fileName}`);
+        async getPresignedUrl(fileName, dataset) {
+            const { data } = await this.axios.get(
+                `/api/get-pre-signed-url/${dataset}?filename=${fileName}`,
+            );
             return data;
         },
-        async finalizeUpload(dataset){
+        async finalizeUpload(dataset) {
             console.log(JSON.stringify(dataset));
-            await this.axios.post('/api/finalize-upload', JSON.stringify(dataset));
+            await this.axios.post(
+                "/api/finalize-upload",
+                JSON.stringify(dataset),
+            );
         },
-        async startAnalysis(dataset, method){
-            const {data} = await this.axios.post('/api/start-analysis', JSON.stringify({dataset, method}));
+        async startAnalysis(dataset, method) {
+            const { data } = await this.axios.post(
+                "/api/start-analysis",
+                JSON.stringify({ dataset, method }),
+            );
             return data;
         },
-        async deleteDataset(dataset){
+        async deleteDataset(dataset) {
             await this.axios.delete(`/api/delete-dataset/${dataset}`);
         },
-        async getLogInfo(job_id){
-            const {data} = await this.axios.get(`/api/log-info/${job_id}`);
+        async getLogInfo(job_id) {
+            const { data } = await this.axios.get(`/api/log-info/${job_id}`);
             return data;
         },
-
     },
 });
 
