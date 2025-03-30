@@ -421,8 +421,8 @@ onMounted(() => {
 
 /* Annotation dot colors */
 .color-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     display: inline-block;
 }
