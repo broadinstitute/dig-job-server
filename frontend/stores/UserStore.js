@@ -39,10 +39,23 @@ export const useUserStore = defineStore("UserStore", {
             );
             return data;
         },
-        async retrieveDatasets(orderBy = "uploaded_at", orderDir = "desc") {
-            const { data } = await this.axios.get(
-                `/api/datasets?orderBy=${orderBy}&orderDir=${orderDir}`,
-            );
+        async retrieveDatasets(orderBy = null, orderDir = null) {
+            let url = `/api/datasets`;
+            const params = [];
+
+            if (orderBy) {
+                params.push(`orderBy=${orderBy}`);
+            }
+
+            if (orderDir) {
+                params.push(`orderDir=${orderDir}`);
+            }
+
+            if (params.length > 0) {
+                url += `?${params.join("&")}`;
+            }
+
+            const { data } = await this.axios.get(url);
             return data;
         },
         async login(username, password) {
