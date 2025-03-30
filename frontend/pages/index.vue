@@ -213,6 +213,8 @@ function progress(data) {
                         :rowsPerPageOptions="[5, 10, 20]"
                         stripedRows
                         size="small"
+                        sortField="uploaded_at"
+                        :sortOrder="-1"
                     >
                         <Column field="dataset" header="Dataset">
                             <template #body="{ data }">
@@ -328,18 +330,18 @@ function progress(data) {
                                         icon="pi pi-forward"
                                         outlined
                                     ></Button>
-                                    <Button
+                                    <router-link
                                         v-if="data.status === 'sldsc SUCCEEDED'"
-                                        @click="
-                                            router.push(
-                                                `/results?dataset=${data.dataset}`,
-                                            )
-                                        "
-                                        label="View Results"
-                                        size="small"
-                                        outlined
-                                        icon="pi pi-eye"
-                                    ></Button>
+                                        :to="`/results?dataset=${data.dataset}`"
+                                        target="_blank"
+                                    >
+                                        <Button
+                                            label="View Results"
+                                            size="small"
+                                            outlined
+                                            icon="pi pi-eye"
+                                        ></Button>
+                                    </router-link>
                                 </span>
                             </template>
                         </Column>
