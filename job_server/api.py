@@ -64,11 +64,15 @@ def is_logged_in(user: User = Depends(get_current_user)):
 
 
 @router.get("/datasets")
-async def get_datasets(user: User = Depends(get_current_user)):
+async def get_datasets(user: User = Depends(get_current_user),
+                       orderBy: str = Query("uploaded_at", description="Field to order by"),
+                       orderDir: str = Query("desc", description="Sort direction (asc or desc)")):
     data_set_folders = s3.get_datasets(user.username)
     jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
     data_set_metadata = database_utils.get_dataset_metadata(get_db(), user.username)
-    return [{'dataset': d,
+
+    # Create the dataset list
+    datasets = [{'dataset': d,
              'uploaded_at': data_set_metadata.get(d, {}).get('uploaded_at', ''),
              'ancestry': data_set_metadata.get(d, {}).get('ancestry', ''),
              'file_name': data_set_metadata.get(d, {}).get('file', ''),
@@ -77,6 +81,13 @@ async def get_datasets(user: User = Depends(get_current_user)):
              'status': jobs_for_user.get(database_utils.get_dataset_hash(d, user.username), {}).get('status'),
              'id': database_utils.get_dataset_hash(d, user.username)
              } for d in data_set_folders]
+
+    # Sort datasets based on requested order
+    reverse = orderDir.lower() == "desc"
+    if orderBy in datasets[0] if datasets else {}:
+        datasets.sort(key=lambda x: x.get(orderBy, ""), reverse=reverse)
+
+    return datasets
 
 @router.get("/log-info/{job_id}")
 async def get_log_info(job_id: str, user: User = Depends(get_current_user)):
