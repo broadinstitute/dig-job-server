@@ -1,11 +1,11 @@
 <script setup>
 import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
-import { useToast } from "primevue/usetoast";
 
 const userStore = useUserStore();
 const router = useRouter();
 const toast = useToast();
+const confirm = useConfirm();
 const datasets = ref([]);
 const totalRecords = ref(0);
 const config = useRuntimeConfig();
@@ -83,7 +83,8 @@ const listenForJobStatus = (jobId, data) => {
             toast.add({
                 severity: "success",
                 summary: "Success",
-                detail: `${statusData.method} completed successfully`,
+                detail: `${statusData.status.split(" ")[0]} completed successfully`,
+                life: 5000,
             });
         } else if (statusData.status.endsWith("FAILED")) {
             eventSource.close();
@@ -91,7 +92,8 @@ const listenForJobStatus = (jobId, data) => {
             toast.add({
                 severity: "error",
                 summary: "Error",
-                detail: `${statusData.method} failed`,
+                detail: `${statusData.status.split(" ")[0]} failed`,
+                life: 5000,
             });
         }
     };
@@ -128,15 +130,31 @@ async function runSldsc(data) {
 }
 
 async function handleDelete(dataSet) {
-    await userStore.deleteDataset(dataSet);
-    datasets.value = datasets.value.filter(
-        (dataset) => dataset.dataset !== dataSet,
-    );
-    toast.add({
-        severity: "success",
-        summary: "Success",
-        detail: "Dataset deleted successfully",
-        life: 5000,
+    confirm.require({
+        message: `Are you sure you want to delete the dataset "${dataSet}"?`,
+        header: "Delete Confirmation",
+        icon: "pi pi-exclamation-triangle",
+        acceptClass: "p-button-danger",
+        accept: async () => {
+            await userStore.deleteDataset(dataSet);
+            datasets.value = datasets.value.filter(
+                (dataset) => dataset.dataset !== dataSet,
+            );
+            toast.add({
+                severity: "success",
+                summary: "Success",
+                detail: "Dataset deleted successfully",
+                life: 5000,
+            });
+        },
+        reject: () => {
+            toast.add({
+                severity: "info",
+                summary: "Cancelled",
+                detail: "Dataset deletion cancelled",
+                life: 5000,
+            });
+        },
     });
 }
 
@@ -153,6 +171,7 @@ function progress(data) {
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
         <div class="col-span-12">
             <Toast position="top-center" />
+            <ConfirmDialog />
 
             <div class="flex justify-between items-center">
                 <Button
