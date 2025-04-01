@@ -352,7 +352,7 @@ function progress(data) {
                                 <div class="flex items-center gap-2">
                                     <div
                                         class="step-dot step-completed"
-                                        v-tooltip.top="'Uploaded'"
+                                        v-tooltip.top="'Upload Completed'"
                                     ></div>
                                     <div
                                         class="step-dot"
