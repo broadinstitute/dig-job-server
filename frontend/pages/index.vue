@@ -380,7 +380,8 @@ function progress(data) {
                                                 data.status ===
                                                     'sumstats SUCCEEDED' ||
                                                 data.status ===
-                                                    'sldsc SUCCEEDED',
+                                                    'sldsc SUCCEEDED' ||
+                                                data.status === 'RUNNING sldsc',
                                         }"
                                         v-tooltip.top="
                                             data.status ===
