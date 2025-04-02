@@ -45,7 +45,7 @@
                                         id="dataset"
                                         autofocus
                                         type="text"
-                                        v-model="dataSetName"
+                                        v-model.trim="dataSetName"
                                         placeholder="Enter dataset name"
                                         class="w-full"
                                     />
@@ -413,14 +413,16 @@ async function sampleFile(e) {
     fileName = e.files[0].name;
 
     const lowercaseFileName = fileName.toLowerCase();
-    const isGzipped = lowercaseFileName.endsWith('.gz');
-    const baseFileName = isGzipped ? lowercaseFileName.slice(0, -3) : lowercaseFileName;
+    const isGzipped = lowercaseFileName.endsWith(".gz");
+    const baseFileName = isGzipped
+        ? lowercaseFileName.slice(0, -3)
+        : lowercaseFileName;
 
-    if (!baseFileName.endsWith('.csv') && !baseFileName.endsWith('.tsv')) {
+    if (!baseFileName.endsWith(".csv") && !baseFileName.endsWith(".tsv")) {
         toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'File must be a .csv or .tsv file (optionally gzipped)'
+            severity: "error",
+            summary: "Error",
+            detail: "File must be a .csv or .tsv file (optionally gzipped)",
         });
         fileInput.value.clear();
         return;
