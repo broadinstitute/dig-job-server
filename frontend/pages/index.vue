@@ -166,6 +166,14 @@ function progress(data) {
     }
     return 0; // Default
 }
+
+function viewResults(dataset) {
+    router.push(`/results?dataset=${dataset}`);
+}
+
+function openInNewTab(dataset) {
+    window.open(`/results?dataset=${dataset}`, "_blank");
+}
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
@@ -348,18 +356,23 @@ function progress(data) {
                                         icon="pi pi-forward"
                                         outlined
                                     ></Button>
-                                    <router-link
+                                    <SplitButton
                                         v-if="data.status === 'sldsc SUCCEEDED'"
-                                        :to="`/results?dataset=${data.dataset}`"
-                                        target="_blank"
-                                    >
-                                        <Button
-                                            label="View Results"
-                                            size="small"
-                                            outlined
-                                            icon="pi pi-eye"
-                                        ></Button>
-                                    </router-link>
+                                        label="View Results"
+                                        class="whitespace-nowrap"
+                                        icon="pi pi-eye"
+                                        size="small"
+                                        outlined
+                                        @click="viewResults(data.dataset)"
+                                        :model="[
+                                            {
+                                                label: 'Open in new tab',
+                                                icon: 'pi pi-external-link',
+                                                command: () =>
+                                                    openInNewTab(data.dataset),
+                                            },
+                                        ]"
+                                    />
                                 </span>
                             </template>
                         </Column>
