@@ -71,6 +71,40 @@
                                 </div>
                                 <div class="field mt-2">
                                     <label
+                                        for="phenotype"
+                                        class="block text-surface-600 dark:text-surface-50 text-l font-medium ml-2"
+                                        >Phenotype</label
+                                    >
+                                    <div class="p-fluid">
+                                        <AutoComplete
+                                            id="phenotype"
+                                            v-model="phenotype"
+                                            :suggestions="filteredPhenotypes"
+                                            @complete="searchPhenotypes($event)"
+                                            placeholder="Enter or select a phenotype (optional)"
+                                            optionLabel="description"
+                                            field="description"
+                                            class="w-full"
+                                            inputClass="w-full"
+                                            :loading="phenotypeStore.loading"
+                                        >
+                                            <template #option="slotProps">
+                                                <div>
+                                                    <div>
+                                                        {{
+                                                            slotProps.option
+                                                                .description ||
+                                                            slotProps.option
+                                                                .name
+                                                        }}
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </AutoComplete>
+                                    </div>
+                                </div>
+                                <div class="field mt-2">
+                                    <label
                                         for="effectiveN"
                                         class="block text-surface-600 dark:text-surface-50 text-l font-medium ml-2"
                                         >Effective N</label
@@ -245,6 +279,7 @@
 <script setup>
 import { useToast } from "primevue/usetoast";
 import { useUserStore } from "~/stores/UserStore";
+import { usePhenotypeStore } from "~/stores/PhenotypeStore";
 import axios from "axios";
 const fileInfo = ref({});
 const fileInput = ref(null);
@@ -252,6 +287,7 @@ const dataSetName = ref("");
 const toast = useToast();
 const route = useRouter();
 const store = useUserStore();
+const phenotypeStore = usePhenotypeStore();
 let fileName = null;
 const uploadProgress = ref(0);
 let file = ref(null);
@@ -260,6 +296,8 @@ const missingMappingError = ref("");
 const ancestry = ref("");
 const effectiveN = ref(null);
 const genomeBuild = ref("");
+const phenotype = ref(null);
+const filteredPhenotypes = ref([]);
 const currentStep = ref("1");
 
 const colMap = computed(() => {
@@ -379,6 +417,9 @@ async function uploadData() {
             },
         });
         const col_map = JSON.parse(JSON.stringify(colMap.value));
+        // Extract just the name from the phenotype object if it exists
+        const phenotypeName = phenotype.value?.name || phenotype.value;
+
         await store.finalizeUpload({
             file: fileName,
             name: dataSetName.value,
@@ -386,6 +427,7 @@ async function uploadData() {
             effective_n: effectiveN.value,
             separator: fileInfo.value.delimiter,
             genome_build: genomeBuild.value,
+            phenotype: phenotypeName,
             col_map,
         });
         console.log("File uploaded successfully");
@@ -439,6 +481,32 @@ async function sampleFile(e) {
         selectedFields.value = {};
     }
 }
+
+async function searchPhenotypes(event) {
+    const query = event.query;
+
+    if (!phenotypeStore.phenotypes.length) {
+        await phenotypeStore.fetchPhenotypes();
+    }
+
+    if (query) {
+        filteredPhenotypes.value = phenotypeStore.phenotypes.filter(
+            (phenotype) =>
+                (phenotype.description &&
+                    phenotype.description
+                        .toLowerCase()
+                        .includes(query.toLowerCase())) ||
+                phenotype.name.toLowerCase().includes(query.toLowerCase()),
+        );
+    } else {
+        filteredPhenotypes.value = phenotypeStore.phenotypes;
+    }
+}
+
+// Initialize phenotype data when component is mounted
+onMounted(async () => {
+    await phenotypeStore.fetchPhenotypes();
+});
 </script>
 
 <style scoped>
