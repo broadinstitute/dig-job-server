@@ -17,6 +17,7 @@ class DatasetInfo(BaseModel):
     ancestry: str
     separator: str
     genome_build: str
+    phenotype: Union[str, None]
     effective_n: Union[float, None]
     col_map: dict
 
