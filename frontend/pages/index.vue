@@ -1,11 +1,11 @@
 <script setup>
 import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
-import { useToast } from "primevue/usetoast";
 
 const userStore = useUserStore();
 const router = useRouter();
 const toast = useToast();
+const confirm = useConfirm();
 const datasets = ref([]);
 const totalRecords = ref(0);
 const config = useRuntimeConfig();
@@ -83,7 +83,8 @@ const listenForJobStatus = (jobId, data) => {
             toast.add({
                 severity: "success",
                 summary: "Success",
-                detail: `${statusData.method} completed successfully`,
+                detail: `${statusData.status.split(" ")[0]} completed successfully`,
+                life: 5000,
             });
         } else if (statusData.status.endsWith("FAILED")) {
             eventSource.close();
@@ -91,7 +92,8 @@ const listenForJobStatus = (jobId, data) => {
             toast.add({
                 severity: "error",
                 summary: "Error",
-                detail: `${statusData.method} failed`,
+                detail: `${statusData.status.split(" ")[0]} failed`,
+                life: 5000,
             });
         }
     };
@@ -128,15 +130,31 @@ async function runSldsc(data) {
 }
 
 async function handleDelete(dataSet) {
-    await userStore.deleteDataset(dataSet);
-    datasets.value = datasets.value.filter(
-        (dataset) => dataset.dataset !== dataSet,
-    );
-    toast.add({
-        severity: "success",
-        summary: "Success",
-        detail: "Dataset deleted successfully",
-        life: 5000,
+    confirm.require({
+        message: `Are you sure you want to delete the dataset "${dataSet}"?`,
+        header: "Delete Confirmation",
+        icon: "pi pi-exclamation-triangle",
+        acceptClass: "p-button-danger",
+        accept: async () => {
+            await userStore.deleteDataset(dataSet);
+            datasets.value = datasets.value.filter(
+                (dataset) => dataset.dataset !== dataSet,
+            );
+            toast.add({
+                severity: "success",
+                summary: "Success",
+                detail: "Dataset deleted successfully",
+                life: 5000,
+            });
+        },
+        reject: () => {
+            toast.add({
+                severity: "info",
+                summary: "Cancelled",
+                detail: "Dataset deletion cancelled",
+                life: 5000,
+            });
+        },
     });
 }
 
@@ -148,11 +166,20 @@ function progress(data) {
     }
     return 0; // Default
 }
+
+function viewResults(dataset) {
+    router.push(`/results?dataset=${dataset}`);
+}
+
+function openInNewTab(dataset) {
+    window.open(`/results?dataset=${dataset}`, "_blank");
+}
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
         <div class="col-span-12">
             <Toast position="top-center" />
+            <ConfirmDialog />
 
             <div class="flex justify-between items-center">
                 <Button
@@ -174,7 +201,6 @@ function progress(data) {
                 ></Button>
             </div>
 
-            <!-- Popover with Timeline component -->
             <Popover ref="helpPopover">
                 <div class="p-4 w-[500px]">
                     <h3 class="mb-3 text-lg font-bold">Workflow Steps</h3>
@@ -213,6 +239,8 @@ function progress(data) {
                         :rowsPerPageOptions="[5, 10, 20]"
                         stripedRows
                         size="small"
+                        sortField="uploaded_at"
+                        :sortOrder="-1"
                     >
                         <Column field="dataset" header="Dataset">
                             <template #body="{ data }">
@@ -307,7 +335,7 @@ function progress(data) {
                                 </template>
                             </template>
                         </Column>
-                        <Column header="Analysis">
+                        <Column header="Analysis" :style="{ width: '10rem' }">
                             <template #body="{ data }">
                                 <span>
                                     <Button
@@ -328,18 +356,23 @@ function progress(data) {
                                         icon="pi pi-forward"
                                         outlined
                                     ></Button>
-                                    <Button
+                                    <SplitButton
                                         v-if="data.status === 'sldsc SUCCEEDED'"
-                                        @click="
-                                            router.push(
-                                                `/results?dataset=${data.dataset}`,
-                                            )
-                                        "
                                         label="View Results"
+                                        class="whitespace-nowrap"
+                                        icon="pi pi-eye"
                                         size="small"
                                         outlined
-                                        icon="pi pi-eye"
-                                    ></Button>
+                                        @click="viewResults(data.dataset)"
+                                        :model="[
+                                            {
+                                                label: 'Open in new tab',
+                                                icon: 'pi pi-external-link',
+                                                command: () =>
+                                                    openInNewTab(data.dataset),
+                                            },
+                                        ]"
+                                    />
                                 </span>
                             </template>
                         </Column>
@@ -348,11 +381,43 @@ function progress(data) {
                             :style="{ width: '10rem' }"
                         >
                             <template #body="{ data }">
-                                <ProgressBar
-                                    :showValue="false"
-                                    :value="progress(data)"
-                                    style="height: 6px"
-                                />
+                                <div class="flex items-center gap-2">
+                                    <div
+                                        class="step-dot step-completed"
+                                        v-tooltip.top="'Upload Completed'"
+                                    ></div>
+                                    <div
+                                        class="step-dot"
+                                        :class="{
+                                            'step-completed':
+                                                data.status ===
+                                                    'sumstats SUCCEEDED' ||
+                                                data.status ===
+                                                    'sldsc SUCCEEDED' ||
+                                                data.status === 'RUNNING sldsc',
+                                        }"
+                                        v-tooltip.top="
+                                            data.status ===
+                                                'sumstats SUCCEEDED' ||
+                                            data.status === 'sldsc SUCCEEDED'
+                                                ? 'SumStats Completed'
+                                                : null
+                                        "
+                                    ></div>
+                                    <div
+                                        class="step-dot"
+                                        :class="{
+                                            'step-completed':
+                                                data.status ===
+                                                'sldsc SUCCEEDED',
+                                        }"
+                                        v-tooltip.top="
+                                            data.status === 'sldsc SUCCEEDED'
+                                                ? 'SLDSC Completed'
+                                                : null
+                                        "
+                                    ></div>
+                                </div>
                             </template>
                         </Column>
                         <Column
@@ -393,12 +458,24 @@ function progress(data) {
 }
 
 :deep(.p-timeline .p-timeline-event-marker) {
-    border-color: var(--primary-color);
+    border-color: var(--p-primary-color);
 }
 
-/* :deep(.p-timeline .p-timeline-event-connector) {
-    background-color: var(--primary-color);
-} */
+/* Step dots styling */
+.step-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #e0e0e0;
+    border: 1px solid #bdbdbd;
+    transition: all 0.2s ease;
+}
+
+.step-dot.step-completed {
+    background-color: var(--p-primary-color);
+    border-color: var(--p-primary-color);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
 
 /* Add additional styling for the popover itself */
 :deep(.p-popover) {
