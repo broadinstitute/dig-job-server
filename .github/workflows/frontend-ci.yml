@@ -1,73 +1,72 @@
 name: Frontend CI/CD
 
 on:
-  push:
-    branches:
-      - "*"
-    paths:
-      - 'frontend/**'
+    push:
+        branches:
+            - "*"
+        paths:
+            - "frontend/**"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
 
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
+            - name: Install dependencies
+              working-directory: ./frontend
+              run: npm ci
 
-      - name: Create .env file
-        working-directory: ./frontend
-        run: |
-          echo "NUXT_PUBLIC_API_BASE_URL=https://api.ldserver.kpndataregistry.org" >> .env
+            - name: Create .env file
+              working-directory: ./frontend
+              run: |
+                  echo "NUXT_PUBLIC_API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env
+                  echo "NUXT_PUBLIC_PHENOTYPES_URL=${{ secrets.PHENOTYPES_URL }}" >> .env
 
-      - name: Build
-        working-directory: ./frontend
-        run: npx nuxt generate -v
+            - name: Build
+              working-directory: ./frontend
+              run: npx nuxt generate -v
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: nuxt-build
-          path: frontend/.output/public
+            - name: Upload Artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: nuxt-build
+                  path: frontend/.output/public
 
+    deploy:
+        needs: [build]
+        if: github.ref == 'refs/heads/main'
+        name: Deploy UI
+        runs-on: ubuntu-latest
+        steps:
+            - name: Download Artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  name: nuxt-build
 
-  deploy:
-    needs: [build]
-    if: github.ref == 'refs/heads/main'
-    name: Deploy UI
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: nuxt-build
+            - name: Clear Remote Directory
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.FRONT_END_DEPLOY_HOST }}
+                  username: ec2-user
+                  key: ${{ secrets.FRONT_END_SSH_PRIVATE_KEY }}
+                  port: 22
+                  script: |
+                      rm -rf /home/ec2-user/ldserver-frontend/.output/*
 
-      - name: Clear Remote Directory
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.FRONT_END_DEPLOY_HOST }}
-          username: ec2-user
-          key: ${{ secrets.FRONT_END_SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            rm -rf /home/ec2-user/ldserver-frontend/.output/*
-
-      - name: Deploy to Server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.FRONT_END_DEPLOY_HOST }}
-          username: ec2-user
-          key: ${{ secrets.FRONT_END_SSH_PRIVATE_KEY }}
-          port: 22
-          source: "*"
-          debug: true
-          target: "/home/ec2-user/ldserver-frontend/.output/public"
-
+            - name: Deploy to Server
+              uses: appleboy/scp-action@master
+              with:
+                  host: ${{ secrets.FRONT_END_DEPLOY_HOST }}
+                  username: ec2-user
+                  key: ${{ secrets.FRONT_END_SSH_PRIVATE_KEY }}
+                  port: 22
+                  source: "*"
+                  debug: true
+                  target: "/home/ec2-user/ldserver-frontend/.output/public"
