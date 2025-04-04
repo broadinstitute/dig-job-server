@@ -299,7 +299,10 @@ function openInNewTab(dataset) {
                                 {{ data.genome_build }}
                             </template>
                         </Column>
-                        <Column header="Uploader">
+                        <Column
+                            header="Uploader"
+                            v-if="userStore.user.username !== 'demo'"
+                        >
                             <template #body="{ data }">
                                 {{ data.uploaded_by }}
                             </template>

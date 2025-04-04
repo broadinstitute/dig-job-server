@@ -87,6 +87,11 @@
                                             class="w-full"
                                             inputClass="w-full"
                                             :loading="phenotypeStore.loading"
+                                            :dropdown="
+                                                phenotype &&
+                                                filteredPhenotypes.length > 0
+                                            "
+                                            dropdown-mode="current"
                                         >
                                             <template #option="slotProps">
                                                 <div>
@@ -184,6 +189,68 @@
                                         currentStep === '3',
                                 }"
                             >
+                                <h5>
+                                    Map column names to their representations.
+                                </h5>
+                                <small
+                                    >Match all the required fields<span
+                                        style="color: darkred"
+                                        >*</span
+                                    >, n (or manually entered effective n)<span
+                                        style="color: darkred"
+                                        >^</span
+                                    >, and any optional field to upload
+                                    file.</small
+                                >
+                                <div
+                                    class="card flex flex-wrap gap-1 required-card"
+                                >
+                                    <h6 class="w-full">Required fields:</h6>
+                                    <template v-for="field in requiredFields">
+                                        <Chip
+                                            v-if="
+                                                Object.values(
+                                                    selectedFields,
+                                                ).includes(field)
+                                            "
+                                            :key="field"
+                                            icon="pi pi-check"
+                                            :label="field"
+                                            class="selected-chip"
+                                        />
+
+                                        <Chip
+                                            v-else
+                                            :label="field"
+                                            :key="'else-' + field"
+                                        />
+                                    </template>
+                                    <Chip
+                                        v-if="requiredEffectFields"
+                                        icon="pi pi-check"
+                                        label="beta | oddsRatio"
+                                        class="selected-chip"
+                                    />
+                                    <Chip v-else label="beta | oddsRatio" />
+                                    <Chip
+                                        v-if="effectiveN || colMap.n"
+                                        label="n"
+                                        icon="pi pi-check"
+                                        class="selected-chip"
+                                    />
+                                    <Chip v-else label="n" />
+                                </div>
+                                <div v-if="fileInfo.columns" class="flex">
+                                    <Button
+                                        type="button"
+                                        label="Reset Mapping"
+                                        icon="pi pi-refresh"
+                                        @click="resetMapping"
+                                        severity="help"
+                                        variant="outlined"
+                                        size="small"
+                                    ></Button>
+                                </div>
                                 <DataTable
                                     :value="tableRows"
                                     v-if="fileInfo.columns"
@@ -195,14 +262,15 @@
                                         field="column"
                                         header="Column"
                                         class="col-span-4"
+                                        style="width: 30%"
                                     ></Column>
                                     <Column
                                         header=">>"
-                                        class="col-span-1"
+                                        style="width: 5%"
                                     ></Column>
                                     <Column
                                         header="Represents"
-                                        class="col-span-7"
+                                        style="width: 65%"
                                     >
                                         <template #body="{ data }">
                                             <Dropdown
@@ -243,7 +311,7 @@
                                 </div>
                             </Fieldset>
                             <div class="field">
-                                <p v-if="formIncomplete" class="mb-2 text-sm">
+                                <!-- <p v-if="formIncomplete" class="mb-2 text-sm">
                                     {{
                                         `You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
                   includes ${requiredFields.join(
@@ -251,13 +319,14 @@
                   )}, and either beta or odds ratio.  You also must specify n in your column mapping
                   or provide an effective n before you can upload.`
                                     }}
-                                </p>
+                                </p> -->
                                 <Button
                                     label="Upload Dataset"
                                     class="w-full mt-4"
                                     icon="pi pi-upload"
                                     :disabled="formIncomplete"
                                     @click="uploadData"
+                                    raised
                                 />
                             </div>
                         </template>
@@ -374,6 +443,13 @@ const tableRows = computed(() => {
               column: value,
           }))
         : [];
+});
+
+const requiredEffectFields = computed(() => {
+    return (
+        colMap.value["beta"] !== undefined ||
+        colMap.value["oddsRatio"] !== undefined
+    );
 });
 
 function resetFile() {
@@ -503,6 +579,13 @@ async function searchPhenotypes(event) {
     }
 }
 
+function resetMapping() {
+    //reset all values in selectedFields to null
+    Object.keys(selectedFields.value).forEach((key) => {
+        selectedFields.value[key] = null;
+    });
+}
+
 // Initialize phenotype data when component is mounted
 onMounted(async () => {
     await phenotypeStore.fetchPhenotypes();
@@ -584,5 +667,25 @@ onMounted(async () => {
 
 .card:last-child {
     margin-bottom: 0;
+}
+
+.required-card {
+    border: 1px dashed #ccc;
+    padding: 0.5rem;
+    margin-top: 1rem;
+}
+.required-card h6 {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.p-chip.selected-chip {
+    background-color: #24cb67;
+    color: white;
+}
+:deep(.p-chip.selected-chip > .p-chip-icon.pi) {
+    color: white;
+}
+.p-chip {
+    padding-block: unset;
 }
 </style>
