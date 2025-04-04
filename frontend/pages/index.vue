@@ -1,8 +1,10 @@
 <script setup>
 import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
+import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 
 const userStore = useUserStore();
+const phenotypeStore = usePhenotypeStore();
 const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
@@ -14,6 +16,21 @@ const helpPopover = ref(null);
 const toggleHelp = (event) => {
     helpPopover.value.toggle(event);
 };
+
+// Ancestry mapping from codes to descriptive names
+const ancestryMapping = {
+    AFR: "African",
+    AMR: "Native American",
+    EAS: "East Asian",
+    EUR: "European",
+    SAS: "South Asian",
+    MID: "Middle Eastern",
+};
+
+// Function to get descriptive name for ancestry code
+function getAncestryName(code) {
+    return ancestryMapping[code] || code; // Return the code itself if no mapping exists
+}
 
 // Timeline events for the workflow steps
 const timelineEvents = [
@@ -50,6 +67,9 @@ onMounted(async () => {
         }
     });
     totalRecords.value = datasets.value.length;
+
+    // Fetch phenotypes data
+    await phenotypeStore.fetchPhenotypes();
 });
 
 onUnmounted(() => {
@@ -254,10 +274,24 @@ function openInNewTab(dataset) {
                                 >
                             </template>
                         </Column>
-
                         <Column field="ancestry" header="Ancestry">
                             <template #body="{ data }">
-                                {{ data.ancestry }}
+                                {{ getAncestryName(data.ancestry) }}
+                            </template>
+                        </Column>
+                        <Column field="phenotype" header="Phenotype">
+                            <template #body="{ data }">
+                                <template v-if="data.phenotype">
+                                    <span
+                                        v-tooltip.top="
+                                            phenotypeStore.getPhenotypeByName(
+                                                data.phenotype,
+                                            )?.description || ''
+                                        "
+                                    >
+                                        {{ data.phenotype }}
+                                    </span>
+                                </template>
                             </template>
                         </Column>
                         <Column field="genome_build" header="Genome Build">
