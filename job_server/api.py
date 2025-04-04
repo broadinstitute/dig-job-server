@@ -73,6 +73,7 @@ async def get_datasets(user: User = Depends(get_current_user)):
              'ancestry': data_set_metadata.get(d, {}).get('ancestry', ''),
              'file_name': data_set_metadata.get(d, {}).get('file', ''),
              'genome_build': data_set_metadata.get(d, {}).get('genome_build', ''),
+             'phenotype': data_set_metadata.get(d, {}).get('phenotype', ''),
              'uploaded_by': user.username,
              'status': jobs_for_user.get(database_utils.get_dataset_hash(d, user.username), {}).get('status'),
              'id': database_utils.get_dataset_hash(d, user.username)
