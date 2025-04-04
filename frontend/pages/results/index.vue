@@ -76,10 +76,12 @@
                             />
                         </template>
                         <template #body="{ data }">
-                            <Chip
-                                :label="data.annotation"
-                                :class="'chip_' + data.annotation"
-                            />
+                            <div class="flex items-center">
+                                <div
+                                    :class="'color-dot ' + data.annotation"
+                                ></div>
+                                <span class="ml-2">{{ data.annotation }}</span>
+                            </div>
                         </template>
                     </Column>
                     <Column
@@ -417,44 +419,34 @@ onMounted(() => {
     justify-content: space-between;
 }
 
-/* :deep(.p-datatable) {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-    border-radius: 4px;
-} */
+/* Annotation dot colors */
+.color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.color-dot.binding_sites {
+    background-color: #2196f3;
+}
+
+.color-dot.accessible_chromatin {
+    background-color: #4caf50;
+}
+
+.color-dot.enhancer {
+    background-color: #ff9800;
+}
+
+.color-dot.promoter {
+    background-color: #e91e63;
+}
 
 :deep(.p-column-header-content) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-}
-
-/* Annotation chip colors */
-:deep(.chip_binding_sites) {
-    border: 2px solid #2196f3;
-    color: #2196f3;
-    background-color: transparent;
-    padding-block: 0.1rem;
-}
-
-:deep(.chip_accessible_chromatin) {
-    border: 2px solid #4caf50;
-    color: #4caf50;
-    background-color: transparent;
-    padding-block: 0.1rem;
-}
-
-:deep(.chip_enhancer) {
-    border: 2px solid #ff9800;
-    color: #ff9800;
-    background-color: transparent;
-    padding-block: 0.1rem;
-}
-
-:deep(.chip_promoter) {
-    border: 2px solid #e91e63;
-    color: #e91e63;
-    background-color: transparent;
-    padding-block: 0.1rem;
 }
 
 :deep(.p-column-filter) {

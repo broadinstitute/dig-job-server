@@ -27,7 +27,7 @@ export const useResultsStore = defineStore("results", {
                 // Create query params from the provided parameters
                 const queryParams = new URLSearchParams({
                     first: params.first || 0,
-                    limit: params.rows || 10,
+                    rows: params.rows || 10,
                     sort_field: params.sort_field || "pValue",
                     sort_order: params.sort_order || -1,
                 });
