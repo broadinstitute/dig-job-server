@@ -28,6 +28,9 @@ jobs:
               run: |
                   echo "NUXT_PUBLIC_API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env
                   echo "NUXT_PUBLIC_PHENOTYPES_URL=${{ secrets.PHENOTYPES_URL }}" >> .env
+                  echo "NUXT_PUBLIC_DEFAULT_USERNAME=defaultuser" >> .env
+                  echo "NUXT_PUBLIC_DEFAULT_PASSWORD=defaultpass" >> .env
+                  
 
             - name: Build
               working-directory: ./frontend
