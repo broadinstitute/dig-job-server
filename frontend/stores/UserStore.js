@@ -6,12 +6,14 @@ export const useUserStore = defineStore("UserStore", {
             user: null,
             axios: null,
             loginError: null,
+            isDefaultUser: false,
         };
     },
     actions: {
         init() {
             const config = useRuntimeConfig();
             this.axios = useAxios(config);
+            this.isDefaultUser = localStorage.getItem("isDefaultUser") === "true";
         },
         async isUserLoggedIn() {
             try {
@@ -22,8 +24,28 @@ export const useUserStore = defineStore("UserStore", {
                 this.user = data;
                 return true;
             } catch (error) {
-                return false;
+                // If not logged in and we have default credentials, try to log in with them
+                if (!localStorage.getItem('authToken')) {
+                    await this.tryDefaultLogin();
+                }
+                return this.user !== null;
             }
+        },
+        async tryDefaultLogin() {
+            try {
+                const config = useRuntimeConfig();
+                if (config.public.defaultUsername && config.public.defaultPassword) {
+                    await this.login(
+                        config.public.defaultUsername,
+                        config.public.defaultPassword,
+                        true
+                    );
+                    return true;
+                }
+            } catch (error) {
+                console.error("Failed to login with default credentials", error);
+            }
+            return false;
         },
         async sampleTextFile(file) {
             const part = await readFilePart(file, 2048);
@@ -58,7 +80,7 @@ export const useUserStore = defineStore("UserStore", {
             const { data } = await this.axios.get(url);
             return data;
         },
-        async login(username, password) {
+        async login(username, password, isDefault = false) {
             if (!this.axios) {
                 this.init();
             }
@@ -68,6 +90,13 @@ export const useUserStore = defineStore("UserStore", {
             );
             if (response.data && response.data.access_token) {
                 localStorage.setItem("authToken", response.data.access_token);
+                this.isDefaultUser = isDefault;
+                if (isDefault) {
+                    localStorage.setItem("isDefaultUser", "true");
+                } else {
+                    localStorage.removeItem("isDefaultUser");
+                }
+                await this.isUserLoggedIn();
             }
         },
         async getPresignedUrl(fileName, dataset) {

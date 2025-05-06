@@ -25,6 +25,16 @@
                         href="/"
                     />
                     <Button
+                        v-if="userStore.isDefaultUser"
+                        icon="pi pi-user"
+                        label="Login"
+                        class="p-button-text"
+                        size="small"
+                        as="a"
+                        href="/login"
+                    />
+                    <Button
+                        v-if="!userStore.isDefaultUser"
                         icon="pi pi-sign-out"
                         label="Sign out"
                         class="p-button-text"
@@ -110,12 +120,20 @@
 </style>
 <script setup>
 import { useTheme } from "~/composables/useTheme";
+import { useUserStore } from "~/stores/UserStore";
 
+const userStore = useUserStore();
 const { isDarkMode, toggleDarkMode } = useTheme();
+
+onMounted(() => {
+    // Initialize userStore to check isDefaultUser status
+    userStore.init();
+});
 
 function signOut() {
     console.log("Signing out...");
     localStorage.removeItem("authToken");
+    localStorage.removeItem("isDefaultUser");
     window.location.href = "/login";
 }
 </script>
