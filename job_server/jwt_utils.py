@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import jwt
+from jwt import ExpiredSignatureError, InvalidSignatureError, DecodeError
 
 ALGORITHM = "HS256"
 # one week
@@ -25,5 +26,14 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
-def get_decoded_jwt_data(cookie_data: str) -> dict:
-    return jwt.decode(cookie_data, get_jwt_secret(), algorithms=[ALGORITHM])
+def get_decoded_jwt_data(cookie_data: str) -> tuple[dict, str]:
+    try:
+        return jwt.decode(cookie_data, get_jwt_secret(), algorithms=[ALGORITHM]), ""
+    except ExpiredSignatureError:
+        return None, "Token expired"
+    except InvalidSignatureError:
+        return None, "Invalid token signature"
+    except DecodeError:
+        return None, "Malformed token"
+    except Exception as e:
+        return None, f"Token error: {str(e)}"

@@ -11,7 +11,10 @@ const userStore = useUserStore();
 
 const submitForm = async () => {
     try {
-        await userStore.login(username.value, password.value);
+        // Clear the default user flag when explicitly logging in
+        localStorage.removeItem("isDefaultUser");
+        
+        await userStore.login(username.value, password.value, false);
         await userStore.isUserLoggedIn();
         const defaultUrl = "/";
         navigateTo(route.query.redirect ? route.query.redirect : defaultUrl);
@@ -29,13 +32,17 @@ const submitForm = async () => {
 onMounted(async () => {
     // Check if the user is already logged in
     const isLoggedIn = await userStore.isUserLoggedIn();
-    if (isLoggedIn) {
-        // If already logged in, redirect to homepage
+    
+    // If logged in but not with default account, redirect to homepage
+    if (isLoggedIn && !userStore.isDefaultUser) {
         navigateTo("/");
         return;
     }
-
-    // Otherwise continue with normal login form behavior
+    
+    // If they're logged in with default account, we should let them login with their own credentials
+    // so we'll just continue with the login form
+    
+    // Focus username field for better UX
     document.getElementById("username").focus();
     if (userStore.loginError) {
         toast.add({

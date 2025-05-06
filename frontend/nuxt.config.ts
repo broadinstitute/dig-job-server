@@ -68,6 +68,8 @@ export default defineNuxtConfig({
             apiBaseUrl: "",
             skipAuth: false,
             phenotypesUrl: process.env.NUXT_PUBLIC_PHENOTYPES_URL || "",
+            defaultUsername: process.env.NUXT_PUBLIC_DEFAULT_USERNAME || "",
+            defaultPassword: process.env.NUXT_PUBLIC_DEFAULT_PASSWORD || "",
         },
     },
     shiki: {

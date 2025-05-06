@@ -43,12 +43,12 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
     if authorization:
         schema, _, token = authorization.partition(' ')
         if schema.lower() == 'bearer' and token:
-            data = get_decoded_jwt_data(token)
+            data = get_decoded_jwt_data(token)[0]
             if data:
                 return User(**data)
 
     if token:
-        data = get_decoded_jwt_data(token)
+        data = get_decoded_jwt_data(token)[0]
         if data:
             return User(**data)
 
