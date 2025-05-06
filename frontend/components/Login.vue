@@ -30,17 +30,26 @@ const submitForm = async () => {
 };
 
 onMounted(async () => {
-    // Check if the user is already logged in
-    const isLoggedIn = await userStore.isUserLoggedIn();
-    
-    // If logged in but not with default account, redirect to homepage
-    if (isLoggedIn && !userStore.isDefaultUser) {
-        navigateTo("/");
-        return;
+    // If we're coming from the login button click, we should clear the default user state
+    if (userStore.isDefaultUser) {
+        // Clear default user data so we don't auto-login again
+        localStorage.removeItem("isDefaultUser");
+        localStorage.removeItem("authToken"); 
+        userStore.isDefaultUser = false;
+        userStore.user = null;
+    } else {
+        // Normal flow - check if user is already logged in
+        const isLoggedIn = await userStore.isUserLoggedIn();
+        
+        // If logged in with personal account, redirect to homepage
+        if (isLoggedIn && !userStore.isDefaultUser) {
+            navigateTo("/");
+            return;
+        }
+        
+        // If they're logged in with default account (should not happen now),
+        // let them login with their own credentials
     }
-    
-    // If they're logged in with default account, we should let them login with their own credentials
-    // so we'll just continue with the login form
     
     // Focus username field for better UX
     document.getElementById("username").focus();
