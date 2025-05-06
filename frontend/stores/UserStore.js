@@ -24,10 +24,25 @@ export const useUserStore = defineStore("UserStore", {
                 this.user = data;
                 return true;
             } catch (error) {
-                // If not logged in and we have default credentials, try to log in with them
+                // Clear token if it has expired (401 response)
+                if (error.response && error.response.status === 401) {
+                    // If we were using default credentials, relogin automatically
+                    const wasDefaultUser = localStorage.getItem('isDefaultUser') === 'true';
+                    
+                    // Clear invalid token
+                    localStorage.removeItem('authToken');
+                    
+                    // For default user, try to login again automatically
+                    if (wasDefaultUser) {
+                        await this.tryDefaultLogin();
+                    }
+                }
+                
+                // If not logged in and we don't have any token, try default login
                 if (!localStorage.getItem('authToken')) {
                     await this.tryDefaultLogin();
                 }
+                
                 return this.user !== null;
             }
         },
