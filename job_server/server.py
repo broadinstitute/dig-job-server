@@ -39,7 +39,8 @@ def cli_serve(port):
     origins = [
         "http://localhost:3000",
         "https://local.kpndataregistry.org:8000",
-        "https://ldserver.kpndataregistry.org"
+        "https://ldserver.kpndataregistry.org",
+        "https://gwas-ce.kpndataregistry.org"
     ]
     app.add_middleware(
         CORSMiddleware,

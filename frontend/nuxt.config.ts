@@ -43,7 +43,7 @@ export default defineNuxtConfig({
             htmlAttrs: {
                 lang: "en",
             },
-            title: "LDSC Server",
+            title: "GWAS-CE",
         },
     },
     primevue: {
