@@ -3,11 +3,14 @@ import { useToast } from "primevue/usetoast";
 
 const toast = useToast();
 import { useUserStore } from "~/stores/UserStore";
+import { useTheme } from "~/composables/useTheme";
+
 const username = ref("");
 const password = ref("");
 
 const route = useRoute();
 const userStore = useUserStore();
+const { isDarkMode, toggleDarkMode } = useTheme();
 
 const submitForm = async () => {
     try {
@@ -71,8 +74,12 @@ onMounted(async () => {
     >
         <div class="flex flex-col items-center justify-center">
             <div class="w-full bg-surface-0 dark:bg-surface-900">
-                <div class="text-center">
-                    <img src="/images/logo.png" alt="Logo" />
+                <div class="text-center mb-4">
+                    <img 
+                        src="/images/gwas-ce-logo.png" 
+                        alt="Logo" 
+                        class="max-w-xs w-full h-auto"
+                    />
                 </div>
                 <form id="login-form" class="p-8">
                     <div class="field">
@@ -121,6 +128,17 @@ onMounted(async () => {
                         @click="submitForm()"
                     ></Button>
                 </form>
+                <div class="flex justify-center mb-4">
+                    <Button
+                        :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
+                        :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+                        class="p-button-rounded p-button-text theme-toggle-btn mt-4"
+                        :class="{ 'sun-icon': isDarkMode }"
+                        @click="toggleDarkMode"
+                        v-tooltip.top="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+                        size="small"
+                    />
+                </div>
             </div>
         </div>
     </div>
@@ -130,5 +148,9 @@ onMounted(async () => {
 <style scoped>
 label {
     white-space: nowrap;
+}
+
+.theme-toggle-btn.sun-icon :deep(.pi-sun) {
+    color: #ffd700;
 }
 </style>
