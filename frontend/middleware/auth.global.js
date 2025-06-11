@@ -7,7 +7,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return;
     }
 
-    if (to.path.startsWith("/login")) {
+    if (to.path.startsWith("/login") || to.path.startsWith("/signup")) {
         return;
     }
     const userStore = useUserStore();
