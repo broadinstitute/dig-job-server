@@ -2,7 +2,6 @@
 import { useToast } from "primevue/usetoast";
 
 const toast = useToast();
-import { useUserStore } from "~/stores/UserStore";
 import { useTheme } from "~/composables/useTheme";
 
 const username = ref("");
@@ -11,7 +10,6 @@ const confirmPassword = ref("");
 const email = ref("");
 
 const route = useRoute();
-const userStore = useUserStore();
 const config = useRuntimeConfig();
 const { isDarkMode, toggleDarkMode } = useTheme();
 
