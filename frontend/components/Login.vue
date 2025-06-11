@@ -127,6 +127,11 @@ onMounted(async () => {
                         icon="bi-person"
                         @click="submitForm()"
                     ></Button>
+
+                    <div class="text-center mt-6">
+                        <span class="text-surface-600 dark:text-surface-300">Don't have an account? </span>
+                        <NuxtLink to="/signup" class="text-primary-500 hover:text-primary-400">Sign up</NuxtLink>
+                    </div>
                 </form>
                 <div class="flex justify-center mb-4">
                     <Button

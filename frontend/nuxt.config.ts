@@ -70,6 +70,8 @@ export default defineNuxtConfig({
             phenotypesUrl: process.env.NUXT_PUBLIC_PHENOTYPES_URL || "",
             defaultUsername: process.env.NUXT_PUBLIC_DEFAULT_USERNAME || "",
             defaultPassword: process.env.NUXT_PUBLIC_DEFAULT_PASSWORD || "",
+            githubAuthClientId: "",
+            githubAuthRedirectUri: "",
         },
     },
     shiki: {
