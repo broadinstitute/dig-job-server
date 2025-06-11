@@ -17,6 +17,11 @@ export const useUserStore = defineStore("UserStore", {
         },
         async isUserLoggedIn() {
             try {
+                // Ensure axios is initialized for pages that bypass the default layout
+                if (!this.axios) {
+                    this.init();
+                }
+                
                 const token = localStorage.getItem('authToken');
                 if (!token) {
                     // If not logged in and we don't have any token, try default login
