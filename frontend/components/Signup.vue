@@ -107,8 +107,8 @@ const signupWithGitHub = async () => {
       const state = JSON.stringify({
         action: 'signup', // or 'login'
         client: 'gwas-ce',
-        redirect_uri: 'http://localhost:3000/auth',
-        token: '47c5488c-1660-4133-8700-23c14e942788'
+        redirect_uri: config.public.finalRedirectUri,
+        token: config.public.userServiceToken
       });
 
       const githubAuthUrl = `https://github.com/login/oauth/authorize?` +

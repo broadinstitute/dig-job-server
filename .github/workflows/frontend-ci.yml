@@ -33,6 +33,8 @@ jobs:
                   echo "NUXT_PUBLIC_GITHUB_AUTH_REDIRECT_URI=https://users.kpndataregistry.org/gh-callback/" >> .env
                   echo "NUXT_PUBLIC_GITHUB_AUTH_CLIENT_ID=${{ secrets.OATH_GITHUB_CLIENT_ID }}" >> .env
                   echo "NUXT_PUBLIC_USER_SERVICE_URL=https://users.kpndataregistry.org" >> .env
+                  echo "NUXT_PUBLIC_USER_SERVICE_TOKEN=47c5488c-1660-4133-8700-23c14e942788" >> .env
+                  echo "NUXT_PUBLIC_FINAL_REDIRECT_URI=https://gwas-ce.kpndataregistry.org" >> .env
                   echo "NUXT_PUBLIC_USER_GROUP=gwas-ce" >> .env
                   
 

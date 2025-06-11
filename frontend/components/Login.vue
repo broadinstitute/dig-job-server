@@ -10,6 +10,7 @@ const password = ref("");
 
 const route = useRoute();
 const userStore = useUserStore();
+const config = useRuntimeConfig();
 const { isDarkMode, toggleDarkMode } = useTheme();
 
 const submitForm = async () => {
@@ -27,6 +28,32 @@ const submitForm = async () => {
             severity: "error",
             summary: "Error",
             detail: error.response?.data?.detail || error.message,
+            life: 3000,
+        });
+    }
+};
+
+const loginWithGitHub = async () => {
+    try {
+      const state = JSON.stringify({
+        action: 'login',
+        client: 'gwas-ce',
+        redirect_uri: config.public.finalRedirectUri,
+        token: config.public.userServiceToken
+      });
+
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
+          `client_id=${config.public.githubAuthClientId}&` +
+          `redirect_uri=${encodeURIComponent(config.public.githubAuthRedirectUri)}&` +
+          `scope=user:email&` +
+          `state=${encodeURIComponent(state)}`;
+      window.location.href = githubAuthUrl;
+    } catch (error) {
+        console.log(error);
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: "Failed to initiate GitHub login",
             life: 3000,
         });
     }
@@ -126,6 +153,18 @@ onMounted(async () => {
                         class="w-full p-4 text-xl mt-4"
                         icon="bi-person"
                         @click="submitForm()"
+                    ></Button>
+
+                    <div class="text-center my-4">
+                        <span class="text-surface-600 dark:text-surface-300">or</span>
+                    </div>
+
+                    <Button
+                        label="Sign in with GitHub"
+                        class="w-full p-4 text-xl"
+                        icon="pi pi-github"
+                        severity="secondary"
+                        @click="loginWithGitHub()"
                     ></Button>
 
                     <div class="text-center mt-6">
