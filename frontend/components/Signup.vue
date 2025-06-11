@@ -112,7 +112,7 @@ const signupWithGitHub = async () => {
       });
 
       const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
-          `client_id=${config.public.githubClientId}&` +
+          `client_id=${config.public.githubAuthClientId}&` +
           `redirect_uri=${encodeURIComponent(config.public.githubAuthRedirectUri)}&` +
           `scope=user:email&` +
           `state=${encodeURIComponent(state)}`;
