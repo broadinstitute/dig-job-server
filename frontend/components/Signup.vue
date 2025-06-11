@@ -39,17 +39,47 @@ const submitForm = async () => {
       }
     });
 
-    toast.add({
-      severity: "success",
-      summary: "Success",
-      detail: "Account created successfully! Please log in.",
-      life: 3000,
+    // Automatically log in the user after successful signup
+    const loginResponse = await $fetch(`${config.public.userServiceUrl}/api/auth/login/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: {
+        username: username.value,
+        password: password.value,
+        group: config.public.userGroup
+      }
     });
 
-    // Redirect to login page after successful signup
-    setTimeout(() => {
-      navigateTo("/login");
-    }, 2000);
+    if (loginResponse && loginResponse.access) {
+      localStorage.setItem("authToken", loginResponse.access);
+      localStorage.removeItem("isDefaultUser");
+      
+      toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Account created and logged in successfully!",
+        life: 3000,
+      });
+
+      // Redirect to home page after successful signup and login
+      setTimeout(() => {
+        navigateTo("/");
+      }, 2000);
+    } else {
+      toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Account created successfully! Please log in.",
+        life: 3000,
+      });
+
+      // Redirect to login page if auto-login failed
+      setTimeout(() => {
+        navigateTo("/login");
+      }, 2000);
+    }
 
   } catch (error) {
     console.log(error);
