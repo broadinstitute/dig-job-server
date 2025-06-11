@@ -74,6 +74,8 @@ export default defineNuxtConfig({
             githubAuthRedirectUri: "",
             userServiceUrl: "",
             userGroup: "",
+            userServiceToken: "",
+            finalRedirectUri: "",
         },
     },
     shiki: {
