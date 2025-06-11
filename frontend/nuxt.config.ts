@@ -72,6 +72,8 @@ export default defineNuxtConfig({
             defaultPassword: process.env.NUXT_PUBLIC_DEFAULT_PASSWORD || "",
             githubAuthClientId: "",
             githubAuthRedirectUri: "",
+            userServiceUrl: "",
+            userGroup: "",
         },
     },
     shiki: {
