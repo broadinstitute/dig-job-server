@@ -17,20 +17,32 @@ export const useUserStore = defineStore("UserStore", {
         },
         async isUserLoggedIn() {
             try {
-                if (!this.axios) {
-                    this.init();
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    // If not logged in and we don't have any token, try default login
+                    await this.tryDefaultLogin();
+                    return this.user !== null;
                 }
-                const { data } = await this.axios.get("/api/is-logged-in");
-                this.user = data;
+
+                // Verify token with user service
+                const config = useRuntimeConfig();
+                const response = await $fetch(`${config.public.userServiceUrl}/api/auth/verify/?group=${config.public.userGroup}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                this.user = response.user;
                 return true;
             } catch (error) {
                 // Clear token if it has expired (401 response)
-                if (error.response && error.response.status === 401) {
+                if (error.status === 401) {
                     // If we were using default credentials, relogin automatically
                     const wasDefaultUser = localStorage.getItem('isDefaultUser') === 'true';
                     
                     // Clear invalid token
                     localStorage.removeItem('authToken');
+                    this.user = null;
                     
                     // For default user, try to login again automatically
                     if (wasDefaultUser) {
@@ -96,23 +108,46 @@ export const useUserStore = defineStore("UserStore", {
             return data;
         },
         async login(username, password, isDefault = false) {
-            if (!this.axios) {
-                this.init();
-            }
-            const response = await this.axios.post(
-                "/api/login",
-                JSON.stringify({ username, password }),
-            );
-            if (response.data && response.data.access_token) {
-                localStorage.setItem("authToken", response.data.access_token);
-                this.isDefaultUser = isDefault;
-                if (isDefault) {
-                    localStorage.setItem("isDefaultUser", "true");
-                } else {
-                    localStorage.removeItem("isDefaultUser");
+            try {
+                const config = useRuntimeConfig();
+                
+                // Call user service login API
+                const response = await $fetch(`${config.public.userServiceUrl}/api/auth/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: {
+                        username,
+                        password,
+                        group: config.public.userGroup
+                    }
+                });
+
+                if (response && response.access) {
+                    localStorage.setItem("authToken", response.access);
+                    this.user = response.user;
+                    this.isDefaultUser = isDefault;
+                    
+                    if (isDefault) {
+                        localStorage.setItem("isDefaultUser", "true");
+                    } else {
+                        localStorage.removeItem("isDefaultUser");
+                    }
+                    
+                    return true;
                 }
-                await this.isUserLoggedIn();
+            } catch (error) {
+                this.loginError = error.data?.error || error.message || 'Login failed';
+                throw error;
             }
+        },
+        logout() {
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("isDefaultUser");
+            this.user = null;
+            this.isDefaultUser = false;
+            this.loginError = null;
         },
         async getPresignedUrl(fileName, dataset) {
             const { data } = await this.axios.get(

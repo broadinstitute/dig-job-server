@@ -24,6 +24,7 @@ class DatasetInfo(BaseModel):
 class AnalysisMethod(str, Enum):
     sumstats = "sumstats"
     sldsc = "sldsc"
+    magma = "magma"
 
 
 class AnalysisRequest(BaseModel):
