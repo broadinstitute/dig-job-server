@@ -45,11 +45,17 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
         if schema.lower() == 'bearer' and token:
             data = get_decoded_jwt_data(token)[0]
             if data:
+                # Map user_id to username for compatibility
+                if 'user_id' in data and 'username' not in data:
+                    data['username'] = data['user_id']
                 return User(**data)
 
     if token:
         data = get_decoded_jwt_data(token)[0]
         if data:
+            # Map user_id to username for compatibility
+            if 'user_id' in data and 'username' not in data:
+                data['username'] = data['user_id']
             return User(**data)
 
     raise fastapi.HTTPException(status_code=401, detail='Not logged in')
