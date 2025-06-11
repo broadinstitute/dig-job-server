@@ -105,8 +105,9 @@ const submitForm = async () => {
 const signupWithGitHub = async () => {
     try {
       const state = JSON.stringify({
-        action: 'signup', // or 'login'
+        action: 'signup',
         client: 'gwas-ce',
+        group: config.public.userGroup,
         redirect_uri: config.public.finalRedirectUri,
         token: config.public.userServiceToken
       });
