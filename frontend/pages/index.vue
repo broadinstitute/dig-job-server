@@ -57,6 +57,48 @@ const timelineEvents = [
 ];
 
 onMounted(async () => {
+    // Handle OAuth callback if present
+    const route = useRoute();
+    if (route.query.access_token && route.query.success === 'true') {
+        try {
+            // Store the access token
+            localStorage.setItem("authToken", route.query.access_token);
+            localStorage.removeItem("isDefaultUser");
+            
+            // Show success message
+            const wasCreated = route.query.created === 'true';
+            toast.add({
+                severity: "success",
+                summary: "Success",
+                detail: wasCreated ? "Account created and logged in successfully!" : "Logged in successfully!",
+                life: 3000,
+            });
+
+            // Clean up the URL by removing query parameters
+            await navigateTo('/', { replace: true });
+            
+        } catch (error) {
+            console.error("OAuth callback error:", error);
+            toast.add({
+                severity: "error", 
+                summary: "Error",
+                detail: "Failed to complete login",
+                life: 3000,
+            });
+        }
+    } else if (route.query.success === 'false' && route.query.error) {
+        // Handle OAuth error
+        toast.add({
+            severity: "error",
+            summary: "Login Failed", 
+            detail: decodeURIComponent(route.query.error),
+            life: 5000,
+        });
+        
+        // Clean up the URL
+        await navigateTo('/', { replace: true });
+    }
+
     datasets.value = await userStore.retrieveDatasets();
     datasets.value.forEach((data) => {
         if (data.status?.includes("RUNNING")) {
