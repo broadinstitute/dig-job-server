@@ -111,7 +111,6 @@ export const useUserStore = defineStore("UserStore", {
             try {
                 const config = useRuntimeConfig();
                 
-                // Call user service login API
                 const response = await $fetch(`${config.public.userServiceUrl}/api/auth/login/`, {
                     method: 'POST',
                     headers: {
