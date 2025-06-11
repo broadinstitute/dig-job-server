@@ -38,6 +38,7 @@ const loginWithGitHub = async () => {
       const state = JSON.stringify({
         action: 'login',
         client: 'gwas-ce',
+        group: config.public.userGroup,
         redirect_uri: config.public.finalRedirectUri,
         token: config.public.userServiceToken
       });
