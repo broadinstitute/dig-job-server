@@ -45,7 +45,6 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
         if schema.lower() == 'bearer' and token:
             data = get_decoded_jwt_data(token)[0]
             if data:
-                print(f"Decoded JWT data: {data}")
                 return User(**data)
 
     if token:
