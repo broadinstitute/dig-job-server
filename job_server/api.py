@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import io
 import json
 import re
@@ -215,6 +216,11 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
 def get_s3_results_path(dataset: str, user: User) -> str:
     return f"userdata/{user.username}/genetic/{dataset}/sldsc/sldsc"
 
+
+def get_s3_magma_results_path(dataset: str, user: User) -> str:
+    return f"userdata/{user.username}/genetic/{dataset}/magma/genes"
+
+
 @router.get("/download/{dataset}")
 async def download_hermes_file(dataset: str, user: User = Depends(get_current_user)):
     s3_path = get_s3_results_path(dataset, user)
@@ -237,6 +243,62 @@ def get_cached_results(s3_path: str) -> pd.DataFrame:
     except ClientError as e:
         raise fastapi.HTTPException(status_code=500, detail="Failed to fetch tissue results") from e
 
+
+@lru_cache(maxsize=16)
+def get_cached_magma_results(s3_path: str) -> pd.DataFrame:
+    try:
+        with gzip.open(s3.get_magma_results(s3_path)['Body'], 'rt') as f:
+            df = pd.DataFrame.from_records(map(json.loads, f.readlines()))
+        df['pValue'] = pd.to_numeric(df['pValue'])
+        return df
+    except ClientError as e:
+        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch magma results") from e
+
+
+def filter_results(
+        df: pd.DataFrame,
+        request: Request,
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+):
+    filter_params = {}
+    for param, value in request.query_params.items():
+        if param.startswith("filter_") and value:
+            column_name = param.replace("filter_", "")
+            filter_params[column_name] = value
+
+    for column, value in filter_params.items():
+        if column in df.columns:
+            if df[column].dtype.kind in 'ifc':
+                try:
+                    if value.startswith(">="):
+                        df = df[df[column] >= float(value[2:])]
+                    elif value.startswith("<="):
+                        df = df[df[column] <= float(value[2:])]
+                    elif value.startswith(">"):
+                        df = df[df[column] > float(value[1:])]
+                    elif value.startswith("<"):
+                        df = df[df[column] < float(value[1:])]
+                    else:
+                        df = df[df[column] == float(value)]
+                except ValueError:
+                    pass
+            else:
+                if value.startswith("eq:"):
+                    df = df[df[column].astype(str).str.lower() == value[3:].lower()]
+                elif value.startswith("contains:"):
+                    df = df[df[column].astype(str).str.contains(value[9:], case=False, na=False)]
+                else:
+                    df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
+
+    if sort_field:
+        ascending = sort_order == 1
+        df = df.sort_values(by=sort_field, ascending=ascending)
+    else:
+        df = df.sort_values(by='pValue')
+    return df
+
+
 @router.get("/results/{dataset}")
 async def get_results(
         dataset: str,
@@ -251,42 +313,7 @@ async def get_results(
 
     try:
         df = get_cached_results(s3_path)
-
-        filter_params = {}
-        for param, value in request.query_params.items():
-            if param.startswith("filter_") and value:
-                column_name = param.replace("filter_", "")
-                filter_params[column_name] = value
-
-        for column, value in filter_params.items():
-            if column in df.columns:
-                if df[column].dtype.kind in 'ifc':
-                    try:
-                        if value.startswith(">="):
-                            df = df[df[column] >= float(value[2:])]
-                        elif value.startswith("<="):
-                            df = df[df[column] <= float(value[2:])]
-                        elif value.startswith(">"):
-                            df = df[df[column] > float(value[1:])]
-                        elif value.startswith("<"):
-                            df = df[df[column] < float(value[1:])]
-                        else:
-                            df = df[df[column] == float(value)]
-                    except ValueError:
-                        pass
-                else:
-                    if value.startswith("eq:"):
-                        df = df[df[column].astype(str).str.lower() == value[3:].lower()]
-                    elif value.startswith("contains:"):
-                        df = df[df[column].astype(str).str.contains(value[9:], case=False, na=False)]
-                    else:
-                        df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
-
-        if sort_field:
-            ascending = sort_order == 1
-            df = df.sort_values(by=sort_field, ascending=ascending)
-        else:
-            df = df.sort_values(by='pValue')
+        df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
         tissues = df['tissue'].unique().tolist()
@@ -301,6 +328,37 @@ async def get_results(
             "tissues": tissues,
             "biosamples": biosamples,
             "annotations": annotations
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/magma-results/{dataset}")
+async def get_magma_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_magma_results_path(dataset, user)
+
+    try:
+        df = get_cached_magma_results(s3_path)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        genes = df['gene'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "genes": genes
         })
 
     except Exception as e:
