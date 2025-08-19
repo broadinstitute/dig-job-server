@@ -5,7 +5,7 @@ import json
 import re
 from asyncio import Queue
 from functools import lru_cache
-from typing import Optional, Dict
+from typing import Dict, Optional, TextIO
 
 import fastapi
 import pandas as pd
@@ -213,18 +213,14 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
     return {"job_id": job_id}
 
 
-def get_s3_results_path(dataset: str, user: User) -> str:
-    return f"userdata/{user.username}/genetic/{dataset}/sldsc/sldsc"
-
-
-def get_s3_magma_results_path(dataset: str, user: User) -> str:
-    return f"userdata/{user.username}/genetic/{dataset}/magma/genes"
+def get_s3_results_path(dataset: str, user: User, method_group: str, method: str) -> str:
+    return f"userdata/{user.username}/genetic/{dataset}/{method_group}/{method}"
 
 
 @router.get("/download/{dataset}")
 async def download_hermes_file(dataset: str, user: User = Depends(get_current_user)):
-    s3_path = get_s3_results_path(dataset, user)
-    df = get_cached_results(s3_path)
+    s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
+    df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
     return Response(content=df.to_csv(sep='\t', index=False),
                        media_type='text/tab-separated-values',
                        headers={
@@ -232,27 +228,25 @@ async def download_hermes_file(dataset: str, user: User = Depends(get_current_us
                        })
 
 
-@lru_cache(maxsize=16)
-def get_cached_results(s3_path: str) -> pd.DataFrame:
-    try:
-        wrapped_text = io.TextIOWrapper(s3.get_results(s3_path)['Body'])
-        df = pd.read_csv(wrapped_text, sep='\t',
-                         names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
-        df['pValue'] = pd.to_numeric(df['pValue'])
-        return df
-    except ClientError as e:
-        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch tissue results") from e
+def get_dataframe(data: TextIO, file_type: str) -> pd.DataFrame:
+    if file_type == 'sldsc':
+        return pd.read_csv(data, sep='\t', names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
+    elif file_type == 'magma':
+        return pd.DataFrame.from_records(map(json.loads, data.readlines()))
 
 
 @lru_cache(maxsize=16)
-def get_cached_magma_results(s3_path: str) -> pd.DataFrame:
+def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: bool) -> pd.DataFrame:
     try:
-        with gzip.open(s3.get_magma_results(s3_path)['Body'], 'rt') as f:
-            df = pd.DataFrame.from_records(map(json.loads, f.readlines()))
+        if is_compressed:
+            with gzip.open(s3.get_results(s3_path, file)['Body'], 'rt') as f:
+                df = get_dataframe(f, file_type)
+        else:
+            df = get_dataframe(s3.get_results(s3_path, file)['Body'], file_type)
         df['pValue'] = pd.to_numeric(df['pValue'])
         return df
     except ClientError as e:
-        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch magma results") from e
+        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch results") from e
 
 
 def filter_results(
@@ -309,10 +303,10 @@ async def get_results(
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
-    s3_path = get_s3_results_path(dataset, user)
+    s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
 
     try:
-        df = get_cached_results(s3_path)
+        df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
         df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
@@ -344,10 +338,10 @@ async def get_magma_results(
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
-    s3_path = get_s3_magma_results_path(dataset, user)
+    s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
 
     try:
-        df = get_cached_magma_results(s3_path)
+        df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
         df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
