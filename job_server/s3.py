@@ -1,6 +1,5 @@
-import json
-
 import boto3
+import json
 import os
 
 BUCKET_NAME = os.getenv('JOB_SERVER_BUCKET', 'dig-ldsc-server')
@@ -38,6 +37,11 @@ def upload_metadata(metadata, path):
 def get_results(path):
     s3_client = boto3.client('s3')
     return s3_client.get_object(Bucket=BUCKET_NAME, Key=f"{path}/tissue.output.tsv")
+
+
+def get_magma_results(path):
+    s3_client = boto3.client('s3')
+    return s3_client.get_object(Bucket=BUCKET_NAME, Key=f"{path}/associations.genes.json.gz")
 
 
 def clear_dir(s3_path):
