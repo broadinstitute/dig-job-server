@@ -400,19 +400,18 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
     return {"job_id": job_id}
 
 
-
-def get_s3_results_path(dataset: str, user: User, method_group: str, method: str) -> str:
-    return f"userdata/{user.username}/genetic/{dataset}/{method_group}/{method}"
+def get_s3_results_path(dataset: str, user: User, dataset_type: str, method_group: str, method: str) -> str:
+    return f"userdata/{user.username}/{dataset_type}/{dataset}/{method_group}/{method}"
 
 
 @router.get("/download/{dataset}")
 async def download_hermes_file(dataset: str, result_type: str = Query('sldsc', description="Type of results to download"), user: User = Depends(get_current_user)):
     if result_type.lower() == 'magma':
-        s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
+        s3_path = get_s3_results_path(dataset, user, 'genetic', 'magma', 'genes')
         df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
         filename = f"{dataset}_magma_results.tsv"
     else:
-        s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
+        s3_path = get_s3_results_path(dataset, user, 'genetic', 'sldsc', 'sldsc')
         df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
         filename = f"{dataset}_ldsc_results.tsv"
 
@@ -426,6 +425,8 @@ async def download_hermes_file(dataset: str, result_type: str = Query('sldsc', d
 def get_dataframe(data: TextIO, file_type: str) -> pd.DataFrame:
     if file_type == 'sldsc':
         return pd.read_csv(data, sep='\t', names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
+    if file_type == 'annot-sldsc':
+        return pd.read_csv(data, sep='\t', names=['phenotype', 'ancestry', 'annotation', 'enrichment', 'pValue'])
     elif file_type == 'magma':
         return pd.DataFrame.from_records(map(json.loads, data.readlines()))
 
@@ -498,7 +499,7 @@ async def get_results(
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
-    s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'sldsc', 'sldsc')
 
     try:
         # Get workflow status to extract job ID
@@ -548,7 +549,7 @@ async def get_magma_results(
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
-    s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'magma', 'genes')
 
     try:
         # Get workflow status to extract job ID
@@ -576,6 +577,37 @@ async def get_magma_results(
             "totalRecords": total_records,
             "genes": genes,
             "jobId": job_id,
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/annot-sldsc-results/{dataset}")
+async def get_annot_sldsc_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user, 'annotation', 'sldsc', 'annot-sldsc')
+
+    try:
+        df = get_cached_results(s3_path, 'custom.output.tsv', 'annot-sldsc', False)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        phenotypes = df['phenotype'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "phenotypes": phenotypes
         })
 
     except Exception as e:
