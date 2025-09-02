@@ -1,10 +1,11 @@
 import asyncio
+import gzip
 import io
 import json
 import re
 from asyncio import Queue
 from functools import lru_cache
-from typing import Optional, Dict
+from typing import Dict, Optional, TextIO
 
 import fastapi
 import pandas as pd
@@ -212,13 +213,14 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
     return {"job_id": job_id}
 
 
-def get_s3_results_path(dataset: str, user: User) -> str:
-    return f"userdata/{user.username}/genetic/{dataset}/sldsc/sldsc"
+def get_s3_results_path(dataset: str, user: User, method_group: str, method: str) -> str:
+    return f"userdata/{user.username}/genetic/{dataset}/{method_group}/{method}"
+
 
 @router.get("/download/{dataset}")
 async def download_hermes_file(dataset: str, user: User = Depends(get_current_user)):
-    s3_path = get_s3_results_path(dataset, user)
-    df = get_cached_results(s3_path)
+    s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
+    df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
     return Response(content=df.to_csv(sep='\t', index=False),
                        media_type='text/tab-separated-values',
                        headers={
@@ -226,16 +228,70 @@ async def download_hermes_file(dataset: str, user: User = Depends(get_current_us
                        })
 
 
+def get_dataframe(data: TextIO, file_type: str) -> pd.DataFrame:
+    if file_type == 'sldsc':
+        return pd.read_csv(data, sep='\t', names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
+    elif file_type == 'magma':
+        return pd.DataFrame.from_records(map(json.loads, data.readlines()))
+
+
 @lru_cache(maxsize=16)
-def get_cached_results(s3_path: str) -> pd.DataFrame:
+def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: bool) -> pd.DataFrame:
     try:
-        wrapped_text = io.TextIOWrapper(s3.get_results(s3_path)['Body'])
-        df = pd.read_csv(wrapped_text, sep='\t',
-                         names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
+        if is_compressed:
+            with gzip.open(s3.get_results(s3_path, file)['Body'], 'rt') as f:
+                df = get_dataframe(f, file_type)
+        else:
+            df = get_dataframe(s3.get_results(s3_path, file)['Body'], file_type)
         df['pValue'] = pd.to_numeric(df['pValue'])
         return df
     except ClientError as e:
-        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch tissue results") from e
+        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch results") from e
+
+
+def filter_results(
+        df: pd.DataFrame,
+        request: Request,
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+):
+    filter_params = {}
+    for param, value in request.query_params.items():
+        if param.startswith("filter_") and value:
+            column_name = param.replace("filter_", "")
+            filter_params[column_name] = value
+
+    for column, value in filter_params.items():
+        if column in df.columns:
+            if df[column].dtype.kind in 'ifc':
+                try:
+                    if value.startswith(">="):
+                        df = df[df[column] >= float(value[2:])]
+                    elif value.startswith("<="):
+                        df = df[df[column] <= float(value[2:])]
+                    elif value.startswith(">"):
+                        df = df[df[column] > float(value[1:])]
+                    elif value.startswith("<"):
+                        df = df[df[column] < float(value[1:])]
+                    else:
+                        df = df[df[column] == float(value)]
+                except ValueError:
+                    pass
+            else:
+                if value.startswith("eq:"):
+                    df = df[df[column].astype(str).str.lower() == value[3:].lower()]
+                elif value.startswith("contains:"):
+                    df = df[df[column].astype(str).str.contains(value[9:], case=False, na=False)]
+                else:
+                    df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
+
+    if sort_field:
+        ascending = sort_order == 1
+        df = df.sort_values(by=sort_field, ascending=ascending)
+    else:
+        df = df.sort_values(by='pValue')
+    return df
+
 
 @router.get("/results/{dataset}")
 async def get_results(
@@ -247,46 +303,11 @@ async def get_results(
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
-    s3_path = get_s3_results_path(dataset, user)
+    s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
 
     try:
-        df = get_cached_results(s3_path)
-
-        filter_params = {}
-        for param, value in request.query_params.items():
-            if param.startswith("filter_") and value:
-                column_name = param.replace("filter_", "")
-                filter_params[column_name] = value
-
-        for column, value in filter_params.items():
-            if column in df.columns:
-                if df[column].dtype.kind in 'ifc':
-                    try:
-                        if value.startswith(">="):
-                            df = df[df[column] >= float(value[2:])]
-                        elif value.startswith("<="):
-                            df = df[df[column] <= float(value[2:])]
-                        elif value.startswith(">"):
-                            df = df[df[column] > float(value[1:])]
-                        elif value.startswith("<"):
-                            df = df[df[column] < float(value[1:])]
-                        else:
-                            df = df[df[column] == float(value)]
-                    except ValueError:
-                        pass
-                else:
-                    if value.startswith("eq:"):
-                        df = df[df[column].astype(str).str.lower() == value[3:].lower()]
-                    elif value.startswith("contains:"):
-                        df = df[df[column].astype(str).str.contains(value[9:], case=False, na=False)]
-                    else:
-                        df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
-
-        if sort_field:
-            ascending = sort_order == 1
-            df = df.sort_values(by=sort_field, ascending=ascending)
-        else:
-            df = df.sort_values(by='pValue')
+        df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
+        df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
         tissues = df['tissue'].unique().tolist()
@@ -301,6 +322,37 @@ async def get_results(
             "tissues": tissues,
             "biosamples": biosamples,
             "annotations": annotations
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/magma-results/{dataset}")
+async def get_magma_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
+
+    try:
+        df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        genes = df['gene'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "genes": genes
         })
 
     except Exception as e:
