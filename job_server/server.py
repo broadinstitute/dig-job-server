@@ -5,6 +5,8 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 
+# Load environment variables by default
+load_dotenv()
 
 from job_server.api import router
 from job_server.api import get_current_user
