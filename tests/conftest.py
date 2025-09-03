@@ -14,6 +14,9 @@ if environ.get('TEST_DIG_JOB_SERVER_DB'):
 else:
     environ['DIG_JOB_SERVER_DB'] = 'mysql+pymysql://job_server:job_server@localhost:3305/job_server'
 
+# Enable test mode for JWT authentication
+environ['TEST_MODE'] = 'true'
+
 client = TestClient(create_app())
 
 
