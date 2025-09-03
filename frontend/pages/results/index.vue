@@ -10,7 +10,7 @@
 
         <div>
             <h2 class="text-2xl font-bold mb-4 text-center">
-                Analysis Results for Dataset: {{ dataset }}
+                {{ resultType.toUpperCase() }} Results for Dataset: {{ dataset }}
             </h2>
         </div>
 
@@ -33,7 +33,9 @@
 
         <Card>
             <template #content>
+                <!-- LDSC Results Table -->
                 <DataTable
+                    v-if="resultType === 'ldsc'"
                     :first="first"
                     :rows="rows"
                     :sortField="sortField"
@@ -174,7 +176,90 @@
                     </Column>
 
                     <template #empty>
-                        <div class="text-center p-4">No results found.</div>
+                        <div class="text-center p-4">No LDSC results found.</div>
+                    </template>
+                    <template #loading>
+                        <div class="p-4">
+                            <div class="mb-2" v-for="i in 5" :key="i">
+                                <Skeleton height="3rem" />
+                            </div>
+                        </div>
+                    </template>
+                </DataTable>
+
+                <!-- MAGMA Results Table -->
+                <DataTable
+                    v-else-if="resultType === 'magma'"
+                    :first="first"
+                    :rows="rows"
+                    :sortField="sortField"
+                    :sortOrder="sortOrder"
+                    :value="results"
+                    ref="dt"
+                    :lazy="true"
+                    :totalRecords="totalRecords"
+                    :loading="loading"
+                    paginator
+                    :rows-per-page-options="[10, 20, 50]"
+                    @page="onPage"
+                    @sort="onSort"
+                    :filters="magmaFilters"
+                    @filter="onFilter"
+                    stripedRows
+                    class="p-datatable-sm"
+                    filterDisplay="row"
+                    :showFilterOperator="false"
+                    :showFilterMatchModes="false"
+                    :showFilterMenu="false"
+                    :showClearButton="false"
+                >
+                    <Column
+                        field="gene"
+                        header="Gene"
+                        sortable
+                        filterMatchMode="equals"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <AutoComplete
+                                v-model="magmaFilters['gene'].value"
+                                :suggestions="filteredGenes"
+                                @complete="searchGenes"
+                                placeholder="Search gene"
+                                class="p-column-filter w-full"
+                                @item-select="onGeneSelect"
+                                @clear="onGeneClear"
+                                :delay="300"
+                                dropdown
+                                forceSelection
+                            />
+                        </template>
+                    </Column>
+                    <Column
+                        field="pValue"
+                        header="P-Value"
+                        sortable
+                        filterMatchMode="lte"
+                        :showFilterMenu="false"
+                    >
+                        <template #filter="{ filterModel }">
+                            <InputNumber
+                                v-model="magmaFilters['pValue'].value"
+                                placeholder="≤ Value"
+                                class="p-column-filter w-full"
+                                mode="decimal"
+                                :minFractionDigits="3"
+                                :maxFractionDigits="3"
+                                @keydown.enter="onFilter"
+                            />
+                        </template>
+                        <template #body="slotProps">
+                            {{ formatPValue(slotProps.data.pValue) }}
+                        </template>
+                    </Column>
+
+                    <template #empty>
+                        <div class="text-center p-4">No MAGMA results found.</div>
                     </template>
                     <template #loading>
                         <div class="p-4">
@@ -207,6 +292,7 @@ const {
     tissues: apiTissues,
     biosamples: apiBiosamples,
     annotations: apiAnnotations,
+    genes: apiGenes,
 } = storeToRefs(resultsStore);
 
 const first = ref(0);
@@ -214,8 +300,10 @@ const rows = ref(10);
 const sortField = ref("pValue");
 const sortOrder = ref(1);
 const dataset = ref(route.query.dataset);
+const resultType = ref(route.query.type || 'ldsc'); // 'ldsc' or 'magma'
 const dt = ref();
 const filteredBiosamples = ref([]);
+const filteredGenes = ref([]);
 
 const formatNumber = (value) => {
     return new Intl.NumberFormat("en-US", {
@@ -340,11 +428,61 @@ const onBiosampleClear = () => {
     onFilter();
 };
 
+// Search genes for autocomplete (MAGMA)
+const searchGenes = (event) => {
+    const query = event.query.toLowerCase();
+
+    if (query === "") {
+        if (apiGenes.value && apiGenes.value.length > 0) {
+            filteredGenes.value = apiGenes.value;
+        } else if (results.value?.length) {
+            filteredGenes.value = [
+                ...new Set(results.value.map((item) => item.gene)),
+            ];
+        } else {
+            filteredGenes.value = [];
+        }
+        return;
+    }
+
+    if (apiGenes.value && apiGenes.value.length > 0) {
+        filteredGenes.value = apiGenes.value.filter((gene) =>
+            gene.toLowerCase().includes(query),
+        );
+    } else if (results.value?.length) {
+        const uniqueGenes = [
+            ...new Set(results.value.map((item) => item.gene)),
+        ];
+        filteredGenes.value = uniqueGenes.filter((gene) =>
+            gene.toLowerCase().includes(query),
+        );
+    } else {
+        filteredGenes.value = [];
+    }
+};
+
+// Gene selection (MAGMA)
+const onGeneSelect = (event) => {
+    magmaFilters.value.gene.value = event.value;
+    onFilter();
+};
+
+// Clearing the gene autocomplete
+const onGeneClear = () => {
+    magmaFilters.value.gene.value = null;
+    onFilter();
+};
+
 const filters = ref({
     annotation: { value: null, matchMode: "equals" },
     tissue: { value: null, matchMode: "equals" },
     biosample: { value: null, matchMode: "equals" },
     enrichment: { value: null, matchMode: "gte" },
+    pValue: { value: null, matchMode: "lte" },
+});
+
+const magmaFilters = ref({
+    gene: { value: null, matchMode: "equals" },
     pValue: { value: null, matchMode: "lte" },
 });
 
@@ -361,10 +499,16 @@ const transformFilters = (filters) => {
                 transformedFilters[`filter_${key}`] = `<=${filter.value}`;
             } else if (key === "enrichment") {
                 transformedFilters[`filter_${key}`] = `>=${filter.value}`;
+            } else if (key === "start") {
+                transformedFilters[`filter_${key}`] = `>=${filter.value}`;
+            } else if (key === "end") {
+                transformedFilters[`filter_${key}`] = `<=${filter.value}`;
             } else if (
                 key === "biosample" ||
                 key === "annotation" ||
-                key === "tissue"
+                key === "tissue" ||
+                key === "gene" ||
+                key === "chr"
             ) {
                 transformedFilters[`filter_${key}`] = `eq:${filter.value}`;
             } else {
@@ -378,13 +522,14 @@ const transformFilters = (filters) => {
 
 const loadResults = async () => {
     try {
+        const currentFilters = resultType.value === 'magma' ? magmaFilters.value : filters.value;
         await resultsStore.getResults(dataset.value, {
             first: first.value,
             rows: rows.value,
             sort_field: sortField.value,
             sort_order: sortOrder.value,
-            ...transformFilters(filters.value),
-        });
+            ...transformFilters(currentFilters),
+        }, resultType.value);
     } catch (err) {
         console.error("Failed to load results:", err);
     }

@@ -138,6 +138,33 @@ const listenForJobStatus = (jobId, data) => {
 
         // Update the status in the datasets table
         data.status = statusData.status;
+        
+        // Update the workflows data structure for button state
+        const parts = statusData.status.split(" ");
+        if (parts.length >= 1) {
+            let method, status;
+            if (statusData.status.startsWith("RUNNING ")) {
+                method = parts[1]; // "RUNNING sldsc" -> method = "sldsc"
+                status = "RUNNING";
+            } else {
+                method = parts[0]; // "sldsc SUCCEEDED" -> method = "sldsc"  
+                status = parts[1]; // "sldsc SUCCEEDED" -> status = "SUCCEEDED"
+            }
+            
+            // Initialize workflows structure if needed
+            if (!data.workflows) {
+                data.workflows = {};
+            }
+            if (!data.workflows[method]) {
+                data.workflows[method] = {};
+            }
+            
+            // Update the status for this method
+            data.workflows[method][method] = {
+                status: status,
+                updated_at: new Date().toISOString()
+            };
+        }
 
         if (statusData.status.endsWith("SUCCEEDED")) {
             eventSource.close();
@@ -167,18 +194,6 @@ const listenForJobStatus = (jobId, data) => {
     };
 };
 
-async function runSumstats(data) {
-    const { job_id } = await userStore.startAnalysis(data.dataset, "sumstats");
-    data.status = "RUNNING sumstats";
-    listenForJobStatus(job_id, data);
-    toast.add({
-        severity: "success",
-        summary: "Success",
-        detail: "sumstats started successfully",
-        life: 5000,
-    });
-}
-
 async function runSldsc(data) {
     const { job_id } = await userStore.startAnalysis(data.dataset, "sldsc");
     data.status = "RUNNING sldsc";
@@ -186,9 +201,27 @@ async function runSldsc(data) {
     toast.add({
         severity: "success",
         summary: "Success",
-        detail: "SLDSC started successfully",
+        detail: "SLDSC analysis started successfully",
         life: 5000,
     });
+}
+
+async function runMagma(data) {
+    const { job_id } = await userStore.startAnalysis(data.dataset, "magma");
+    data.status = "RUNNING magma";
+    listenForJobStatus(job_id, data);
+    toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "MAGMA analysis started successfully",
+        life: 5000,
+    });
+}
+
+// Helper function to get simple job status for sldsc or magma
+function getJobStatus(data, method) {
+    if (!data.workflows || !data.workflows[method] || !data.workflows[method][method]) return null;
+    return data.workflows[method][method].status;
 }
 
 async function handleDelete(dataSet) {
@@ -235,6 +268,14 @@ function viewResults(dataset) {
 
 function openInNewTab(dataset) {
     window.open(`/results?dataset=${dataset}`, "_blank");
+}
+
+function viewMagmaResults(dataset) {
+    router.push(`/results?dataset=${dataset}&type=magma`);
+}
+
+function openMagmaResultsInNewTab(dataset) {
+    window.open(`/results?dataset=${dataset}&type=magma`, "_blank");
 }
 </script>
 <template>
@@ -414,31 +455,33 @@ function openInNewTab(dataset) {
                                 </template>
                             </template>
                         </Column>
-                        <Column header="Analysis" :style="{ width: '10rem' }">
+                        <Column header="Analysis" :style="{ width: '15rem' }">
                             <template #body="{ data }">
-                                <span>
+                                <div class="flex gap-2 flex-wrap">
+                                    <!-- SLDSC Analysis -->
                                     <Button
-                                        v-if="!data.status"
-                                        @click.prevent="runSumstats(data)"
-                                        label="Run SumStats"
-                                        size="small"
-                                        icon="pi pi-play"
-                                        outlined
-                                    ></Button>
-                                    <Button
-                                        v-if="
-                                            data.status === 'sumstats SUCCEEDED'
-                                        "
+                                        v-if="!getJobStatus(data, 'sldsc')"
                                         @click.prevent="runSldsc(data)"
                                         label="Run SLDSC"
                                         size="small"
-                                        icon="pi pi-forward"
+                                        icon="pi pi-chart-line"
                                         outlined
-                                    ></Button>
+                                        class="flex-1 min-w-0"
+                                    />
+                                    <Button
+                                        v-else-if="getJobStatus(data, 'sldsc') === 'RUNNING'"
+                                        label="SLDSC Running"
+                                        size="small"
+                                        icon="pi pi-spin pi-spinner"
+                                        severity="warn"
+                                        outlined
+                                        disabled
+                                        class="flex-1 min-w-0"
+                                    />
                                     <SplitButton
-                                        v-if="data.status === 'sldsc SUCCEEDED'"
-                                        label="View Results"
-                                        class="whitespace-nowrap"
+                                        v-else-if="getJobStatus(data, 'sldsc') === 'SUCCEEDED'"
+                                        label="SLDSC Results"
+                                        class="whitespace-nowrap flex-1 min-w-0"
                                         icon="pi pi-eye"
                                         size="small"
                                         outlined
@@ -452,50 +495,116 @@ function openInNewTab(dataset) {
                                             },
                                         ]"
                                     />
-                                </span>
+                                    <Button
+                                        v-else-if="getJobStatus(data, 'sldsc') === 'FAILED'"
+                                        label="SLDSC Failed"
+                                        size="small"
+                                        icon="pi pi-times"
+                                        severity="danger"
+                                        outlined
+                                        disabled
+                                        class="flex-1 min-w-0"
+                                    />
+
+                                    <!-- MAGMA Analysis -->
+                                    <Button
+                                        v-if="!getJobStatus(data, 'magma')"
+                                        @click.prevent="runMagma(data)"
+                                        label="Run MAGMA"
+                                        size="small"
+                                        icon="pi pi-chart-bar"
+                                        outlined
+                                        class="flex-1 min-w-0"
+                                    />
+                                    <Button
+                                        v-else-if="getJobStatus(data, 'magma') === 'RUNNING'"
+                                        label="MAGMA Running"
+                                        size="small"
+                                        icon="pi pi-spin pi-spinner"
+                                        severity="warn"
+                                        outlined
+                                        disabled
+                                        class="flex-1 min-w-0"
+                                    />
+                                    <SplitButton
+                                        v-else-if="getJobStatus(data, 'magma') === 'SUCCEEDED'"
+                                        label="MAGMA Results"
+                                        class="whitespace-nowrap flex-1 min-w-0"
+                                        icon="pi pi-eye"
+                                        size="small"
+                                        outlined
+                                        @click="viewMagmaResults(data.dataset)"
+                                        :model="[
+                                            {
+                                                label: 'Open in new tab',
+                                                icon: 'pi pi-external-link',
+                                                command: () =>
+                                                    openMagmaResultsInNewTab(data.dataset),
+                                            },
+                                        ]"
+                                    />
+                                    <Button
+                                        v-else-if="getJobStatus(data, 'magma') === 'FAILED'"
+                                        label="MAGMA Failed"
+                                        size="small"
+                                        icon="pi pi-times"
+                                        severity="danger"
+                                        outlined
+                                        disabled
+                                        class="flex-1 min-w-0"
+                                    />
+                                </div>
                             </template>
                         </Column>
                         <Column
-                            header="Steps Completed"
+                            header="Progress"
                             :style="{ width: '10rem' }"
                         >
                             <template #body="{ data }">
-                                <div class="flex items-center gap-2">
-                                    <div
-                                        class="step-dot step-completed"
-                                        v-tooltip.top="'Upload Completed'"
-                                    ></div>
-                                    <div
-                                        class="step-dot"
-                                        :class="{
-                                            'step-completed':
-                                                data.status ===
-                                                    'sumstats SUCCEEDED' ||
-                                                data.status ===
-                                                    'sldsc SUCCEEDED' ||
-                                                data.status === 'RUNNING sldsc',
-                                        }"
-                                        v-tooltip.top="
-                                            data.status ===
-                                                'sumstats SUCCEEDED' ||
-                                            data.status === 'sldsc SUCCEEDED'
-                                                ? 'SumStats Completed'
-                                                : null
-                                        "
-                                    ></div>
-                                    <div
-                                        class="step-dot"
-                                        :class="{
-                                            'step-completed':
-                                                data.status ===
-                                                'sldsc SUCCEEDED',
-                                        }"
-                                        v-tooltip.top="
-                                            data.status === 'sldsc SUCCEEDED'
-                                                ? 'SLDSC Completed'
-                                                : null
-                                        "
-                                    ></div>
+                                <div class="flex flex-col gap-2">
+                                    <!-- SLDSC Progress -->
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-medium w-12">SLDSC:</span>
+                                        <div
+                                            class="step-dot step-completed"
+                                            v-tooltip.top="'Data Uploaded'"
+                                        ></div>
+                                        <div
+                                            class="step-dot"
+                                            :class="{
+                                                'step-completed': getJobStatus(data, 'sldsc') === 'SUCCEEDED',
+                                                'step-running': getJobStatus(data, 'sldsc') === 'RUNNING',
+                                                'step-failed': getJobStatus(data, 'sldsc') === 'FAILED'
+                                            }"
+                                            v-tooltip.top="
+                                                getJobStatus(data, 'sldsc') === 'SUCCEEDED' ? 'SLDSC Completed' :
+                                                getJobStatus(data, 'sldsc') === 'RUNNING' ? 'SLDSC Running' :
+                                                getJobStatus(data, 'sldsc') === 'FAILED' ? 'SLDSC Failed' : 'SLDSC Pending'
+                                            "
+                                        ></div>
+                                    </div>
+                                    
+                                    <!-- MAGMA Progress -->
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-medium w-12">MAGMA:</span>
+                                        <div
+                                            class="step-dot step-completed"
+                                            v-tooltip.top="'Data Uploaded'"
+                                        ></div>
+                                        <div
+                                            class="step-dot"
+                                            :class="{
+                                                'step-completed': getJobStatus(data, 'magma') === 'SUCCEEDED',
+                                                'step-running': getJobStatus(data, 'magma') === 'RUNNING',
+                                                'step-failed': getJobStatus(data, 'magma') === 'FAILED'
+                                            }"
+                                            v-tooltip.top="
+                                                getJobStatus(data, 'magma') === 'SUCCEEDED' ? 'MAGMA Completed' :
+                                                getJobStatus(data, 'magma') === 'RUNNING' ? 'MAGMA Running' :
+                                                getJobStatus(data, 'magma') === 'FAILED' ? 'MAGMA Failed' : 'MAGMA Pending'
+                                            "
+                                        ></div>
+                                    </div>
                                 </div>
                             </template>
                         </Column>
@@ -542,8 +651,8 @@ function openInNewTab(dataset) {
 
 /* Step dots styling */
 .step-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background-color: #e0e0e0;
     border: 1px solid #bdbdbd;
@@ -554,6 +663,26 @@ function openInNewTab(dataset) {
     background-color: var(--p-primary-color);
     border-color: var(--p-primary-color);
     box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
+
+.step-dot.step-running {
+    background-color: #f59e0b;
+    border-color: #f59e0b;
+    animation: pulse 2s infinite;
+}
+
+.step-dot.step-failed {
+    background-color: #ef4444;
+    border-color: #ef4444;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 /* Add additional styling for the popover itself */

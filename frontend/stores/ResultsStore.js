@@ -11,6 +11,7 @@ export const useResultsStore = defineStore("results", {
         tissues: [],
         biosamples: [],
         annotations: [],
+        genes: [],
     }),
 
     actions: {
@@ -18,7 +19,7 @@ export const useResultsStore = defineStore("results", {
             const config = useRuntimeConfig();
             this.axios = useAxios(config);
         },
-        async getResults(dataset, params = {}) {
+        async getResults(dataset, params = {}, resultType = 'ldsc') {
             this.init();
             this.loading = true;
             this.error = null;
@@ -43,14 +44,30 @@ export const useResultsStore = defineStore("results", {
                     }
                 });
 
-                const { data } = await this.axios.get(
-                    `/api/results/${dataset}?${queryParams.toString()}`,
-                );
+                // Choose the appropriate endpoint based on result type
+                const endpoint = resultType === 'magma' ? 
+                    `/api/magma-results/${dataset}?${queryParams.toString()}` :
+                    `/api/results/${dataset}?${queryParams.toString()}`;
+
+                const { data } = await this.axios.get(endpoint);
+                
                 if (data.items) this.items = data.items;
                 if (data.totalRecords) this.totalRecords = data.totalRecords;
-                if (data.tissues) this.tissues = data.tissues;
-                if (data.biosamples) this.biosamples = data.biosamples;
-                if (data.annotations) this.annotations = data.annotations;
+                
+                // Handle different result types
+                if (resultType === 'magma') {
+                    if (data.genes) this.genes = data.genes;
+                    // Clear LDSC-specific fields
+                    this.tissues = [];
+                    this.biosamples = [];
+                    this.annotations = [];
+                } else {
+                    if (data.tissues) this.tissues = data.tissues;
+                    if (data.biosamples) this.biosamples = data.biosamples;
+                    if (data.annotations) this.annotations = data.annotations;
+                    // Clear MAGMA-specific fields
+                    this.genes = [];
+                }
 
                 return data;
             } catch (error) {

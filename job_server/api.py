@@ -2,12 +2,14 @@ import asyncio
 import gzip
 import io
 import json
+import os
 import re
 from asyncio import Queue
 from functools import lru_cache
 from typing import Dict, Optional, TextIO
 
 import fastapi
+import httpx
 import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
@@ -40,20 +42,34 @@ async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depend
 
 
 async def get_current_user(authorization: Optional[str] = Header(None), token: Optional[str] = Query(None)):
-
+    # Handle both header and query param token
+    auth_token = None
+    
     if authorization:
-        schema, _, token = authorization.partition(' ')
-        if schema.lower() == 'bearer' and token:
-            data = get_decoded_jwt_data(token)[0]
-            if data:
-                return User(**data)
-
-    if token:
-        data = get_decoded_jwt_data(token)[0]
-        if data:
-            return User(**data)
-
-    raise fastapi.HTTPException(status_code=401, detail='Not logged in')
+        schema, _, auth_token = authorization.partition(' ')
+        if schema.lower() != 'bearer' or not auth_token:
+            raise fastapi.HTTPException(status_code=401, detail='Bearer token required')
+    elif token:
+        auth_token = token
+    
+    if not auth_token:
+        raise fastapi.HTTPException(status_code=401, detail='Authorization token required')
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{os.getenv('USER_SERVICE_URL', 'https://users.kpndataregistry.org')}/api/auth/verify/",
+                params={"group": os.getenv('USER_GROUP', 'gwas-ce')},
+                headers={"Authorization": f"Bearer {auth_token}"}
+            )
+            if response.status_code == 200:
+                user_data = response.json()
+                user = user_data.get('user')
+                return User(username=user.get('username'))
+            else:
+                raise fastapi.HTTPException(status_code=401, detail='Invalid token')
+    except httpx.RequestError:
+        raise fastapi.HTTPException(status_code=503, detail='User service unavailable')
 
 
 @router.get('/is-logged-in')
@@ -70,19 +86,27 @@ async def get_datasets(user: User = Depends(get_current_user),
                        orderDir: str = Query(None, description="Sort direction (asc or desc)")):
     data_set_folders = s3.get_datasets(user.username)
     jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
+    workflow_jobs_for_user = database_utils.get_workflow_jobs_for_user(get_db(), user.username)
     data_set_metadata = database_utils.get_dataset_metadata(get_db(), user.username)
 
     # Create the dataset list
-    datasets = [{'dataset': d,
-             'uploaded_at': data_set_metadata.get(d, {}).get('uploaded_at', ''),
-             'ancestry': data_set_metadata.get(d, {}).get('ancestry', ''),
-             'file_name': data_set_metadata.get(d, {}).get('file', ''),
-             'genome_build': data_set_metadata.get(d, {}).get('genome_build', ''),
-             'phenotype': data_set_metadata.get(d, {}).get('phenotype', ''),
-             'uploaded_by': user.username,
-             'status': jobs_for_user.get(database_utils.get_dataset_hash(d, user.username), {}).get('status'),
-             'id': database_utils.get_dataset_hash(d, user.username)
-             } for d in data_set_folders]
+    datasets = []
+    for d in data_set_folders:
+        dataset_id = database_utils.get_dataset_hash(d, user.username)
+        workflows = workflow_jobs_for_user.get(dataset_id, {})
+        
+        datasets.append({
+            'dataset': d,
+            'uploaded_at': data_set_metadata.get(d, {}).get('uploaded_at', ''),
+            'ancestry': data_set_metadata.get(d, {}).get('ancestry', ''),
+            'file_name': data_set_metadata.get(d, {}).get('file', ''),
+            'genome_build': data_set_metadata.get(d, {}).get('genome_build', ''),
+            'phenotype': data_set_metadata.get(d, {}).get('phenotype', ''),
+            'uploaded_by': user.username,
+            'status': jobs_for_user.get(dataset_id, {}).get('status'),
+            'workflows': workflows,  # New: detailed workflow status
+            'id': dataset_id
+        })
 
     # Sort datasets only if orderBy parameter is provided
     if orderBy and datasets:
@@ -95,12 +119,17 @@ async def get_datasets(user: User = Depends(get_current_user),
 
     return datasets
 
+@router.get("/workflow-status/{dataset}")
+async def get_workflow_status(dataset: str, user: User = Depends(get_current_user)):
+    """Get detailed workflow status for a specific dataset"""
+    return database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
 @router.get("/log-info/{job_id}")
 async def get_log_info(job_id: str, user: User = Depends(get_current_user)):
     return database_utils.get_log_info(get_db(), user.username, job_id)
 
 @router.post("/preview-delimited-file")
-async def preview_file(file: UploadFile):
+async def preview_file(file: UploadFile, user: User = Depends(get_current_user)):
     contents = await file.read(100)
     await file.seek(0)
 
@@ -142,7 +171,6 @@ async def finalize_upload(request: DatasetInfo, background_tasks: BackgroundTask
     s3.upload_metadata(request, s3_path)
     if not database_utils.insert_dataset(get_db(), user.username, request):
         raise fastapi.HTTPException(status_code=409, detail="Failed to insert dataset")
-    await start_job(user, request.name, AnalysisMethod.sumstats.value, background_tasks)
     return Response(status_code=200)
 
 @router.delete("/delete-dataset/{dataset}")
@@ -211,6 +239,7 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
         job_queues[job_id] = Queue()
     await start_job(user, request.dataset, request.method.value, background_tasks)
     return {"job_id": job_id}
+
 
 
 def get_s3_results_path(dataset: str, user: User, method_group: str, method: str) -> str:

@@ -26,6 +26,7 @@ async def submit_and_await_job(job_config, user, dataset, method, job_queues):
             )
             log_messages = [event['message'] for event in log_events['events']]
             complete_log = '\n'.join(log_messages)
+            
             status = f"{method} {job_status}"
             database_utils.log_job_end(get_db(), user, dataset, status, complete_log)
             job_id = database_utils.get_dataset_hash(dataset, user)
