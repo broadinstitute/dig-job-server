@@ -55,6 +55,15 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
     if not auth_token:
         raise fastapi.HTTPException(status_code=401, detail='Authorization token required')
     
+    # For testing, use JWT authentication instead of external user service
+    if os.getenv('TEST_MODE', 'false').lower() == 'true':
+        data = get_decoded_jwt_data(auth_token)[0]
+        if data:
+            return User(**data)
+        else:
+            raise fastapi.HTTPException(status_code=401, detail='Invalid token')
+    
+    # Production: use external user service
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
