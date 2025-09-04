@@ -115,12 +115,14 @@
                 >
                     <TabList>
                         <Tab
+                            v-if="shouldShowSldscTab"
                             value="sldsc"
                             :disabled="!hasSldscResults"
                             @click="() => onTabChange({ value: 'sldsc' })"
                             >{{ sldscTabHeader }}</Tab
                         >
                         <Tab
+                            v-if="shouldShowMagmaTab"
                             value="magma"
                             :disabled="!hasMagmaResults"
                             @click="() => onTabChange({ value: 'magma' })"
@@ -128,8 +130,44 @@
                         >
                     </TabList>
                     <TabPanels>
-                        <TabPanel value="sldsc">
-                            <div v-if="sldscLoading" class="p-4">
+                        <TabPanel v-if="shouldShowSldscTab" value="sldsc">
+                            <!-- Show loading skeleton while workflow is running -->
+                            <div v-if="sldscWorkflowRunning" class="p-4">
+                                <div
+                                    class="mb-4 p-4 bg-blue-100 text-blue-700 rounded"
+                                >
+                                    <div
+                                        class="flex items-center justify-between"
+                                    >
+                                        <div>
+                                            <h3 class="font-semibold mb-1">
+                                                SLDSC Analysis Running
+                                            </h3>
+                                            <p class="text-sm">
+                                                The SLDSC workflow is currently
+                                                processing. Results will be
+                                                available once complete.
+                                            </p>
+                                            <p class="text-sm mt-1">
+                                                Status:
+                                                {{ sldscWorkflowStatus }}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            label="Refresh"
+                                            @click="checkResultsAvailability"
+                                            class="ml-2"
+                                            size="small"
+                                        />
+                                    </div>
+                                </div>
+                                <div class="mb-2" v-for="i in 5" :key="i">
+                                    <Skeleton height="3rem" />
+                                </div>
+                            </div>
+
+                            <!-- Show loading skeleton while data is loading -->
+                            <div v-else-if="sldscLoading" class="p-4">
                                 <div class="mb-2" v-for="i in 5" :key="i">
                                     <Skeleton height="3rem" />
                                 </div>
@@ -328,8 +366,44 @@
                             </div>
                         </TabPanel>
 
-                        <TabPanel value="magma">
-                            <div v-if="magmaLoading" class="p-4">
+                        <TabPanel v-if="shouldShowMagmaTab" value="magma">
+                            <!-- Show loading skeleton while workflow is running -->
+                            <div v-if="magmaWorkflowRunning" class="p-4">
+                                <div
+                                    class="mb-4 p-4 bg-blue-100 text-blue-700 rounded"
+                                >
+                                    <div
+                                        class="flex items-center justify-between"
+                                    >
+                                        <div>
+                                            <h3 class="font-semibold mb-1">
+                                                MAGMA Analysis Running
+                                            </h3>
+                                            <p class="text-sm">
+                                                The MAGMA workflow is currently
+                                                processing. Results will be
+                                                available once complete.
+                                            </p>
+                                            <p class="text-sm mt-1">
+                                                Status:
+                                                {{ magmaWorkflowStatus }}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            label="Refresh"
+                                            @click="checkResultsAvailability"
+                                            class="ml-2"
+                                            size="small"
+                                        />
+                                    </div>
+                                </div>
+                                <div class="mb-2" v-for="i in 5" :key="i">
+                                    <Skeleton height="3rem" />
+                                </div>
+                            </div>
+
+                            <!-- Show loading skeleton while data is loading -->
+                            <div v-else-if="magmaLoading" class="p-4">
                                 <div class="mb-2" v-for="i in 5" :key="i">
                                     <Skeleton height="3rem" />
                                 </div>
@@ -451,7 +525,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useResultsStore } from "~/stores/ResultsStore.js";
 const route = useRoute();
 import { storeToRefs } from "pinia";
@@ -503,39 +577,72 @@ const {
 
 // Computed properties for tab headers
 const sldscTabHeader = computed(() => {
-    let header = "SLDSC";
-
-    // Add count if available
-    // if (sldscTotalRecords.value > 0) {
-    //     header += ` (${sldscTotalRecords.value})`;
-    // }
-
-    // Add workflow status if available
-    const sldscStatus =
-        workflowStatus.value.ldsc?.ldsc?.status ||
-        workflowStatus.value.sldsc?.sldsc?.status;
-    if (sldscStatus && sldscStatus !== "SUCCEEDED") {
-        header += ` - ${sldscStatus}`;
-    }
-
-    return header;
+    return "SLDSC";
 });
 
 const magmaTabHeader = computed(() => {
-    let header = "MAGMA";
+    return "MAGMA";
+});
 
-    // Add count if available
-    // if (magmaTotalRecords.value > 0) {
-    //     header += ` (${magmaTotalRecords.value})`;
-    // }
+// Computed properties for tab visibility and workflow status
+const shouldShowSldscTab = computed(() => {
+    // Only show if workflow succeeded OR if we have data (fallback)
+    const sldscStatus =
+        workflowStatus.value.ldsc?.ldsc?.status ||
+        workflowStatus.value.sldsc?.sldsc?.status;
 
-    // Add workflow status if available
-    const magmaStatus = workflowStatus.value.magma?.magma?.status;
-    if (magmaStatus && magmaStatus !== "SUCCEEDED") {
-        header += ` - ${magmaStatus}`;
+    if (hasWorkflowData.value) {
+        // If we have workflow data, only show if succeeded
+        return sldscStatus === "SUCCEEDED" || hasSldscResults.value;
+    } else {
+        // Fallback: show if we have results data
+        return hasSldscResults.value;
     }
+});
 
-    return header;
+const shouldShowMagmaTab = computed(() => {
+    // Only show if workflow succeeded OR if we have data (fallback)
+    const magmaStatus = workflowStatus.value.magma?.magma?.status;
+
+    if (hasWorkflowData.value) {
+        // If we have workflow data, only show if succeeded
+        return magmaStatus === "SUCCEEDED" || hasMagmaResults.value;
+    } else {
+        // Fallback: show if we have results data
+        return hasMagmaResults.value;
+    }
+});
+
+const sldscWorkflowStatus = computed(() => {
+    return (
+        workflowStatus.value.ldsc?.ldsc?.status ||
+        workflowStatus.value.sldsc?.sldsc?.status ||
+        null
+    );
+});
+
+const magmaWorkflowStatus = computed(() => {
+    return workflowStatus.value.magma?.magma?.status || null;
+});
+
+const sldscWorkflowRunning = computed(() => {
+    const status = sldscWorkflowStatus.value;
+    return (
+        status &&
+        ["RUNNING", "RUNNABLE", "PENDING", "SUBMITTED"].includes(
+            status.toUpperCase(),
+        )
+    );
+});
+
+const magmaWorkflowRunning = computed(() => {
+    const status = magmaWorkflowStatus.value;
+    return (
+        status &&
+        ["RUNNING", "RUNNABLE", "PENDING", "SUBMITTED"].includes(
+            status.toUpperCase(),
+        )
+    );
 });
 const canDownloadCurrentTab = computed(() => {
     if (activeTab.value === "magma") {
@@ -796,12 +903,34 @@ const onTabChange = (event) => {
         return;
     }
 
+    // Only allow switching to tabs that should be shown and have results
+    if (
+        newValue === "sldsc" &&
+        (!shouldShowSldscTab.value || !hasSldscResults.value)
+    ) {
+        return;
+    }
+    if (
+        newValue === "magma" &&
+        (!shouldShowMagmaTab.value || !hasMagmaResults.value)
+    ) {
+        return;
+    }
+
     activeTab.value = newValue;
 
-    // Load data for the active tab if not already loaded
-    if (newValue === "sldsc" && sldscResults.value.length === 0) {
+    // Load data for the active tab if not already loaded and workflow succeeded
+    if (
+        newValue === "sldsc" &&
+        sldscResults.value.length === 0 &&
+        hasSldscResults.value
+    ) {
         loadSldscResults();
-    } else if (newValue === "magma" && magmaResults.value.length === 0) {
+    } else if (
+        newValue === "magma" &&
+        magmaResults.value.length === 0 &&
+        hasMagmaResults.value
+    ) {
         loadMagmaResults();
     }
 };
@@ -929,19 +1058,25 @@ const checkResultsAvailability = async () => {
 
         console.log("Workflow status for dataset:", dataset.value, workflows);
 
-        // Check if LDSC/SLDSC workflows are available and completed
-        const hasSldscWorkflow =
-            workflows.ldsc?.ldsc?.status === "SUCCEEDED" ||
-            workflows.sldsc?.sldsc?.status === "SUCCEEDED";
+        // Check if LDSC/SLDSC workflows are available and completed successfully
+        const sldscStatus =
+            workflows.ldsc?.ldsc?.status || workflows.sldsc?.sldsc?.status;
+        const hasSldscWorkflow = !!sldscStatus;
+        const sldscSucceeded = sldscStatus === "SUCCEEDED";
 
-        // Check if MAGMA workflows are available and completed
-        const hasMagmaWorkflow = workflows.magma?.magma?.status === "SUCCEEDED";
+        // Check if MAGMA workflows are available and completed successfully
+        const magmaStatus = workflows.magma?.magma?.status;
+        const hasMagmaWorkflow = !!magmaStatus;
+        const magmaSucceeded = magmaStatus === "SUCCEEDED";
 
-        // Set availability based on workflow status, with fallback checks
-        if (hasSldscWorkflow) {
+        // Set results availability based on workflow status
+        if (sldscSucceeded) {
             hasSldscResults.value = true;
+        } else if (hasSldscWorkflow) {
+            // Workflow exists but hasn't succeeded - don't show results
+            hasSldscResults.value = false;
         } else {
-            // Fallback: Check if SLDSC data exists even without workflow success
+            // No workflow info - fallback to checking for existing data
             try {
                 const sldscResponse = await resultsStore.axios.get(
                     `/api/results/${dataset.value}?first=0&rows=1`,
@@ -954,13 +1089,16 @@ const checkResultsAvailability = async () => {
             }
         }
 
-        if (hasMagmaWorkflow) {
+        if (magmaSucceeded) {
             hasMagmaResults.value = true;
             console.log(
                 "MAGMA workflow succeeded, marking results as available",
             );
+        } else if (hasMagmaWorkflow) {
+            // Workflow exists but hasn't succeeded - don't show results
+            hasMagmaResults.value = false;
         } else {
-            // Fallback: Check if MAGMA data exists even without workflow success
+            // No workflow info - fallback to checking for existing data
             try {
                 console.log("Checking MAGMA data availability via API...");
                 const magmaResponse = await resultsStore.axios.get(
@@ -980,26 +1118,28 @@ const checkResultsAvailability = async () => {
             }
         }
 
-        // Load data for the inactive tab if it has results
-        if (
-            activeTab.value === "magma" &&
-            hasSldscResults.value &&
-            sldscResults.value.length === 0
-        ) {
-            // MAGMA is active, check if we should preload SLDSC
-            loadSldscResults();
-        } else if (
-            activeTab.value === "sldsc" &&
-            hasMagmaResults.value &&
-            magmaResults.value.length === 0
-        ) {
-            // SLDSC is active, check if we should preload MAGMA
-            loadMagmaResults();
+        // Ensure we have a valid active tab
+        // If current active tab shouldn't be shown, switch to the first available tab
+        await nextTick(); // Wait for computed properties to update
+
+        const currentTabValid =
+            (activeTab.value === "sldsc" && shouldShowSldscTab.value) ||
+            (activeTab.value === "magma" && shouldShowMagmaTab.value);
+
+        if (!currentTabValid) {
+            if (shouldShowSldscTab.value) {
+                activeTab.value = "sldsc";
+            } else if (shouldShowMagmaTab.value) {
+                activeTab.value = "magma";
+            }
         }
 
-        // If we just discovered MAGMA results are available and we're on the default SLDSC tab,
-        // but no MAGMA data is loaded yet, trigger loading
-        if (hasMagmaResults.value && magmaResults.value.length === 0) {
+        // Load data for successful workflows only
+        if (sldscSucceeded && sldscResults.value.length === 0) {
+            loadSldscResults();
+        }
+
+        if (magmaSucceeded && magmaResults.value.length === 0) {
             console.log("MAGMA results detected as available, loading data...");
             loadMagmaResults();
         }
@@ -1032,13 +1172,13 @@ const checkResultsAvailability = async () => {
 watch(activeTab, (newTab) => {
     if (
         newTab === "sldsc" &&
-        !hasSldscResults.value &&
+        hasSldscResults.value &&
         sldscResults.value.length === 0
     ) {
         loadSldscResults();
     } else if (
         newTab === "magma" &&
-        !hasMagmaResults.value &&
+        hasMagmaResults.value &&
         magmaResults.value.length === 0
     ) {
         loadMagmaResults();
@@ -1046,15 +1186,23 @@ watch(activeTab, (newTab) => {
 });
 
 onMounted(async () => {
-    // Start loading data for the initial tab immediately
-    if (activeTab.value === "magma") {
+    // First check workflow availability to determine what tabs to show
+    await checkResultsAvailability();
+
+    // Then load data for the active tab if it has results available
+    if (
+        activeTab.value === "magma" &&
+        hasMagmaResults.value &&
+        magmaResults.value.length === 0
+    ) {
         loadMagmaResults();
-    } else {
+    } else if (
+        activeTab.value === "sldsc" &&
+        hasSldscResults.value &&
+        sldscResults.value.length === 0
+    ) {
         loadSldscResults();
     }
-
-    // Then check availability for the other tab
-    await checkResultsAvailability();
 });
 </script>
 
