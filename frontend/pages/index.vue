@@ -59,44 +59,45 @@ const timelineEvents = [
 onMounted(async () => {
     // Handle OAuth callback if present
     const route = useRoute();
-    if (route.query.access_token && route.query.success === 'true') {
+    if (route.query.access_token && route.query.success === "true") {
         try {
             // Store the access token
             localStorage.setItem("authToken", route.query.access_token);
             localStorage.removeItem("isDefaultUser");
-            
+
             // Show success message
-            const wasCreated = route.query.created === 'true';
+            const wasCreated = route.query.created === "true";
             toast.add({
                 severity: "success",
                 summary: "Success",
-                detail: wasCreated ? "Account created and logged in successfully!" : "Logged in successfully!",
+                detail: wasCreated
+                    ? "Account created and logged in successfully!"
+                    : "Logged in successfully!",
                 life: 3000,
             });
 
             // Clean up the URL by removing query parameters
-            await navigateTo('/', { replace: true });
-            
+            await navigateTo("/", { replace: true });
         } catch (error) {
             console.error("OAuth callback error:", error);
             toast.add({
-                severity: "error", 
+                severity: "error",
                 summary: "Error",
                 detail: "Failed to complete login",
                 life: 3000,
             });
         }
-    } else if (route.query.success === 'false' && route.query.error) {
+    } else if (route.query.success === "false" && route.query.error) {
         // Handle OAuth error
         toast.add({
             severity: "error",
-            summary: "Login Failed", 
+            summary: "Login Failed",
             detail: decodeURIComponent(route.query.error),
             life: 5000,
         });
-        
+
         // Clean up the URL
-        await navigateTo('/', { replace: true });
+        await navigateTo("/", { replace: true });
     }
 
     datasets.value = await userStore.retrieveDatasets();
@@ -138,7 +139,7 @@ const listenForJobStatus = (jobId, data) => {
 
         // Update the status in the datasets table
         data.status = statusData.status;
-        
+
         // Update the workflows data structure for button state
         const parts = statusData.status.split(" ");
         if (parts.length >= 1) {
@@ -147,10 +148,10 @@ const listenForJobStatus = (jobId, data) => {
                 method = parts[1]; // "RUNNING sldsc" -> method = "sldsc"
                 status = "RUNNING";
             } else {
-                method = parts[0]; // "sldsc SUCCEEDED" -> method = "sldsc"  
+                method = parts[0]; // "sldsc SUCCEEDED" -> method = "sldsc"
                 status = parts[1]; // "sldsc SUCCEEDED" -> status = "SUCCEEDED"
             }
-            
+
             // Initialize workflows structure if needed
             if (!data.workflows) {
                 data.workflows = {};
@@ -158,11 +159,11 @@ const listenForJobStatus = (jobId, data) => {
             if (!data.workflows[method]) {
                 data.workflows[method] = {};
             }
-            
+
             // Update the status for this method
             data.workflows[method][method] = {
                 status: status,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
             };
         }
 
@@ -220,7 +221,12 @@ async function runMagma(data) {
 
 // Helper function to get simple job status for sldsc or magma
 function getJobStatus(data, method) {
-    if (!data.workflows || !data.workflows[method] || !data.workflows[method][method]) return null;
+    if (
+        !data.workflows ||
+        !data.workflows[method] ||
+        !data.workflows[method][method]
+    )
+        return null;
     return data.workflows[method][method].status;
 }
 
@@ -469,7 +475,10 @@ function openMagmaResultsInNewTab(dataset) {
                                         class="flex-1 min-w-0"
                                     />
                                     <Button
-                                        v-else-if="getJobStatus(data, 'sldsc') === 'RUNNING'"
+                                        v-else-if="
+                                            getJobStatus(data, 'sldsc') ===
+                                            'RUNNING'
+                                        "
                                         label="SLDSC Running"
                                         size="small"
                                         icon="pi pi-spin pi-spinner"
@@ -479,7 +488,10 @@ function openMagmaResultsInNewTab(dataset) {
                                         class="flex-1 min-w-0"
                                     />
                                     <SplitButton
-                                        v-else-if="getJobStatus(data, 'sldsc') === 'SUCCEEDED'"
+                                        v-else-if="
+                                            getJobStatus(data, 'sldsc') ===
+                                            'SUCCEEDED'
+                                        "
                                         label="SLDSC Results"
                                         class="whitespace-nowrap flex-1 min-w-0"
                                         icon="pi pi-eye"
@@ -496,7 +508,10 @@ function openMagmaResultsInNewTab(dataset) {
                                         ]"
                                     />
                                     <Button
-                                        v-else-if="getJobStatus(data, 'sldsc') === 'FAILED'"
+                                        v-else-if="
+                                            getJobStatus(data, 'sldsc') ===
+                                            'FAILED'
+                                        "
                                         label="SLDSC Failed"
                                         size="small"
                                         icon="pi pi-times"
@@ -517,7 +532,10 @@ function openMagmaResultsInNewTab(dataset) {
                                         class="flex-1 min-w-0"
                                     />
                                     <Button
-                                        v-else-if="getJobStatus(data, 'magma') === 'RUNNING'"
+                                        v-else-if="
+                                            getJobStatus(data, 'magma') ===
+                                            'RUNNING'
+                                        "
                                         label="MAGMA Running"
                                         size="small"
                                         icon="pi pi-spin pi-spinner"
@@ -527,7 +545,10 @@ function openMagmaResultsInNewTab(dataset) {
                                         class="flex-1 min-w-0"
                                     />
                                     <SplitButton
-                                        v-else-if="getJobStatus(data, 'magma') === 'SUCCEEDED'"
+                                        v-else-if="
+                                            getJobStatus(data, 'magma') ===
+                                            'SUCCEEDED'
+                                        "
                                         label="MAGMA Results"
                                         class="whitespace-nowrap flex-1 min-w-0"
                                         icon="pi pi-eye"
@@ -539,12 +560,17 @@ function openMagmaResultsInNewTab(dataset) {
                                                 label: 'Open in new tab',
                                                 icon: 'pi pi-external-link',
                                                 command: () =>
-                                                    openMagmaResultsInNewTab(data.dataset),
+                                                    openMagmaResultsInNewTab(
+                                                        data.dataset,
+                                                    ),
                                             },
                                         ]"
                                     />
                                     <Button
-                                        v-else-if="getJobStatus(data, 'magma') === 'FAILED'"
+                                        v-else-if="
+                                            getJobStatus(data, 'magma') ===
+                                            'FAILED'
+                                        "
                                         label="MAGMA Failed"
                                         size="small"
                                         icon="pi pi-times"
@@ -556,58 +582,7 @@ function openMagmaResultsInNewTab(dataset) {
                                 </div>
                             </template>
                         </Column>
-                        <Column
-                            header="Progress"
-                            :style="{ width: '10rem' }"
-                        >
-                            <template #body="{ data }">
-                                <div class="flex flex-col gap-2">
-                                    <!-- SLDSC Progress -->
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-medium w-12">SLDSC:</span>
-                                        <div
-                                            class="step-dot step-completed"
-                                            v-tooltip.top="'Data Uploaded'"
-                                        ></div>
-                                        <div
-                                            class="step-dot"
-                                            :class="{
-                                                'step-completed': getJobStatus(data, 'sldsc') === 'SUCCEEDED',
-                                                'step-running': getJobStatus(data, 'sldsc') === 'RUNNING',
-                                                'step-failed': getJobStatus(data, 'sldsc') === 'FAILED'
-                                            }"
-                                            v-tooltip.top="
-                                                getJobStatus(data, 'sldsc') === 'SUCCEEDED' ? 'SLDSC Completed' :
-                                                getJobStatus(data, 'sldsc') === 'RUNNING' ? 'SLDSC Running' :
-                                                getJobStatus(data, 'sldsc') === 'FAILED' ? 'SLDSC Failed' : 'SLDSC Pending'
-                                            "
-                                        ></div>
-                                    </div>
-                                    
-                                    <!-- MAGMA Progress -->
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-medium w-12">MAGMA:</span>
-                                        <div
-                                            class="step-dot step-completed"
-                                            v-tooltip.top="'Data Uploaded'"
-                                        ></div>
-                                        <div
-                                            class="step-dot"
-                                            :class="{
-                                                'step-completed': getJobStatus(data, 'magma') === 'SUCCEEDED',
-                                                'step-running': getJobStatus(data, 'magma') === 'RUNNING',
-                                                'step-failed': getJobStatus(data, 'magma') === 'FAILED'
-                                            }"
-                                            v-tooltip.top="
-                                                getJobStatus(data, 'magma') === 'SUCCEEDED' ? 'MAGMA Completed' :
-                                                getJobStatus(data, 'magma') === 'RUNNING' ? 'MAGMA Running' :
-                                                getJobStatus(data, 'magma') === 'FAILED' ? 'MAGMA Failed' : 'MAGMA Pending'
-                                            "
-                                        ></div>
-                                    </div>
-                                </div>
-                            </template>
-                        </Column>
+
                         <Column
                             header="Delete"
                             :style="{ width: '4rem' }"
@@ -677,7 +652,8 @@ function openMagmaResultsInNewTab(dataset) {
 }
 
 @keyframes pulse {
-    0%, 100% {
+    0%,
+    100% {
         opacity: 1;
     }
     50% {
