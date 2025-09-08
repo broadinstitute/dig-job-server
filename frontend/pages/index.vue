@@ -195,6 +195,173 @@ const listenForJobStatus = (jobId, data) => {
     };
 };
 
+// Helper function to get available workflows that can be run
+function getAvailableWorkflows(data) {
+    const workflows = [];
+
+    // Check SLDSC
+    if (!getJobStatus(data, "sldsc")) {
+        workflows.push({
+            label: "Run SLDSC",
+            icon: "pi pi-chart-line",
+            method: "sldsc",
+            command: () => runSldsc(data),
+        });
+    }
+
+    // Check MAGMA
+    if (!getJobStatus(data, "magma")) {
+        workflows.push({
+            label: "Run MAGMA",
+            icon: "pi pi-chart-bar",
+            method: "magma",
+            command: () => runMagma(data),
+        });
+    }
+
+    return workflows;
+}
+
+// Helper function to get all workflow options for dropdown (including failed as disabled)
+function getAllWorkflowOptions(data) {
+    const options = [];
+
+    // Check SLDSC
+    const sldscStatus = getJobStatus(data, "sldsc");
+    if (!sldscStatus) {
+        // Not run yet - available to run
+        options.push({
+            label: "Run SLDSC",
+            icon: "pi pi-chart-line",
+            method: "sldsc",
+            command: () => runSldsc(data),
+            disabled: false,
+        });
+    } else if (sldscStatus === "FAILED") {
+        // Failed - show as disabled option
+        options.push({
+            label: "Run SLDSC (Failed)",
+            icon: "pi pi-chart-line",
+            method: "sldsc",
+            command: () => runSldsc(data),
+            disabled: true,
+        });
+    }
+
+    // Check MAGMA
+    const magmaStatus = getJobStatus(data, "magma");
+    if (!magmaStatus) {
+        // Not run yet - available to run
+        options.push({
+            label: "Run MAGMA",
+            icon: "pi pi-chart-bar",
+            method: "magma",
+            command: () => runMagma(data),
+            disabled: false,
+        });
+    } else if (magmaStatus === "FAILED") {
+        // Failed - show as disabled option
+        options.push({
+            label: "Run MAGMA (Failed)",
+            icon: "pi pi-chart-bar",
+            method: "magma",
+            command: () => runMagma(data),
+            disabled: true,
+        });
+    }
+
+    return options;
+}
+
+// Helper function to get running workflows
+function getRunningWorkflows(data) {
+    const workflows = [];
+
+    // Check SLDSC
+    if (getJobStatus(data, "sldsc") === "RUNNING") {
+        workflows.push({
+            label: "SLDSC Running",
+            icon: "pi pi-spin pi-spinner",
+            method: "sldsc",
+        });
+    }
+
+    // Check MAGMA
+    if (getJobStatus(data, "magma") === "RUNNING") {
+        workflows.push({
+            label: "MAGMA Running",
+            icon: "pi pi-spin pi-spinner",
+            method: "magma",
+        });
+    }
+
+    return workflows;
+}
+
+// Helper function to get successful workflows
+function getSuccessfulWorkflows(data) {
+    const workflows = [];
+
+    // Check SLDSC
+    if (getJobStatus(data, "sldsc") === "SUCCEEDED") {
+        workflows.push({
+            label: "View SLDSC",
+            icon: "pi pi-eye",
+            method: "sldsc",
+        });
+    }
+
+    // Check MAGMA
+    if (getJobStatus(data, "magma") === "SUCCEEDED") {
+        workflows.push({
+            label: "View MAGMA",
+            icon: "pi pi-eye",
+            method: "magma",
+        });
+    }
+
+    return workflows;
+}
+
+// Helper function to get result button configuration
+function getResultButtonConfig(data) {
+    const successfulWorkflows = getSuccessfulWorkflows(data);
+
+    if (successfulWorkflows.length === 0) {
+        return null;
+    }
+
+    if (successfulWorkflows.length === 1) {
+        // Single successful workflow - show specific workflow name
+        return {
+            label: successfulWorkflows[0].label,
+            icon: successfulWorkflows[0].icon,
+            command: () => viewResults(data.dataset), // Results page will show the appropriate tab
+            dropdownItems: [
+                {
+                    label: "Open in new tab",
+                    icon: "pi pi-external-link",
+                    command: () => openInNewTab(data.dataset),
+                },
+            ],
+        };
+    } else {
+        // Multiple successful workflows - show generic "View Results"
+        return {
+            label: "View Results",
+            icon: "pi pi-eye",
+            command: () => viewResults(data.dataset), // Results page will handle showing appropriate tabs
+            dropdownItems: [
+                {
+                    label: "Open in new tab",
+                    icon: "pi pi-external-link",
+                    command: () => openInNewTab(data.dataset),
+                },
+            ],
+        };
+    }
+}
+
 async function runSldsc(data) {
     const { job_id } = await userStore.startAnalysis(data.dataset, "sldsc");
     data.status = "RUNNING sldsc";
@@ -228,6 +395,64 @@ function getJobStatus(data, method) {
     )
         return null;
     return data.workflows[method][method].status;
+}
+
+// Helper function to get overall workflow status for analysis button styling
+function getOverallWorkflowStatus(data) {
+    if (!data.workflows && !data.status) return null;
+
+    const workflowMethods = ["sldsc", "magma"]; // Main analysis workflows
+    const statuses = [];
+
+    // Collect all workflow statuses from workflows structure
+    for (const method of workflowMethods) {
+        const status = getJobStatus(data, method);
+        if (status) {
+            statuses.push(status);
+        }
+    }
+
+    // Also check the general status field for sumstats or other workflows
+    if (data.status) {
+        // Extract status from patterns like "sumstats SUCCEEDED", "sldsc RUNNING", etc.
+        const statusParts = data.status.split(" ");
+        if (statusParts.length >= 2) {
+            const method = statusParts[0];
+            const status = statusParts[1];
+            // Only add if it's not already captured in workflows structure
+            if (
+                !workflowMethods.includes(method) ||
+                !getJobStatus(data, method)
+            ) {
+                statuses.push(status);
+            }
+        }
+    }
+
+    if (statuses.length === 0) return null;
+
+    // If all workflows failed, return 'all-failed'
+    if (statuses.every((status) => status === "FAILED")) {
+        return "all-failed";
+    }
+
+    // If some workflows failed, return 'some-failed'
+    if (statuses.some((status) => status === "FAILED")) {
+        return "some-failed";
+    }
+
+    // If all workflows succeeded, return 'all-succeeded'
+    if (statuses.every((status) => status === "SUCCEEDED")) {
+        return "all-succeeded";
+    }
+
+    // If any are running, return 'running'
+    if (statuses.some((status) => status === "RUNNING")) {
+        return "running";
+    }
+
+    // Default to partial success/mixed state
+    return "mixed";
 }
 
 async function handleDelete(dataSet) {
@@ -274,14 +499,6 @@ function viewResults(dataset) {
 
 function openInNewTab(dataset) {
     window.open(`/results?dataset=${dataset}`, "_blank");
-}
-
-function viewMagmaResults(dataset) {
-    router.push(`/results?dataset=${dataset}&type=magma`);
-}
-
-function openMagmaResultsInNewTab(dataset) {
-    window.open(`/results?dataset=${dataset}&type=magma`, "_blank");
 }
 </script>
 <template>
@@ -407,6 +624,77 @@ function openMagmaResultsInNewTab(dataset) {
                                 }}
                             </template>
                         </Column>
+                        <Column
+                            header="Run Analysis"
+                            :style="{ width: '15rem' }"
+                        >
+                            <template #body="{ data }">
+                                <div class="flex gap-2 flex-wrap">
+                                    <!-- Show running workflows -->
+                                    <Button
+                                        v-for="workflow in getRunningWorkflows(
+                                            data,
+                                        )"
+                                        :key="workflow.method"
+                                        :label="workflow.label"
+                                        size="small"
+                                        :icon="workflow.icon"
+                                        severity="warn"
+                                        outlined
+                                        disabled
+                                        class="flex-1 min-w-0"
+                                    />
+
+                                    <!-- Show dropdown only when workflows are available -->
+                                    <Dropdown
+                                        v-if="
+                                            getAllWorkflowOptions(data).length >
+                                            0
+                                        "
+                                        :options="getAllWorkflowOptions(data)"
+                                        optionLabel="label"
+                                        optionDisabled="disabled"
+                                        placeholder="Select Analysis"
+                                        class="flex-1 min-w-0"
+                                        @change="
+                                            (event) => {
+                                                if (
+                                                    event.value &&
+                                                    !event.value.disabled
+                                                ) {
+                                                    event.value.command();
+                                                    // Clear the selection after executing
+                                                    event.target.writeValue(
+                                                        null,
+                                                    );
+                                                }
+                                            }
+                                        "
+                                    >
+                                        <template #option="slotProps">
+                                            <div
+                                                class="flex align-items-center"
+                                                :class="{
+                                                    'opacity-50 cursor-not-allowed':
+                                                        slotProps.option
+                                                            .disabled,
+                                                }"
+                                            >
+                                                <i
+                                                    :class="
+                                                        slotProps.option.icon
+                                                    "
+                                                    class="mr-2"
+                                                ></i>
+                                                <span>{{
+                                                    slotProps.option.label
+                                                }}</span>
+                                            </div>
+                                        </template>
+                                    </Dropdown>
+                                </div>
+                            </template>
+                        </Column>
                         <Column header="Status">
                             <template #body="{ data }">
                                 <template
@@ -461,123 +749,29 @@ function openMagmaResultsInNewTab(dataset) {
                                 </template>
                             </template>
                         </Column>
-                        <Column header="Analysis" :style="{ width: '15rem' }">
+
+                        <Column header="Results" :style="{ width: '15rem' }">
                             <template #body="{ data }">
                                 <div class="flex gap-2 flex-wrap">
-                                    <!-- SLDSC Analysis -->
-                                    <Button
-                                        v-if="!getJobStatus(data, 'sldsc')"
-                                        @click.prevent="runSldsc(data)"
-                                        label="Run SLDSC"
-                                        size="small"
-                                        icon="pi pi-chart-line"
-                                        outlined
-                                        class="flex-1 min-w-0"
-                                    />
-                                    <Button
-                                        v-else-if="
-                                            getJobStatus(data, 'sldsc') ===
-                                            'RUNNING'
-                                        "
-                                        label="SLDSC Running"
-                                        size="small"
-                                        icon="pi pi-spin pi-spinner"
-                                        severity="warn"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
                                     <SplitButton
-                                        v-else-if="
-                                            getJobStatus(data, 'sldsc') ===
-                                            'SUCCEEDED'
+                                        v-if="getResultButtonConfig(data)"
+                                        :label="
+                                            getResultButtonConfig(data).label
                                         "
-                                        label="SLDSC Results"
                                         class="whitespace-nowrap flex-1 min-w-0"
-                                        icon="pi pi-eye"
+                                        :icon="getResultButtonConfig(data).icon"
                                         size="small"
                                         outlined
-                                        @click="viewResults(data.dataset)"
-                                        :model="[
-                                            {
-                                                label: 'Open in new tab',
-                                                icon: 'pi pi-external-link',
-                                                command: () =>
-                                                    openInNewTab(data.dataset),
-                                            },
-                                        ]"
-                                    />
-                                    <Button
-                                        v-else-if="
-                                            getJobStatus(data, 'sldsc') ===
-                                            'FAILED'
+                                        @click="
+                                            getResultButtonConfig(
+                                                data,
+                                            ).command()
                                         "
-                                        label="SLDSC Failed"
-                                        size="small"
-                                        icon="pi pi-times"
-                                        severity="danger"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
-
-                                    <!-- MAGMA Analysis -->
-                                    <Button
-                                        v-if="!getJobStatus(data, 'magma')"
-                                        @click.prevent="runMagma(data)"
-                                        label="Run MAGMA"
-                                        size="small"
-                                        icon="pi pi-chart-bar"
-                                        outlined
-                                        class="flex-1 min-w-0"
-                                    />
-                                    <Button
-                                        v-else-if="
-                                            getJobStatus(data, 'magma') ===
-                                            'RUNNING'
+                                        severity="primary"
+                                        :model="
+                                            getResultButtonConfig(data)
+                                                .dropdownItems
                                         "
-                                        label="MAGMA Running"
-                                        size="small"
-                                        icon="pi pi-spin pi-spinner"
-                                        severity="warn"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
-                                    <SplitButton
-                                        v-else-if="
-                                            getJobStatus(data, 'magma') ===
-                                            'SUCCEEDED'
-                                        "
-                                        label="MAGMA Results"
-                                        class="whitespace-nowrap flex-1 min-w-0"
-                                        icon="pi pi-eye"
-                                        size="small"
-                                        outlined
-                                        @click="viewMagmaResults(data.dataset)"
-                                        :model="[
-                                            {
-                                                label: 'Open in new tab',
-                                                icon: 'pi pi-external-link',
-                                                command: () =>
-                                                    openMagmaResultsInNewTab(
-                                                        data.dataset,
-                                                    ),
-                                            },
-                                        ]"
-                                    />
-                                    <Button
-                                        v-else-if="
-                                            getJobStatus(data, 'magma') ===
-                                            'FAILED'
-                                        "
-                                        label="MAGMA Failed"
-                                        size="small"
-                                        icon="pi pi-times"
-                                        severity="danger"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
                                     />
                                 </div>
                             </template>
