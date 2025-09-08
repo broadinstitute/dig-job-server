@@ -484,6 +484,54 @@ async function handleDelete(dataSet) {
     });
 }
 
+async function confirmAndRunWorkflow(data, workflow) {
+    const workflowDescriptions = {
+        sldsc: "SLDSC (Stratified LD Score Regression) analysis will calculate heritability and genetic correlations for your dataset.",
+        magma: "MAGMA analysis will perform gene-based association testing and pathway analysis on your dataset.",
+    };
+
+    confirm.require({
+        group: "workflow-confirmation",
+        header: "Confirm analysis to run.",
+        icon: "pi pi-question-circle",
+        acceptClass: "p-button-primary",
+        rejectClass: "p-button-secondary",
+        data: {
+            workflow: workflow,
+            dataset: data.dataset,
+            description:
+                workflowDescriptions[workflow.method] ||
+                `${workflow.method} analysis will be performed on your dataset.`,
+        },
+        accept: async () => {
+            try {
+                await workflow.command();
+                toast.add({
+                    severity: "success",
+                    summary: "Analysis Started",
+                    detail: `${workflow.method.toUpperCase()} analysis started successfully`,
+                    life: 5000,
+                });
+            } catch (error) {
+                toast.add({
+                    severity: "error",
+                    summary: "Error",
+                    detail: `Failed to start ${workflow.method.toUpperCase()} analysis`,
+                    life: 5000,
+                });
+            }
+        },
+        reject: () => {
+            toast.add({
+                severity: "info",
+                summary: "Cancelled",
+                detail: "Analysis cancelled",
+                life: 3000,
+            });
+        },
+    });
+}
+
 function progress(data) {
     if (data.status === "sumstats SUCCEEDED") {
         return 50;
@@ -506,6 +554,46 @@ function openInNewTab(dataset) {
         <div class="col-span-12">
             <Toast position="top-center" />
             <ConfirmDialog />
+            <ConfirmDialog group="workflow-confirmation">
+                <template #message="slotProps">
+                    <div class="flex flex-col gap-4 p-4">
+                        <div class="flex items-center gap-3">
+                            <i
+                                class="pi pi-question-circle text-2xl text-primary"
+                            ></i>
+                            <div>
+                                <p class="text-sm text-gray-600 mb-3">
+                                    {{ slotProps.message.data.description }}
+                                </p>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-gray-50 p-3 rounded border-l-4 border-primary"
+                        >
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="pi pi-database text-sm"></i>
+                                <span class="font-medium text-sm"
+                                    >Dataset:</span
+                                >
+                            </div>
+                            <span
+                                class="text-sm font-mono bg-white px-2 py-1 rounded"
+                            >
+                                {{ slotProps.message.data.dataset }}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <i
+                                class="pi pi-info-circle text-sm text-blue-500"
+                            ></i>
+                            <span class="text-md text-gray-600"
+                                >Do you want to proceed with this
+                                analysis?</span
+                            >
+                        </div>
+                    </div>
+                </template>
+            </ConfirmDialog>
 
             <div class="flex justify-between items-center">
                 <Button
@@ -662,8 +750,11 @@ function openInNewTab(dataset) {
                                                     event.value &&
                                                     !event.value.disabled
                                                 ) {
-                                                    event.value.command();
-                                                    // Clear the selection after executing
+                                                    confirmAndRunWorkflow(
+                                                        data,
+                                                        event.value,
+                                                    );
+                                                    // Clear the selection after showing confirmation
                                                     event.target.writeValue(
                                                         null,
                                                     );
