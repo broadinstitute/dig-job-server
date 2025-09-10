@@ -44,17 +44,17 @@ async def login(credentials: UserCredentials, auth_backend: AuthBackend = Depend
 async def get_current_user(authorization: Optional[str] = Header(None), token: Optional[str] = Query(None)):
     # Handle both header and query param token
     auth_token = None
-    
+
     if authorization:
         schema, _, auth_token = authorization.partition(' ')
         if schema.lower() != 'bearer' or not auth_token:
             raise fastapi.HTTPException(status_code=401, detail='Bearer token required')
     elif token:
         auth_token = token
-    
+
     if not auth_token:
         raise fastapi.HTTPException(status_code=401, detail='Authorization token required')
-    
+
     # For testing, use JWT authentication instead of external user service
     if os.getenv('TEST_MODE', 'false').lower() == 'true':
         data = get_decoded_jwt_data(auth_token)[0]
@@ -62,7 +62,7 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
             return User(**data)
         else:
             raise fastapi.HTTPException(status_code=401, detail='Invalid token')
-    
+
     # Production: use external user service
     try:
         async with httpx.AsyncClient() as client:
@@ -103,7 +103,7 @@ async def get_datasets(user: User = Depends(get_current_user),
     for d in data_set_folders:
         dataset_id = database_utils.get_dataset_hash(d, user.username)
         workflows = workflow_jobs_for_user.get(dataset_id, {})
-        
+
         datasets.append({
             'dataset': d,
             'uploaded_at': data_set_metadata.get(d, {}).get('uploaded_at', ''),
@@ -231,9 +231,9 @@ async def job_status(job_id: str):
 async def start_job(user: User, dataset: str, method: str, background_tasks: BackgroundTasks):
     database_utils.log_job_start(get_db(), user.username, dataset, f"RUNNING {method}")
     background_tasks.add_task(batch.submit_and_await_job, {
-        'jobName': 'dig-ldsc-methods',
-        'jobQueue': 'ldsc-methods-job-queue',
-        'jobDefinition': 'dig-ldsc-methods',
+        'jobName': 'dig-sldsc-methods',
+        'jobQueue': 'sldsc-methods-job-queue',
+        'jobDefinition': 'dig-sldsc-methods',
         'parameters': {
             'username': user.username,
             'dataset': dataset,
@@ -256,13 +256,20 @@ def get_s3_results_path(dataset: str, user: User, method_group: str, method: str
 
 
 @router.get("/download/{dataset}")
-async def download_hermes_file(dataset: str, user: User = Depends(get_current_user)):
-    s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
-    df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
+async def download_hermes_file(dataset: str, result_type: str = Query('sldsc', description="Type of results to download"), user: User = Depends(get_current_user)):
+    if result_type.lower() == 'magma':
+        s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
+        df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
+        filename = f"{dataset}_magma_results.tsv"
+    else:
+        s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
+        df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
+        filename = f"{dataset}_ldsc_results.tsv"
+
     return Response(content=df.to_csv(sep='\t', index=False),
                        media_type='text/tab-separated-values',
                        headers={
-                           'Content-Disposition': f'attachment; filename="{dataset}_results.tsv"'
+                           'Content-Disposition': f'attachment; filename="{filename}"'
                        })
 
 
