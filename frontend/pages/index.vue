@@ -40,13 +40,8 @@ const timelineEvents = [
         icon: "pi pi-upload",
     },
     {
-        title: "Run SumStats",
-        description: "Process summary statistics for your dataset",
-        icon: "pi pi-play",
-    },
-    {
-        title: "Run SLDSC",
-        description: "Run stratified LD score regression analysis",
+        title: "Run Analysis",
+        description: "Select analysis to run",
         icon: "pi pi-forward",
     },
     {
@@ -59,44 +54,45 @@ const timelineEvents = [
 onMounted(async () => {
     // Handle OAuth callback if present
     const route = useRoute();
-    if (route.query.access_token && route.query.success === 'true') {
+    if (route.query.access_token && route.query.success === "true") {
         try {
             // Store the access token
             localStorage.setItem("authToken", route.query.access_token);
             localStorage.removeItem("isDefaultUser");
-            
+
             // Show success message
-            const wasCreated = route.query.created === 'true';
+            const wasCreated = route.query.created === "true";
             toast.add({
                 severity: "success",
                 summary: "Success",
-                detail: wasCreated ? "Account created and logged in successfully!" : "Logged in successfully!",
+                detail: wasCreated
+                    ? "Account created and logged in successfully!"
+                    : "Logged in successfully!",
                 life: 3000,
             });
 
             // Clean up the URL by removing query parameters
-            await navigateTo('/', { replace: true });
-            
+            await navigateTo("/", { replace: true });
         } catch (error) {
             console.error("OAuth callback error:", error);
             toast.add({
-                severity: "error", 
+                severity: "error",
                 summary: "Error",
                 detail: "Failed to complete login",
                 life: 3000,
             });
         }
-    } else if (route.query.success === 'false' && route.query.error) {
+    } else if (route.query.success === "false" && route.query.error) {
         // Handle OAuth error
         toast.add({
             severity: "error",
-            summary: "Login Failed", 
+            summary: "Login Failed",
             detail: decodeURIComponent(route.query.error),
             life: 5000,
         });
-        
+
         // Clean up the URL
-        await navigateTo('/', { replace: true });
+        await navigateTo("/", { replace: true });
     }
 
     datasets.value = await userStore.retrieveDatasets();
@@ -138,7 +134,7 @@ const listenForJobStatus = (jobId, data) => {
 
         // Update the status in the datasets table
         data.status = statusData.status;
-        
+
         // Update the workflows data structure for button state
         const parts = statusData.status.split(" ");
         if (parts.length >= 1) {
@@ -147,10 +143,10 @@ const listenForJobStatus = (jobId, data) => {
                 method = parts[1]; // "RUNNING sldsc" -> method = "sldsc"
                 status = "RUNNING";
             } else {
-                method = parts[0]; // "sldsc SUCCEEDED" -> method = "sldsc"  
+                method = parts[0]; // "sldsc SUCCEEDED" -> method = "sldsc"
                 status = parts[1]; // "sldsc SUCCEEDED" -> status = "SUCCEEDED"
             }
-            
+
             // Initialize workflows structure if needed
             if (!data.workflows) {
                 data.workflows = {};
@@ -158,11 +154,11 @@ const listenForJobStatus = (jobId, data) => {
             if (!data.workflows[method]) {
                 data.workflows[method] = {};
             }
-            
+
             // Update the status for this method
             data.workflows[method][method] = {
                 status: status,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
             };
         }
 
@@ -194,6 +190,157 @@ const listenForJobStatus = (jobId, data) => {
     };
 };
 
+// Helper function to get available workflows that can be run
+function getAvailableWorkflows(data) {
+    const workflows = [];
+
+    // Check SLDSC
+    if (!getJobStatus(data, "sldsc")) {
+        workflows.push({
+            label: "Run SLDSC",
+            icon: "pi pi-chart-line",
+            method: "sldsc",
+            command: () => runSldsc(data),
+        });
+    }
+
+    // Check MAGMA
+    if (!getJobStatus(data, "magma")) {
+        workflows.push({
+            label: "Run MAGMA",
+            icon: "pi pi-chart-bar",
+            method: "magma",
+            command: () => runMagma(data),
+        });
+    }
+
+    return workflows;
+}
+
+// Helper function to get all workflow options for dropdown (including failed as disabled)
+function getAllWorkflowOptions(data) {
+    const options = [];
+
+    // Check SLDSC
+    const sldscStatus = getJobStatus(data, "sldsc");
+    if (!sldscStatus) {
+        // Not run yet - available to run
+        options.push({
+            label: "Run SLDSC",
+            icon: "pi pi-chart-line",
+            method: "sldsc",
+            command: () => runSldsc(data),
+            disabled: false,
+        });
+    } else if (sldscStatus === "FAILED") {
+        // Failed - show as disabled option
+        options.push({
+            label: "Run SLDSC (Failed)",
+            icon: "pi pi-chart-line",
+            method: "sldsc",
+            command: () => runSldsc(data),
+            disabled: true,
+        });
+    }
+
+    // Check MAGMA
+    const magmaStatus = getJobStatus(data, "magma");
+    if (!magmaStatus) {
+        // Not run yet - available to run
+        options.push({
+            label: "Run MAGMA",
+            icon: "pi pi-chart-bar",
+            method: "magma",
+            command: () => runMagma(data),
+            disabled: false,
+        });
+    } else if (magmaStatus === "FAILED") {
+        // Failed - show as disabled option
+        options.push({
+            label: "Run MAGMA (Failed)",
+            icon: "pi pi-chart-bar",
+            method: "magma",
+            command: () => runMagma(data),
+            disabled: true,
+        });
+    }
+
+    return options;
+}
+
+// Helper function to get running workflows
+function getRunningWorkflows(data) {
+    const workflows = [];
+
+    // Check SLDSC
+    if (getJobStatus(data, "sldsc") === "RUNNING") {
+        workflows.push({
+            label: "SLDSC Running",
+            icon: "pi pi-spin pi-spinner",
+            method: "sldsc",
+        });
+    }
+
+    // Check MAGMA
+    if (getJobStatus(data, "magma") === "RUNNING") {
+        workflows.push({
+            label: "MAGMA Running",
+            icon: "pi pi-spin pi-spinner",
+            method: "magma",
+        });
+    }
+
+    return workflows;
+}
+
+// Helper function to get successful workflows
+function getSuccessfulWorkflows(data) {
+    const workflows = [];
+
+    // Check SLDSC
+    if (getJobStatus(data, "sldsc") === "SUCCEEDED") {
+        workflows.push({
+            label: "View SLDSC",
+            icon: "pi pi-eye",
+            method: "sldsc",
+        });
+    }
+
+    // Check MAGMA
+    if (getJobStatus(data, "magma") === "SUCCEEDED") {
+        workflows.push({
+            label: "View MAGMA",
+            icon: "pi pi-eye",
+            method: "magma",
+        });
+    }
+
+    return workflows;
+}
+
+// Helper function to get result button configuration
+function getResultButtonConfig(data) {
+    const successfulWorkflows = getSuccessfulWorkflows(data);
+
+    if (successfulWorkflows.length === 0) {
+        return null;
+    }
+
+    // Always show "View Results" for any successful workflows
+    return {
+        label: "View Results",
+        icon: "pi pi-eye",
+        command: () => viewResults(data.dataset), // Results page will handle showing appropriate tabs
+        dropdownItems: [
+            {
+                label: "Open in new tab",
+                icon: "pi pi-external-link",
+                command: () => openInNewTab(data.dataset),
+            },
+        ],
+    };
+}
+
 async function runSldsc(data) {
     const { job_id } = await userStore.startAnalysis(data.dataset, "sldsc");
     data.status = "RUNNING sldsc";
@@ -220,8 +367,71 @@ async function runMagma(data) {
 
 // Helper function to get simple job status for sldsc or magma
 function getJobStatus(data, method) {
-    if (!data.workflows || !data.workflows[method] || !data.workflows[method][method]) return null;
+    if (
+        !data.workflows ||
+        !data.workflows[method] ||
+        !data.workflows[method][method]
+    )
+        return null;
     return data.workflows[method][method].status;
+}
+
+// Helper function to get overall workflow status for analysis button styling
+function getOverallWorkflowStatus(data) {
+    if (!data.workflows && !data.status) return null;
+
+    const workflowMethods = ["sldsc", "magma"]; // Main analysis workflows
+    const statuses = [];
+
+    // Collect all workflow statuses from workflows structure
+    for (const method of workflowMethods) {
+        const status = getJobStatus(data, method);
+        if (status) {
+            statuses.push(status);
+        }
+    }
+
+    // Also check the general status field for sumstats or other workflows
+    if (data.status) {
+        // Extract status from patterns like "sumstats SUCCEEDED", "sldsc RUNNING", etc.
+        const statusParts = data.status.split(" ");
+        if (statusParts.length >= 2) {
+            const method = statusParts[0];
+            const status = statusParts[1];
+            // Only add if it's not already captured in workflows structure
+            if (
+                !workflowMethods.includes(method) ||
+                !getJobStatus(data, method)
+            ) {
+                statuses.push(status);
+            }
+        }
+    }
+
+    if (statuses.length === 0) return null;
+
+    // If all workflows failed, return 'all-failed'
+    if (statuses.every((status) => status === "FAILED")) {
+        return "all-failed";
+    }
+
+    // If some workflows failed, return 'some-failed'
+    if (statuses.some((status) => status === "FAILED")) {
+        return "some-failed";
+    }
+
+    // If all workflows succeeded, return 'all-succeeded'
+    if (statuses.every((status) => status === "SUCCEEDED")) {
+        return "all-succeeded";
+    }
+
+    // If any are running, return 'running'
+    if (statuses.some((status) => status === "RUNNING")) {
+        return "running";
+    }
+
+    // Default to partial success/mixed state
+    return "mixed";
 }
 
 async function handleDelete(dataSet) {
@@ -253,6 +463,54 @@ async function handleDelete(dataSet) {
     });
 }
 
+async function confirmAndRunWorkflow(data, workflow) {
+    const workflowDescriptions = {
+        sldsc: "SLDSC (Stratified LD Score Regression) analysis will calculate heritability and genetic correlations for your dataset.",
+        magma: "MAGMA analysis will perform gene-based association testing and pathway analysis on your dataset.",
+    };
+
+    confirm.require({
+        group: "workflow-confirmation",
+        header: "Confirm analysis to run.",
+        icon: "pi pi-question-circle",
+        acceptClass: "p-button-primary",
+        rejectClass: "p-button-secondary",
+        data: {
+            workflow: workflow,
+            dataset: data.dataset,
+            description:
+                workflowDescriptions[workflow.method] ||
+                `${workflow.method} analysis will be performed on your dataset.`,
+        },
+        accept: async () => {
+            try {
+                await workflow.command();
+                toast.add({
+                    severity: "success",
+                    summary: "Analysis Started",
+                    detail: `${workflow.method.toUpperCase()} analysis started successfully`,
+                    life: 5000,
+                });
+            } catch (error) {
+                toast.add({
+                    severity: "error",
+                    summary: "Error",
+                    detail: `Failed to start ${workflow.method.toUpperCase()} analysis`,
+                    life: 5000,
+                });
+            }
+        },
+        reject: () => {
+            toast.add({
+                severity: "info",
+                summary: "Cancelled",
+                detail: "Analysis cancelled",
+                life: 3000,
+            });
+        },
+    });
+}
+
 function progress(data) {
     if (data.status === "sumstats SUCCEEDED") {
         return 50;
@@ -269,20 +527,49 @@ function viewResults(dataset) {
 function openInNewTab(dataset) {
     window.open(`/results?dataset=${dataset}`, "_blank");
 }
-
-function viewMagmaResults(dataset) {
-    router.push(`/results?dataset=${dataset}&type=magma`);
-}
-
-function openMagmaResultsInNewTab(dataset) {
-    window.open(`/results?dataset=${dataset}&type=magma`, "_blank");
-}
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
         <div class="col-span-12">
             <Toast position="top-center" />
             <ConfirmDialog />
+            <ConfirmDialog group="workflow-confirmation">
+                <template #message="slotProps">
+                    <div class="flex flex-col gap-4 p-4">
+                        <div class="flex items-center gap-3">
+                            <i
+                                class="pi pi-question-circle text-xl text-primary"
+                            ></i>
+                            <div>
+                                <p class="text-sm text-gray-600 mb-3">
+                                    {{ slotProps.message.data.description }}
+                                </p>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-gray-50 p-3 rounded border-l-4 border-primary"
+                        >
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="pi pi-database text-sm"></i>
+                                <span class="font-medium text-sm"
+                                    >Dataset:</span
+                                >
+                            </div>
+                            <span
+                                class="text-sm font-mono bg-white px-2 py-1 rounded"
+                            >
+                                {{ slotProps.message.data.dataset }}
+                            </span>
+                        </div>
+                        <div class="flex justify-end mt-2">
+                            <span class="text-md text-gray-600"
+                                >Do you want to proceed with this
+                                analysis?</span
+                            >
+                        </div>
+                    </div>
+                </template>
+            </ConfirmDialog>
 
             <div class="flex justify-between items-center">
                 <Button
@@ -333,7 +620,31 @@ function openMagmaResultsInNewTab(dataset) {
             <Card class="m-4">
                 <template #header></template>
                 <template #content>
+                    <!-- Show welcome message for new users with no datasets -->
+                    <Message
+                        v-if="datasets.length === 0"
+                        severity="info"
+                        :closable="false"
+                        class="mb-4"
+                    >
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-center gap-2">
+                                <i class="pi pi-info-circle"></i>
+                                <span class="font-semibold"
+                                    >Welcome! Get started by uploading your
+                                    first dataset</span
+                                >
+                            </div>
+                            <p class="text-sm text-gray-700 ml-6">
+                                Upload your GWAS summary statistics to begin
+                                running analyses like SLDSC and MAGMA. Click the
+                                "Upload Dataset" button above to get started.
+                            </p>
+                        </div>
+                    </Message>
+
                     <DataTable
+                        v-if="datasets.length > 0"
                         :value="datasets"
                         class="mb-4"
                         :paginator="true"
@@ -401,6 +712,80 @@ function openMagmaResultsInNewTab(dataset) {
                                 }}
                             </template>
                         </Column>
+                        <Column
+                            header="Run Analysis"
+                            :style="{ width: '15rem' }"
+                        >
+                            <template #body="{ data }">
+                                <div class="flex gap-2 flex-wrap">
+                                    <!-- Show running workflows -->
+                                    <Button
+                                        v-for="workflow in getRunningWorkflows(
+                                            data,
+                                        )"
+                                        :key="workflow.method"
+                                        :label="workflow.label"
+                                        size="small"
+                                        :icon="workflow.icon"
+                                        severity="warn"
+                                        outlined
+                                        disabled
+                                        class="flex-1 min-w-0"
+                                    />
+
+                                    <!-- Show select only when workflows are available -->
+                                    <Select
+                                        v-if="
+                                            getAllWorkflowOptions(data).length >
+                                            0
+                                        "
+                                        :options="getAllWorkflowOptions(data)"
+                                        optionLabel="label"
+                                        optionDisabled="disabled"
+                                        placeholder="Select Analysis"
+                                        class="flex-1 min-w-0"
+                                        @change="
+                                            (event) => {
+                                                if (
+                                                    event.value &&
+                                                    !event.value.disabled
+                                                ) {
+                                                    confirmAndRunWorkflow(
+                                                        data,
+                                                        event.value,
+                                                    );
+                                                    // Clear the selection after showing confirmation
+                                                    event.target.writeValue(
+                                                        null,
+                                                    );
+                                                }
+                                            }
+                                        "
+                                    >
+                                        <template #option="slotProps">
+                                            <div
+                                                class="flex align-items-center"
+                                                :class="{
+                                                    'opacity-50 cursor-not-allowed':
+                                                        slotProps.option
+                                                            .disabled,
+                                                }"
+                                            >
+                                                <i
+                                                    :class="
+                                                        slotProps.option.icon
+                                                    "
+                                                    class="mr-2"
+                                                ></i>
+                                                <span>{{
+                                                    slotProps.option.label
+                                                }}</span>
+                                            </div>
+                                        </template>
+                                    </Select>
+                                </div>
+                            </template>
+                        </Column>
                         <Column header="Status">
                             <template #body="{ data }">
                                 <template
@@ -411,203 +796,85 @@ function openMagmaResultsInNewTab(dataset) {
                                             data.status.endsWith('FAILED'))
                                     "
                                 >
+                                    <!-- Only show Tag/link for FAILED status -->
                                     <router-link
+                                        v-if="data.status.endsWith('FAILED')"
                                         :to="`/log/${data.id}`"
                                         v-tooltip.top="'View log'"
                                     >
-                                        <Tag
-                                            v-if="
-                                                data.status.includes('RUNNING')
-                                            "
-                                            severity="warn"
-                                            rounded
-                                        >
-                                            <i
-                                                class="pi pi-spin pi-spinner mr-2"
-                                            ></i>
-                                            {{ data.status }}
-                                        </Tag>
-                                        <Tag
-                                            v-else
-                                            :severity="
-                                                data.status ===
-                                                'sumstats SUCCEEDED'
-                                                    ? 'info'
-                                                    : data.status.endsWith(
-                                                            'SUCCEEDED',
-                                                        )
-                                                      ? 'success'
-                                                      : 'danger'
-                                            "
-                                            rounded
-                                        >
+                                        <Tag severity="danger" rounded>
                                             {{ data.status }}
                                         </Tag>
                                     </router-link>
+
+                                    <!-- Plain text for RUNNING status -->
+                                    <span
+                                        v-else-if="
+                                            data.status.includes('RUNNING')
+                                        "
+                                        class="text-orange-600 font-medium"
+                                    >
+                                        <i
+                                            class="pi pi-spin pi-spinner mr-2"
+                                        ></i>
+                                        {{ data.status }}
+                                    </span>
+
+                                    <!-- Plain text for SUCCEEDED status -->
+                                    <span
+                                        v-else-if="
+                                            data.status.endsWith('SUCCEEDED')
+                                        "
+                                        :class="{
+                                            'text-blue-600 font-medium':
+                                                data.status ===
+                                                'sumstats SUCCEEDED',
+                                            'text-green-600 font-medium':
+                                                data.status !==
+                                                'sumstats SUCCEEDED',
+                                        }"
+                                    >
+                                        {{ data.status }}
+                                    </span>
                                 </template>
                                 <template v-else-if="!data.status">
-                                    <Tag severity="secondary" rounded>
-                                        uploaded
-                                    </Tag>
+                                    <span class="text-gray-500 font-medium"
+                                        >uploaded</span
+                                    >
                                 </template>
                                 <template v-else>
                                     {{ data.status }}
                                 </template>
                             </template>
                         </Column>
-                        <Column header="Analysis" :style="{ width: '15rem' }">
+
+                        <Column header="Results" :style="{ width: '15rem' }">
                             <template #body="{ data }">
                                 <div class="flex gap-2 flex-wrap">
-                                    <!-- SLDSC Analysis -->
-                                    <Button
-                                        v-if="!getJobStatus(data, 'sldsc')"
-                                        @click.prevent="runSldsc(data)"
-                                        label="Run SLDSC"
-                                        size="small"
-                                        icon="pi pi-chart-line"
-                                        outlined
-                                        class="flex-1 min-w-0"
-                                    />
-                                    <Button
-                                        v-else-if="getJobStatus(data, 'sldsc') === 'RUNNING'"
-                                        label="SLDSC Running"
-                                        size="small"
-                                        icon="pi pi-spin pi-spinner"
-                                        severity="warn"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
                                     <SplitButton
-                                        v-else-if="getJobStatus(data, 'sldsc') === 'SUCCEEDED'"
-                                        label="SLDSC Results"
+                                        v-if="getResultButtonConfig(data)"
+                                        :label="
+                                            getResultButtonConfig(data).label
+                                        "
                                         class="whitespace-nowrap flex-1 min-w-0"
-                                        icon="pi pi-eye"
+                                        :icon="getResultButtonConfig(data).icon"
                                         size="small"
                                         outlined
-                                        @click="viewResults(data.dataset)"
-                                        :model="[
-                                            {
-                                                label: 'Open in new tab',
-                                                icon: 'pi pi-external-link',
-                                                command: () =>
-                                                    openInNewTab(data.dataset),
-                                            },
-                                        ]"
+                                        @click="
+                                            getResultButtonConfig(
+                                                data,
+                                            ).command()
+                                        "
+                                        severity="primary"
+                                        :model="
+                                            getResultButtonConfig(data)
+                                                .dropdownItems
+                                        "
                                     />
-                                    <Button
-                                        v-else-if="getJobStatus(data, 'sldsc') === 'FAILED'"
-                                        label="SLDSC Failed"
-                                        size="small"
-                                        icon="pi pi-times"
-                                        severity="danger"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
+                                </div>
+                            </template>
+                        </Column>
 
-                                    <!-- MAGMA Analysis -->
-                                    <Button
-                                        v-if="!getJobStatus(data, 'magma')"
-                                        @click.prevent="runMagma(data)"
-                                        label="Run MAGMA"
-                                        size="small"
-                                        icon="pi pi-chart-bar"
-                                        outlined
-                                        class="flex-1 min-w-0"
-                                    />
-                                    <Button
-                                        v-else-if="getJobStatus(data, 'magma') === 'RUNNING'"
-                                        label="MAGMA Running"
-                                        size="small"
-                                        icon="pi pi-spin pi-spinner"
-                                        severity="warn"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
-                                    <SplitButton
-                                        v-else-if="getJobStatus(data, 'magma') === 'SUCCEEDED'"
-                                        label="MAGMA Results"
-                                        class="whitespace-nowrap flex-1 min-w-0"
-                                        icon="pi pi-eye"
-                                        size="small"
-                                        outlined
-                                        @click="viewMagmaResults(data.dataset)"
-                                        :model="[
-                                            {
-                                                label: 'Open in new tab',
-                                                icon: 'pi pi-external-link',
-                                                command: () =>
-                                                    openMagmaResultsInNewTab(data.dataset),
-                                            },
-                                        ]"
-                                    />
-                                    <Button
-                                        v-else-if="getJobStatus(data, 'magma') === 'FAILED'"
-                                        label="MAGMA Failed"
-                                        size="small"
-                                        icon="pi pi-times"
-                                        severity="danger"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
-                                </div>
-                            </template>
-                        </Column>
-                        <Column
-                            header="Progress"
-                            :style="{ width: '10rem' }"
-                        >
-                            <template #body="{ data }">
-                                <div class="flex flex-col gap-2">
-                                    <!-- SLDSC Progress -->
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-medium w-12">SLDSC:</span>
-                                        <div
-                                            class="step-dot step-completed"
-                                            v-tooltip.top="'Data Uploaded'"
-                                        ></div>
-                                        <div
-                                            class="step-dot"
-                                            :class="{
-                                                'step-completed': getJobStatus(data, 'sldsc') === 'SUCCEEDED',
-                                                'step-running': getJobStatus(data, 'sldsc') === 'RUNNING',
-                                                'step-failed': getJobStatus(data, 'sldsc') === 'FAILED'
-                                            }"
-                                            v-tooltip.top="
-                                                getJobStatus(data, 'sldsc') === 'SUCCEEDED' ? 'SLDSC Completed' :
-                                                getJobStatus(data, 'sldsc') === 'RUNNING' ? 'SLDSC Running' :
-                                                getJobStatus(data, 'sldsc') === 'FAILED' ? 'SLDSC Failed' : 'SLDSC Pending'
-                                            "
-                                        ></div>
-                                    </div>
-                                    
-                                    <!-- MAGMA Progress -->
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-medium w-12">MAGMA:</span>
-                                        <div
-                                            class="step-dot step-completed"
-                                            v-tooltip.top="'Data Uploaded'"
-                                        ></div>
-                                        <div
-                                            class="step-dot"
-                                            :class="{
-                                                'step-completed': getJobStatus(data, 'magma') === 'SUCCEEDED',
-                                                'step-running': getJobStatus(data, 'magma') === 'RUNNING',
-                                                'step-failed': getJobStatus(data, 'magma') === 'FAILED'
-                                            }"
-                                            v-tooltip.top="
-                                                getJobStatus(data, 'magma') === 'SUCCEEDED' ? 'MAGMA Completed' :
-                                                getJobStatus(data, 'magma') === 'RUNNING' ? 'MAGMA Running' :
-                                                getJobStatus(data, 'magma') === 'FAILED' ? 'MAGMA Failed' : 'MAGMA Pending'
-                                            "
-                                        ></div>
-                                    </div>
-                                </div>
-                            </template>
-                        </Column>
                         <Column
                             header="Delete"
                             :style="{ width: '4rem' }"
@@ -627,7 +894,7 @@ function openMagmaResultsInNewTab(dataset) {
                         </Column>
                     </DataTable>
                 </template>
-                <template #footer
+                <template #footer v-if="datasets.length > 0"
                     ><small>Total records: {{ totalRecords }}</small></template
                 >
             </Card>
@@ -677,7 +944,8 @@ function openMagmaResultsInNewTab(dataset) {
 }
 
 @keyframes pulse {
-    0%, 100% {
+    0%,
+    100% {
         opacity: 1;
     }
     50% {
