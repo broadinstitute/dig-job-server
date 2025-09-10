@@ -709,8 +709,8 @@ function openInNewTab(dataset) {
                                         class="flex-1 min-w-0"
                                     />
 
-                                    <!-- Show dropdown only when workflows are available -->
-                                    <Dropdown
+                                    <!-- Show select only when workflows are available -->
+                                    <Select
                                         v-if="
                                             getAllWorkflowOptions(data).length >
                                             0
@@ -758,7 +758,7 @@ function openInNewTab(dataset) {
                                                 }}</span>
                                             </div>
                                         </template>
-                                    </Dropdown>
+                                    </Select>
                                 </div>
                             </template>
                         </Column>
