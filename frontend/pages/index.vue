@@ -620,7 +620,31 @@ function openInNewTab(dataset) {
             <Card class="m-4">
                 <template #header></template>
                 <template #content>
+                    <!-- Show welcome message for new users with no datasets -->
+                    <Message
+                        v-if="datasets.length === 0"
+                        severity="info"
+                        :closable="false"
+                        class="mb-4"
+                    >
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-center gap-2">
+                                <i class="pi pi-info-circle"></i>
+                                <span class="font-semibold"
+                                    >Welcome! Get started by uploading your
+                                    first dataset</span
+                                >
+                            </div>
+                            <p class="text-sm text-gray-700 ml-6">
+                                Upload your GWAS summary statistics to begin
+                                running analyses like SLDSC and MAGMA. Click the
+                                "Upload Dataset" button above to get started.
+                            </p>
+                        </div>
+                    </Message>
+
                     <DataTable
+                        v-if="datasets.length > 0"
                         :value="datasets"
                         class="mb-4"
                         :paginator="true"
@@ -870,7 +894,7 @@ function openInNewTab(dataset) {
                         </Column>
                     </DataTable>
                 </template>
-                <template #footer
+                <template #footer v-if="datasets.length > 0"
                     ><small>Total records: {{ totalRecords }}</small></template
                 >
             </Card>
