@@ -40,13 +40,8 @@ const timelineEvents = [
         icon: "pi pi-upload",
     },
     {
-        title: "Run SumStats",
-        description: "Process summary statistics for your dataset",
-        icon: "pi pi-play",
-    },
-    {
-        title: "Run SLDSC",
-        description: "Run stratified LD score regression analysis",
+        title: "Run Analysis",
+        description: "Select analysis to run",
         icon: "pi pi-forward",
     },
     {
