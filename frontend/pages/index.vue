@@ -331,35 +331,19 @@ function getResultButtonConfig(data) {
         return null;
     }
 
-    if (successfulWorkflows.length === 1) {
-        // Single successful workflow - show specific workflow name
-        return {
-            label: successfulWorkflows[0].label,
-            icon: successfulWorkflows[0].icon,
-            command: () => viewResults(data.dataset), // Results page will show the appropriate tab
-            dropdownItems: [
-                {
-                    label: "Open in new tab",
-                    icon: "pi pi-external-link",
-                    command: () => openInNewTab(data.dataset),
-                },
-            ],
-        };
-    } else {
-        // Multiple successful workflows - show generic "View Results"
-        return {
-            label: "View Results",
-            icon: "pi pi-eye",
-            command: () => viewResults(data.dataset), // Results page will handle showing appropriate tabs
-            dropdownItems: [
-                {
-                    label: "Open in new tab",
-                    icon: "pi pi-external-link",
-                    command: () => openInNewTab(data.dataset),
-                },
-            ],
-        };
-    }
+    // Always show "View Results" for any successful workflows
+    return {
+        label: "View Results",
+        icon: "pi pi-eye",
+        command: () => viewResults(data.dataset), // Results page will handle showing appropriate tabs
+        dropdownItems: [
+            {
+                label: "Open in new tab",
+                icon: "pi pi-external-link",
+                command: () => openInNewTab(data.dataset),
+            },
+        ],
+    };
 }
 
 async function runSldsc(data) {
@@ -559,7 +543,7 @@ function openInNewTab(dataset) {
                     <div class="flex flex-col gap-4 p-4">
                         <div class="flex items-center gap-3">
                             <i
-                                class="pi pi-question-circle text-2xl text-primary"
+                                class="pi pi-question-circle text-xl text-primary"
                             ></i>
                             <div>
                                 <p class="text-sm text-gray-600 mb-3">
@@ -582,10 +566,7 @@ function openInNewTab(dataset) {
                                 {{ slotProps.message.data.dataset }}
                             </span>
                         </div>
-                        <div class="flex items-center gap-2 mt-2">
-                            <i
-                                class="pi pi-info-circle text-sm text-blue-500"
-                            ></i>
+                        <div class="flex justify-end mt-2">
                             <span class="text-md text-gray-600"
                                 >Do you want to proceed with this
                                 analysis?</span
@@ -796,44 +777,51 @@ function openInNewTab(dataset) {
                                             data.status.endsWith('FAILED'))
                                     "
                                 >
+                                    <!-- Only show Tag/link for FAILED status -->
                                     <router-link
+                                        v-if="data.status.endsWith('FAILED')"
                                         :to="`/log/${data.id}`"
                                         v-tooltip.top="'View log'"
                                     >
-                                        <Tag
-                                            v-if="
-                                                data.status.includes('RUNNING')
-                                            "
-                                            severity="warn"
-                                            rounded
-                                        >
-                                            <i
-                                                class="pi pi-spin pi-spinner mr-2"
-                                            ></i>
-                                            {{ data.status }}
-                                        </Tag>
-                                        <Tag
-                                            v-else
-                                            :severity="
-                                                data.status ===
-                                                'sumstats SUCCEEDED'
-                                                    ? 'info'
-                                                    : data.status.endsWith(
-                                                            'SUCCEEDED',
-                                                        )
-                                                      ? 'success'
-                                                      : 'danger'
-                                            "
-                                            rounded
-                                        >
+                                        <Tag severity="danger" rounded>
                                             {{ data.status }}
                                         </Tag>
                                     </router-link>
+
+                                    <!-- Plain text for RUNNING status -->
+                                    <span
+                                        v-else-if="
+                                            data.status.includes('RUNNING')
+                                        "
+                                        class="text-orange-600 font-medium"
+                                    >
+                                        <i
+                                            class="pi pi-spin pi-spinner mr-2"
+                                        ></i>
+                                        {{ data.status }}
+                                    </span>
+
+                                    <!-- Plain text for SUCCEEDED status -->
+                                    <span
+                                        v-else-if="
+                                            data.status.endsWith('SUCCEEDED')
+                                        "
+                                        :class="{
+                                            'text-blue-600 font-medium':
+                                                data.status ===
+                                                'sumstats SUCCEEDED',
+                                            'text-green-600 font-medium':
+                                                data.status !==
+                                                'sumstats SUCCEEDED',
+                                        }"
+                                    >
+                                        {{ data.status }}
+                                    </span>
                                 </template>
                                 <template v-else-if="!data.status">
-                                    <Tag severity="secondary" rounded>
-                                        uploaded
-                                    </Tag>
+                                    <span class="text-gray-500 font-medium"
+                                        >uploaded</span
+                                    >
                                 </template>
                                 <template v-else>
                                     {{ data.status }}
