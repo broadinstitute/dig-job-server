@@ -528,17 +528,18 @@
 import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useResultsStore } from "~/stores/ResultsStore.js";
 const route = useRoute();
+const router = useRouter();
 import { storeToRefs } from "pinia";
 
 const resultsStore = useResultsStore();
 
 const dataset = ref(route.query.dataset);
-const resultType = ref(route.query.type || "sldsc"); // 'sldsc' or 'magma'
+const tab = ref(route.query.tab || "sldsc"); // 'sldsc' or 'magma'
 const filteredBiosamples = ref([]);
 const filteredGenes = ref([]);
 
 // Tab management
-const activeTab = ref(route.query.type === "magma" ? "magma" : "sldsc");
+const activeTab = ref(route.query.tab || "sldsc");
 
 // Workflow status tracking
 const workflowStatus = ref({});
@@ -693,7 +694,7 @@ const getStatusClass = (status) => {
         case "FAILED":
             return "bg-red-200 text-red-800";
         case "RUNNING":
-        case "RUNNABLE":
+            return "bg-yellow-200 text-yellow-800";
         case "PENDING":
             return "bg-blue-200 text-blue-800";
         case "SUBMITTED":
@@ -918,6 +919,12 @@ const onTabChange = (event) => {
     }
 
     activeTab.value = newValue;
+    tab.value = newValue;
+
+    // Update URL parameter to reflect the current tab
+    router.replace({
+        query: { ...route.query, tab: newValue },
+    });
 
     // Load data for the active tab if not already loaded and workflow succeeded
     if (
@@ -1184,6 +1191,18 @@ watch(activeTab, (newTab) => {
         loadMagmaResults();
     }
 });
+
+// Watch for route query parameter changes
+watch(
+    () => route.query.tab,
+    (newTab) => {
+        if (newTab && (newTab === "sldsc" || newTab === "magma")) {
+            activeTab.value = newTab;
+            tab.value = newTab;
+        }
+    },
+    { immediate: true },
+);
 
 onMounted(async () => {
     // First check workflow availability to determine what tabs to show

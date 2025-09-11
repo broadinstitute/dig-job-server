@@ -223,44 +223,104 @@ function getAllWorkflowOptions(data) {
 
     // Check SLDSC
     const sldscStatus = getJobStatus(data, "sldsc");
+    const sldscWorkflow = data.workflows?.sldsc?.sldsc;
+
     if (!sldscStatus) {
         // Not run yet - available to run
         options.push({
             label: "Run SLDSC",
             icon: "pi pi-chart-line",
             method: "sldsc",
+            status: "available",
+            severity: "secondary",
             command: () => runSldsc(data),
             disabled: false,
         });
     } else if (sldscStatus === "FAILED") {
-        // Failed - show as disabled option
+        // Failed - show as failed option
         options.push({
-            label: "Run SLDSC (Failed)",
-            icon: "pi pi-chart-line",
+            label: "SLDSC (Failed)",
+            icon: "pi pi-times-circle",
             method: "sldsc",
-            command: () => runSldsc(data),
+            status: "failed",
+            severity: "danger",
+            command: () =>
+                showWorkflowDialog(data, "sldsc", "failed", sldscWorkflow),
+            disabled: false,
+        });
+    } else if (sldscStatus === "SUCCEEDED") {
+        // Succeeded - show as succeeded option
+        options.push({
+            label: "SLDSC (Completed)",
+            icon: "pi pi-check-circle",
+            method: "sldsc",
+            status: "succeeded",
+            severity: "success",
+            command: () =>
+                showWorkflowDialog(data, "sldsc", "succeeded", sldscWorkflow),
+            disabled: false,
+        });
+    } else if (sldscStatus === "RUNNING") {
+        // Running - show as running option
+        options.push({
+            label: "SLDSC (Running)",
+            icon: "pi pi-spin pi-spinner",
+            method: "sldsc",
+            status: "running",
+            severity: "warn",
+            command: () => {},
             disabled: true,
         });
     }
 
     // Check MAGMA
     const magmaStatus = getJobStatus(data, "magma");
+    const magmaWorkflow = data.workflows?.magma?.magma;
+
     if (!magmaStatus) {
         // Not run yet - available to run
         options.push({
             label: "Run MAGMA",
             icon: "pi pi-chart-bar",
             method: "magma",
+            status: "available",
+            severity: "secondary",
             command: () => runMagma(data),
             disabled: false,
         });
     } else if (magmaStatus === "FAILED") {
-        // Failed - show as disabled option
+        // Failed - show as failed option
         options.push({
-            label: "Run MAGMA (Failed)",
-            icon: "pi pi-chart-bar",
+            label: "MAGMA (Failed)",
+            icon: "pi pi-times-circle",
             method: "magma",
-            command: () => runMagma(data),
+            status: "failed",
+            severity: "danger",
+            command: () =>
+                showWorkflowDialog(data, "magma", "failed", magmaWorkflow),
+            disabled: false,
+        });
+    } else if (magmaStatus === "SUCCEEDED") {
+        // Succeeded - show as succeeded option
+        options.push({
+            label: "MAGMA (Completed)",
+            icon: "pi pi-check-circle",
+            method: "magma",
+            status: "succeeded",
+            severity: "success",
+            command: () =>
+                showWorkflowDialog(data, "magma", "succeeded", magmaWorkflow),
+            disabled: false,
+        });
+    } else if (magmaStatus === "RUNNING") {
+        // Running - show as running option
+        options.push({
+            label: "MAGMA (Running)",
+            icon: "pi pi-spin pi-spinner",
+            method: "magma",
+            status: "running",
+            severity: "warn",
+            command: () => {},
             disabled: true,
         });
     }
@@ -511,6 +571,67 @@ async function confirmAndRunWorkflow(data, workflow) {
     });
 }
 
+function showWorkflowDialog(data, method, status, workflowData) {
+    if (status === "failed") {
+        // Show dialog for failed workflows
+        confirm.require({
+            group: "workflow-status",
+            header: `${method.toUpperCase()} Analysis Failed`,
+            icon: "pi pi-times-circle",
+            acceptClass: "p-button-primary",
+            rejectClass: "p-button-secondary",
+            acceptLabel: "Upload New Dataset",
+            rejectLabel: "View Log",
+            data: {
+                method: method,
+                dataset: data.dataset,
+                status: status,
+                workflowData: workflowData,
+                isFailure: true,
+            },
+            accept: () => {
+                // Navigate to upload page
+                router.push("/upload");
+            },
+            reject: () => {
+                // Navigate to log page
+                router.push(`/log/${data.id}`);
+            },
+        });
+    } else if (status === "succeeded") {
+        // Show dialog for successful workflows
+        const updatedAt = workflowData?.updated_at
+            ? new Date(workflowData.updated_at).toLocaleString()
+            : "Unknown";
+
+        confirm.require({
+            group: "workflow-status",
+            header: `${method.toUpperCase()} Analysis Completed`,
+            icon: "pi pi-check-circle",
+            acceptClass: "p-button-primary",
+            rejectClass: "p-button-secondary",
+            acceptLabel: "View Results",
+            rejectLabel: "View Log",
+            data: {
+                method: method,
+                dataset: data.dataset,
+                status: status,
+                workflowData: workflowData,
+                updatedAt: updatedAt,
+                isFailure: false,
+            },
+            accept: () => {
+                // Navigate to results page with specific tab selected
+                router.push(`/results?dataset=${data.dataset}&tab=${method}`);
+            },
+            reject: () => {
+                // Navigate to log page
+                router.push(`/log/${data.id}`);
+            },
+        });
+    }
+}
+
 function progress(data) {
     if (data.status === "sumstats SUCCEEDED") {
         return 50;
@@ -541,31 +662,190 @@ function openInNewTab(dataset) {
                                 class="pi pi-question-circle text-xl text-primary"
                             ></i>
                             <div>
-                                <p class="text-sm text-gray-600 mb-3">
+                                <p
+                                    class="text-sm text-gray-600 dark:text-gray-300 mb-3"
+                                >
                                     {{ slotProps.message.data.description }}
                                 </p>
                             </div>
                         </div>
                         <div
-                            class="bg-gray-50 p-3 rounded border-l-4 border-primary"
+                            class="bg-gray-50 dark:bg-gray-800 p-3 rounded border-l-4 border-primary"
                         >
                             <div class="flex items-center gap-2 mb-1">
-                                <i class="pi pi-database text-sm"></i>
-                                <span class="font-medium text-sm"
+                                <i
+                                    class="pi pi-database text-sm dark:text-gray-300"
+                                ></i>
+                                <span
+                                    class="font-medium text-sm dark:text-gray-200"
                                     >Dataset:</span
                                 >
                             </div>
                             <span
-                                class="text-sm font-mono bg-white px-2 py-1 rounded"
+                                class="text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200 px-2 py-1 rounded"
                             >
                                 {{ slotProps.message.data.dataset }}
                             </span>
                         </div>
                         <div class="flex justify-end mt-2">
-                            <span class="text-md text-gray-600"
+                            <span
+                                class="text-md text-gray-600 dark:text-gray-300"
                                 >Do you want to proceed with this
                                 analysis?</span
                             >
+                        </div>
+                    </div>
+                </template>
+            </ConfirmDialog>
+
+            <ConfirmDialog group="workflow-status">
+                <template #message="slotProps">
+                    <div class="flex flex-col gap-4 p-4">
+                        <!-- Failed workflow dialog -->
+                        <div
+                            v-if="slotProps.message.data.isFailure"
+                            class="flex flex-col gap-3"
+                        >
+                            <div class="flex items-center gap-3">
+                                <i
+                                    class="pi pi-times-circle text-2xl text-red-500"
+                                ></i>
+                                <div>
+                                    <h4
+                                        class="font-semibold text-lg text-red-700 dark:text-red-400 mb-2"
+                                    >
+                                        {{
+                                            slotProps.message.data.method.toUpperCase()
+                                        }}
+                                        Analysis Failed
+                                    </h4>
+                                    <p
+                                        class="text-sm text-gray-600 dark:text-gray-300"
+                                    >
+                                        The
+                                        {{
+                                            slotProps.message.data.method.toUpperCase()
+                                        }}
+                                        analysis failed to complete
+                                        successfully.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="bg-red-50 dark:bg-red-900/20 p-3 rounded border-l-4 border-red-500"
+                            >
+                                <h5
+                                    class="font-medium text-sm mb-2 text-red-700 dark:text-red-400"
+                                >
+                                    How to fix this:
+                                </h5>
+                                <ul
+                                    class="text-sm text-gray-700 dark:text-gray-300 space-y-1 ml-4"
+                                >
+                                    <li>
+                                        • Check your dataset format and ensure
+                                        it meets the requirements
+                                    </li>
+                                    <li>
+                                        • Verify your data has the correct
+                                        columns and headers
+                                    </li>
+                                    <li>
+                                        • Consider uploading a new, properly
+                                        formatted dataset
+                                    </li>
+                                    <li>
+                                        • Review the log file for specific error
+                                        details
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div
+                                class="bg-gray-50 dark:bg-gray-800 p-3 rounded border-l-4 border-gray-400"
+                            >
+                                <div class="flex items-center gap-2 mb-1">
+                                    <i
+                                        class="pi pi-database text-sm dark:text-gray-300"
+                                    ></i>
+                                    <span
+                                        class="font-medium text-sm dark:text-gray-200"
+                                        >Dataset:</span
+                                    >
+                                </div>
+                                <span
+                                    class="text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200 px-2 py-1 rounded"
+                                >
+                                    {{ slotProps.message.data.dataset }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Successful workflow dialog -->
+                        <div v-else class="flex flex-col gap-3">
+                            <div class="flex items-center gap-3">
+                                <i
+                                    class="pi pi-check-circle text-2xl text-green-500"
+                                ></i>
+                                <div>
+                                    <h4
+                                        class="font-semibold text-lg text-green-700 dark:text-green-400 mb-2"
+                                    >
+                                        {{
+                                            slotProps.message.data.method.toUpperCase()
+                                        }}
+                                        Analysis Completed
+                                    </h4>
+                                    <p
+                                        class="text-sm text-gray-600 dark:text-gray-300"
+                                    >
+                                        Your
+                                        {{
+                                            slotProps.message.data.method.toUpperCase()
+                                        }}
+                                        analysis has completed successfully!
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="bg-green-50 dark:bg-green-900/20 p-3 rounded border-l-4 border-green-500"
+                            >
+                                <div class="flex items-center gap-2 mb-2">
+                                    <i
+                                        class="pi pi-clock text-sm text-green-600 dark:text-green-400"
+                                    ></i>
+                                    <span
+                                        class="font-medium text-sm text-green-700 dark:text-green-400"
+                                        >Completed:</span
+                                    >
+                                </div>
+                                <span
+                                    class="text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                    {{ slotProps.message.data.updatedAt }}
+                                </span>
+                            </div>
+
+                            <div
+                                class="bg-gray-50 dark:bg-gray-800 p-3 rounded border-l-4 border-gray-400"
+                            >
+                                <div class="flex items-center gap-2 mb-1">
+                                    <i
+                                        class="pi pi-database text-sm dark:text-gray-300"
+                                    ></i>
+                                    <span
+                                        class="font-medium text-sm dark:text-gray-200"
+                                        >Dataset:</span
+                                    >
+                                </div>
+                                <span
+                                    class="text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200 px-2 py-1 rounded"
+                                >
+                                    {{ slotProps.message.data.dataset }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -718,22 +998,7 @@ function openInNewTab(dataset) {
                         >
                             <template #body="{ data }">
                                 <div class="flex gap-2 flex-wrap">
-                                    <!-- Show running workflows -->
-                                    <Button
-                                        v-for="workflow in getRunningWorkflows(
-                                            data,
-                                        )"
-                                        :key="workflow.method"
-                                        :label="workflow.label"
-                                        size="small"
-                                        :icon="workflow.icon"
-                                        severity="warn"
-                                        outlined
-                                        disabled
-                                        class="flex-1 min-w-0"
-                                    />
-
-                                    <!-- Show select only when workflows are available -->
+                                    <!-- Show select with all workflow options -->
                                     <Select
                                         v-if="
                                             getAllWorkflowOptions(data).length >
@@ -750,11 +1015,18 @@ function openInNewTab(dataset) {
                                                     event.value &&
                                                     !event.value.disabled
                                                 ) {
-                                                    confirmAndRunWorkflow(
-                                                        data,
-                                                        event.value,
-                                                    );
-                                                    // Clear the selection after showing confirmation
+                                                    if (
+                                                        event.value.status ===
+                                                        'available'
+                                                    ) {
+                                                        confirmAndRunWorkflow(
+                                                            data,
+                                                            event.value,
+                                                        );
+                                                    } else {
+                                                        event.value.command();
+                                                    }
+                                                    // Clear the selection after action
                                                     event.target.writeValue(
                                                         null,
                                                     );
@@ -764,23 +1036,115 @@ function openInNewTab(dataset) {
                                     >
                                         <template #option="slotProps">
                                             <div
-                                                class="flex align-items-center"
+                                                class="flex items-center gap-1.5 px-3 py-1.5"
                                                 :class="{
                                                     'opacity-50 cursor-not-allowed':
                                                         slotProps.option
                                                             .disabled,
+                                                    'text-blue-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'primary',
+                                                    'text-red-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'danger',
+                                                    'text-green-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'success',
+                                                    'text-orange-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'warn',
                                                 }"
                                             >
                                                 <i
                                                     :class="
                                                         slotProps.option.icon
                                                     "
-                                                    class="mr-2"
+                                                    class="w-4 text-center"
+                                                    style="
+                                                        font-size: 14px;
+                                                        line-height: 1;
+                                                    "
+                                                    :style="{
+                                                        color:
+                                                            slotProps.option
+                                                                .severity ===
+                                                            'primary'
+                                                                ? '#3b82f6'
+                                                                : slotProps
+                                                                        .option
+                                                                        .severity ===
+                                                                    'danger'
+                                                                  ? '#ef4444'
+                                                                  : slotProps
+                                                                          .option
+                                                                          .severity ===
+                                                                      'success'
+                                                                    ? '#10b981'
+                                                                    : slotProps
+                                                                            .option
+                                                                            .severity ===
+                                                                        'warn'
+                                                                      ? '#f59e0b'
+                                                                      : 'inherit',
+                                                    }"
+                                                ></i>
+                                                <span
+                                                    class="font-medium flex-1"
+                                                >
+                                                    {{ slotProps.option.label }}
+                                                </span>
+                                            </div>
+                                        </template>
+
+                                        <template #value="slotProps">
+                                            <div
+                                                v-if="slotProps.value"
+                                                class="flex items-center gap-1.5"
+                                            >
+                                                <i
+                                                    :class="
+                                                        slotProps.value.icon
+                                                    "
+                                                    class="w-4 text-center"
+                                                    style="
+                                                        font-size: 14px;
+                                                        line-height: 1;
+                                                    "
+                                                    :style="{
+                                                        color:
+                                                            slotProps.value
+                                                                .severity ===
+                                                            'primary'
+                                                                ? '#3b82f6'
+                                                                : slotProps
+                                                                        .value
+                                                                        .severity ===
+                                                                    'danger'
+                                                                  ? '#ef4444'
+                                                                  : slotProps
+                                                                          .value
+                                                                          .severity ===
+                                                                      'success'
+                                                                    ? '#10b981'
+                                                                    : slotProps
+                                                                            .value
+                                                                            .severity ===
+                                                                        'warn'
+                                                                      ? '#f59e0b'
+                                                                      : 'inherit',
+                                                    }"
                                                 ></i>
                                                 <span>{{
-                                                    slotProps.option.label
+                                                    slotProps.value.label
                                                 }}</span>
                                             </div>
+                                            <span v-else class="text-gray-500"
+                                                >Select Analysis</span
+                                            >
                                         </template>
                                     </Select>
                                 </div>
