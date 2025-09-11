@@ -796,7 +796,7 @@ function openInNewTab(dataset) {
                                             data.status.endsWith('FAILED'))
                                     "
                                 >
-                                    <!-- Only show Tag/link for FAILED status -->
+                                    <!-- Show Tag/link for FAILED status -->
                                     <router-link
                                         v-if="data.status.endsWith('FAILED')"
                                         :to="`/log/${data.id}`"
@@ -820,22 +820,26 @@ function openInNewTab(dataset) {
                                         {{ data.status }}
                                     </span>
 
-                                    <!-- Plain text for SUCCEEDED status -->
-                                    <span
+                                    <!-- Clickable Tag for SUCCEEDED status -->
+                                    <router-link
                                         v-else-if="
                                             data.status.endsWith('SUCCEEDED')
                                         "
-                                        :class="{
-                                            'text-blue-600 font-medium':
-                                                data.status ===
-                                                'sumstats SUCCEEDED',
-                                            'text-green-600 font-medium':
-                                                data.status !==
-                                                'sumstats SUCCEEDED',
-                                        }"
+                                        :to="`/log/${data.id}`"
+                                        v-tooltip.top="'View log'"
                                     >
-                                        {{ data.status }}
-                                    </span>
+                                        <Tag
+                                            :severity="
+                                                data.status ===
+                                                'sumstats SUCCEEDED'
+                                                    ? 'info'
+                                                    : 'success'
+                                            "
+                                            rounded
+                                        >
+                                            {{ data.status }}
+                                        </Tag>
+                                    </router-link>
                                 </template>
                                 <template v-else-if="!data.status">
                                     <span class="text-gray-500 font-medium"
