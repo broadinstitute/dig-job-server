@@ -3,7 +3,7 @@
         <div class="layout-header">
             <div class="header-container">
                 <div class="logo-container">
-                    <a href="/">
+                    <a href="/datasets">
                         <img
                             :src="
                                 isDarkMode
@@ -22,7 +22,7 @@
                         class="p-button-text"
                         size="small"
                         as="a"
-                        href="/"
+                        href="/datasets"
                     />
                     <Button
                         v-if="userStore.isDefaultUser"
