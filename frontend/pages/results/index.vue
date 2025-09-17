@@ -90,7 +90,7 @@
             <Button
                 label="Back to Datasets"
                 icon="pi pi-arrow-left"
-                @click="$router.push('/')"
+                @click="$router.push('/datasets')"
                 class="mb-4"
                 outlined
                 size="small"
