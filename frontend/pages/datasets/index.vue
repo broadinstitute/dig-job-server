@@ -594,8 +594,8 @@ function showWorkflowDialog(data, method, status, workflowData) {
                 router.push("/upload");
             },
             reject: () => {
-                // Navigate to log page
-                router.push(`/log/${data.id}`);
+                // Navigate to log page with method context
+                router.push(`/log/${data.id}?method=${method}`);
             },
         });
     } else if (status === "succeeded") {
@@ -625,8 +625,8 @@ function showWorkflowDialog(data, method, status, workflowData) {
                 router.push(`/results?dataset=${data.dataset}&tab=${method}`);
             },
             reject: () => {
-                // Navigate to log page
-                router.push(`/log/${data.id}`);
+                // Navigate to log page with method context
+                router.push(`/log/${data.id}?method=${method}`);
             },
         });
     }
@@ -1163,7 +1163,7 @@ function openInNewTab(dataset) {
                                     <!-- Show Tag/link for FAILED status -->
                                     <router-link
                                         v-if="data.status.endsWith('FAILED')"
-                                        :to="`/log/${data.id}`"
+                                        :to="`/log/${data.id}?method=${data.status.split(' ')[0]}`"
                                         v-tooltip.top="'View log'"
                                     >
                                         <Tag severity="danger" rounded>
@@ -1189,7 +1189,7 @@ function openInNewTab(dataset) {
                                         v-else-if="
                                             data.status.endsWith('SUCCEEDED')
                                         "
-                                        :to="`/log/${data.id}`"
+                                        :to="`/log/${data.id}?method=${data.status.split(' ')[0]}`"
                                         v-tooltip.top="'View log'"
                                     >
                                         <Tag
