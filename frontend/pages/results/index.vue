@@ -694,10 +694,25 @@ const jobId = computed(() => {
         return sldscJobId.value;
     }
 
-    // Fallback to dataset name if no job ID available
+    // Fallback to workflow status job ID
+    if (workflowStatus.value) {
+        const workflows = workflowStatus.value;
+
+        if (activeTab.value === "magma" && workflows.magma?.magma?.job_id) {
+            return workflows.magma.magma.job_id;
+        } else if (activeTab.value === "sldsc") {
+            // Check both sldsc and ldsc for SLDSC tab
+            if (workflows.sldsc?.sldsc?.job_id) {
+                return workflows.sldsc.sldsc.job_id;
+            } else if (workflows.ldsc?.ldsc?.job_id) {
+                return workflows.ldsc.ldsc.job_id;
+            }
+        }
+    }
+
+    // Final fallback to dataset name
     return dataset.value;
 });
-
 const downloadButtonLabel = computed(() => {
     return `Download ${activeTab.value.toUpperCase()} Results`;
 });
