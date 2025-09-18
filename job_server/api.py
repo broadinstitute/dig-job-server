@@ -134,8 +134,8 @@ async def get_workflow_status(dataset: str, user: User = Depends(get_current_use
     return database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
 
 @router.get("/log-info/{job_id}")
-async def get_log_info(job_id: str, user: User = Depends(get_current_user)):
-    return database_utils.get_log_info(get_db(), user.username, job_id)
+async def get_log_info(job_id: str, method_name: str = Query(None), user: User = Depends(get_current_user)):
+    return database_utils.get_log_info(get_db(), user.username, job_id, method_name)
 
 @router.post("/preview-delimited-file")
 async def preview_file(file: UploadFile, user: User = Depends(get_current_user)):
