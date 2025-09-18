@@ -347,11 +347,25 @@
                                         </div>
                                     </div>
                                 </template>
-                                <template #footer
-                                    ><small
-                                        >Total records:
-                                        {{ sldscTotalRecords }}</small
-                                    ></template
+                                <template #footer>
+                                    <div
+                                        class="flex justify-between items-center"
+                                    >
+                                        <small
+                                            >Total records:
+                                            {{ sldscTotalRecords }}</small
+                                        >
+                                        <Button
+                                            label="View SLDSC Log"
+                                            icon="pi pi-file-check"
+                                            @click="
+                                                $router.push(`/log/${jobId}`)
+                                            "
+                                            size="small"
+                                            outlined
+                                        />
+                                    </div>
+                                </template>
                                 >
                             </DataTable>
                             <div
@@ -499,11 +513,25 @@
                                         </div>
                                     </div>
                                 </template>
-                                <template #footer
-                                    ><small
-                                        >Total records:
-                                        {{ magmaTotalRecords }}</small
-                                    ></template
+                                <template #footer>
+                                    <div
+                                        class="flex justify-between items-center"
+                                    >
+                                        <small
+                                            >Total records:
+                                            {{ magmaTotalRecords }}</small
+                                        >
+                                        <Button
+                                            label="View MAGMA Log"
+                                            icon="pi pi-file-check"
+                                            @click="
+                                                $router.push(`/log/${jobId}`)
+                                            "
+                                            size="small"
+                                            outlined
+                                        />
+                                    </div>
+                                </template>
                                 >
                             </DataTable>
                             <div
@@ -566,6 +594,10 @@ const magmaSortField = ref("pValue");
 const magmaSortOrder = ref(1);
 const magmaDt = ref();
 const hasMagmaResults = ref(false);
+
+// Job IDs for linking to logs
+const sldscJobId = ref(null);
+const magmaJobId = ref(null);
 
 // Shared data from store
 const {
@@ -651,6 +683,19 @@ const canDownloadCurrentTab = computed(() => {
     } else {
         return hasSldscResults.value;
     }
+});
+
+// Computed property to find a job ID for viewing logs
+const jobId = computed(() => {
+    // Use the job ID from the API response based on active tab
+    if (activeTab.value === "magma" && magmaJobId.value) {
+        return magmaJobId.value;
+    } else if (activeTab.value === "sldsc" && sldscJobId.value) {
+        return sldscJobId.value;
+    }
+
+    // Fallback to dataset name if no job ID available
+    return dataset.value;
 });
 
 const downloadButtonLabel = computed(() => {
@@ -972,6 +1017,7 @@ const loadSldscResults = async () => {
         if (data.tissues) apiTissues.value = data.tissues;
         if (data.biosamples) apiBiosamples.value = data.biosamples;
         if (data.annotations) apiAnnotations.value = data.annotations;
+        if (data.jobId) sldscJobId.value = data.jobId;
     } catch (err) {
         console.error("Failed to load SLDSC results:", err);
     } finally {
@@ -1024,6 +1070,7 @@ const loadMagmaResults = async () => {
         }
         if (data.totalRecords) magmaTotalRecords.value = data.totalRecords;
         if (data.genes) apiGenes.value = data.genes;
+        if (data.jobId) magmaJobId.value = data.jobId;
     } catch (err) {
         console.error("Failed to load MAGMA results:", err);
     } finally {
