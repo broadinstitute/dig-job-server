@@ -44,9 +44,9 @@ onMounted(async () => {
             Log for {{ dataset }}
         </h2>
         <Button
-            label="Back to Datasets"
+            label="Back to previous page"
             icon="pi pi-arrow-left"
-            @click="$router.push('/datasets')"
+            @click="$router.go(-1)"
             class="mb-4"
             outlined
             size="small"
