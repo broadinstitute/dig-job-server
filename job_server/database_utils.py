@@ -116,18 +116,16 @@ def delete_dataset(db, username, dataset):
         connection.execute(query, {"id": dataset_hash})
         connection.commit()
 
-def get_log_info(db, username, job_id):
+def get_log_info(db, username, job_id, method_name):
     with db as connection:
         # Get logs from all jobs for this dataset, most recent first
         query = text("""
             SELECT w.job_log, d.metadata->>'$.name' as ds_name, w.method, w.status
             FROM workflow_jobs w
             JOIN datasets d ON w.id = d.id
-            WHERE w.id=:id and w.user=:username
-            ORDER BY w.updated_at DESC
-            LIMIT 1
+            WHERE w.id=:id and w.user=:username and w.method = :method
         """)
-        row = connection.execute(query, {"id": job_id, "username": username}).fetchone()
+        row = connection.execute(query, {"id": job_id, "username": username, "method": method_name}).fetchone()
         if row:
             log_content, dataset, method, status = row
             return {
