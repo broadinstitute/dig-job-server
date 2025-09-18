@@ -351,6 +351,20 @@ async def get_results(
     s3_path = get_s3_results_path(dataset, user, 'sldsc', 'sldsc')
 
     try:
+        # Get workflow status to extract job ID
+        workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+        # Try to get job ID from SLDSC or LDSC workflow
+        job_id = None
+        if 'sldsc' in workflow_status and 'sldsc' in workflow_status['sldsc']:
+            job_id = workflow_status['sldsc']['sldsc'].get('job_id')
+        elif 'ldsc' in workflow_status and 'ldsc' in workflow_status['ldsc']:
+            job_id = workflow_status['ldsc']['ldsc'].get('job_id')
+
+        # Fallback to dataset name if no specific job ID found
+        if not job_id:
+            job_id = dataset
+
         df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
         df = filter_results(df, request, sort_field, sort_order)
 
@@ -366,7 +380,8 @@ async def get_results(
             "totalRecords": total_records,
             "tissues": tissues,
             "biosamples": biosamples,
-            "annotations": annotations
+            "annotations": annotations,
+            "jobId": job_id,
         })
 
     except Exception as e:
@@ -386,6 +401,18 @@ async def get_magma_results(
     s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
 
     try:
+        # Get workflow status to extract job ID
+        workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+        # Try to get job ID from MAGMA workflow
+        job_id = None
+        if 'magma' in workflow_status and 'magma' in workflow_status['magma']:
+            job_id = workflow_status['magma']['magma'].get('job_id')
+
+        # Fallback to dataset name if no specific job ID found
+        if not job_id:
+            job_id = dataset
+
         df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
         df = filter_results(df, request, sort_field, sort_order)
 
@@ -397,7 +424,8 @@ async def get_magma_results(
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
-            "genes": genes
+            "genes": genes,
+            "jobId": job_id,
         })
 
     except Exception as e:
