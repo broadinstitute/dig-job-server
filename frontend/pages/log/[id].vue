@@ -14,8 +14,11 @@ const loadingLog = ref(false);
 
 onMounted(async () => {
     loadingLog.value = true;
-    const { log: rawLog, dataset: datasetValue } =
-        await userStore.getLogInfo(id);
+    const methodName = route.query.method; // Get method from query params
+    const { log: rawLog, dataset: datasetValue } = await userStore.getLogInfo(
+        id,
+        methodName,
+    );
     dataset.value = datasetValue;
 
     if (!rawLog) {

@@ -359,14 +359,15 @@
                                             label="View SLDSC Log"
                                             icon="pi pi-file-check"
                                             @click="
-                                                $router.push(`/log/${jobId}`)
+                                                $router.push(
+                                                    `/log/${jobId}?method=sldsc`,
+                                                )
                                             "
                                             size="small"
                                             outlined
                                         />
                                     </div>
                                 </template>
-                                >
                             </DataTable>
                             <div
                                 v-else-if="
@@ -525,14 +526,15 @@
                                             label="View MAGMA Log"
                                             icon="pi pi-file-check"
                                             @click="
-                                                $router.push(`/log/${jobId}`)
+                                                $router.push(
+                                                    `/log/${jobId}?method=magma`,
+                                                )
                                             "
                                             size="small"
                                             outlined
                                         />
                                     </div>
                                 </template>
-                                >
                             </DataTable>
                             <div
                                 v-else-if="
