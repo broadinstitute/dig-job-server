@@ -41,8 +41,8 @@ def log_job_start(db, username, dataset, status):
                          "VALUES (:id, :username, :method, 'RUNNING', NOW(), NOW()) "
                          "ON DUPLICATE KEY UPDATE status='RUNNING', updated_at=NOW(), job_log=NULL")
             connection.execute(query, {
-                "id": get_dataset_hash(dataset, username), 
-                "username": username, 
+                "id": get_dataset_hash(dataset, username),
+                "username": username,
                 "method": method
             })
             connection.commit()
@@ -57,9 +57,9 @@ def log_job_end(db, username, dataset, status, job_log):
             query = text("UPDATE workflow_jobs SET status=:status, job_log=:job_log, updated_at=NOW() "
                          "WHERE id=:id AND method=:method")
             connection.execute(query, {
-                "id": get_dataset_hash(dataset, username), 
+                "id": get_dataset_hash(dataset, username),
                 "method": method,
-                "status": result, 
+                "status": result,
                 "job_log": LogCompressor.compress(job_log)
             })
             connection.commit()
@@ -69,17 +69,17 @@ def get_jobs_for_user(db, username):
     with db as connection:
         # Get the most recent status for each dataset by aggregating workflows
         query = text("""
-            SELECT w.id, 
+            SELECT w.id,
                    GROUP_CONCAT(
-                       CASE 
+                       CASE
                            WHEN w.status = 'RUNNING' THEN CONCAT('RUNNING ', w.method)
                            ELSE CONCAT(w.method, ' ', w.status)
-                       END 
+                       END
                        ORDER BY w.updated_at DESC SEPARATOR '; '
                    ) as status,
                    MAX(w.updated_at) as updated_at
-            FROM workflow_jobs w 
-            WHERE w.user = :username 
+            FROM workflow_jobs w
+            WHERE w.user = :username
             GROUP BY w.id
         """)
         results = connection.execute(query, {"username": username}).fetchall()
@@ -99,7 +99,7 @@ def get_workflow_jobs_for_user(db, username):
             if method not in jobs_by_dataset[dataset_id]:
                 jobs_by_dataset[dataset_id][method] = {}
             jobs_by_dataset[dataset_id][method][method] = {
-                "status": status, 
+                "status": status,
                 "updated_at": updated_at
             }
         return jobs_by_dataset
@@ -121,17 +121,17 @@ def get_log_info(db, username, job_id):
         # Get logs from all jobs for this dataset, most recent first
         query = text("""
             SELECT w.job_log, d.metadata->>'$.name' as ds_name, w.method, w.status
-            FROM workflow_jobs w 
-            JOIN datasets d ON w.id = d.id 
-            WHERE w.id=:id and w.user=:username 
-            ORDER BY w.updated_at DESC 
+            FROM workflow_jobs w
+            JOIN datasets d ON w.id = d.id
+            WHERE w.id=:id and w.user=:username
+            ORDER BY w.updated_at DESC
             LIMIT 1
         """)
         row = connection.execute(query, {"id": job_id, "username": username}).fetchone()
         if row:
             log_content, dataset, method, status = row
             return {
-                'log': log_content.decode('latin1') if log_content else None, 
+                'log': log_content.decode('latin1') if log_content else None,
                 'dataset': dataset,
                 'workflow': method,  # Use method as workflow for backward compatibility
                 'method': method,
@@ -149,13 +149,13 @@ def get_job_status(db, job_id):
     """Returns a summary status for the dataset (most recent activity)"""
     with db as connection:
         query = text("""
-            SELECT CASE 
+            SELECT CASE
                        WHEN status = 'RUNNING' THEN CONCAT('RUNNING ', method)
                        ELSE CONCAT(method, ' ', status)
                    END as status
-            FROM workflow_jobs 
-            WHERE id=:id 
-            ORDER BY updated_at DESC 
+            FROM workflow_jobs
+            WHERE id=:id
+            ORDER BY updated_at DESC
             LIMIT 1
         """)
         result = connection.execute(query, {"id": job_id}).fetchone()
@@ -165,24 +165,25 @@ def get_workflow_status_summary(db, username, dataset):
     """Get aggregated job status for a dataset"""
     with db as connection:
         query = text("""
-            SELECT method, status, updated_at
-            FROM workflow_jobs 
-            WHERE id = :id AND user = :username 
+            SELECT method, status, updated_at, id
+            FROM workflow_jobs
+            WHERE id = :id AND user = :username
             ORDER BY method
         """)
         results = connection.execute(query, {
-            "id": get_dataset_hash(dataset, username), 
+            "id": get_dataset_hash(dataset, username),
             "username": username
         }).fetchall()
-        
+
         workflows = {}
-        for method, status, updated_at in results:
+        for method, status, updated_at, job_id in results:
             # Use method as both workflow and method for frontend compatibility
             if method not in workflows:
                 workflows[method] = {}
             workflows[method][method] = {
                 "status": status,
-                "updated_at": updated_at
+                "updated_at": updated_at,
+                "job_id": job_id
             }
-            
+
         return workflows
