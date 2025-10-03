@@ -93,6 +93,16 @@ export const useUserStore = defineStore("UserStore", {
             );
             return data;
         },
+        async validateBedFile(formData) {
+            const { data } = await this.axios.post(
+                "/api/validate-bed-file",
+                formData,
+                {
+                    headers: { "Content-Type": "multipart/form-data" },
+                },
+            );
+            return data;
+        },
         async retrieveDatasets(orderBy = null, orderDir = null) {
             let url = `/api/datasets`;
             const params = [];
@@ -179,6 +189,24 @@ export const useUserStore = defineStore("UserStore", {
         async getLogInfo(job_id) {
             const { data } = await this.axios.get(`/api/log-info/${job_id}`);
             return data;
+        },
+        async getBedPresignedUrl(fileName, dataset) {
+            const { data } = await this.axios.get(
+                `/api/get-bed-presigned-url/${dataset}?filename=${fileName}`,
+            );
+            return data;
+        },
+        async finalizeBedUpload(datasetName, fileName) {
+            await this.axios.post(
+                "/api/finalize-bed-upload",
+                null,
+                {
+                    params: {
+                        dataset_name: datasetName,
+                        filename: fileName
+                    }
+                }
+            );
         },
     },
 });
