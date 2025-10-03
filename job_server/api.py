@@ -246,18 +246,69 @@ async def get_bed_presigned_url(dataset: str, filename: str = Query(None), user:
 
 @router.post("/finalize-bed-upload")
 async def finalize_bed_upload(dataset_name: str, filename: str, user: User = Depends(get_current_user)):
-    """Finalize BED file upload by creating metadata file."""
+    """Finalize BED file upload by creating metadata file and database record."""
     try:
         # Validate that it's a .bed or .tsv file
         if not (filename.lower().endswith('.bed') or filename.lower().endswith('.tsv')):
             raise fastapi.HTTPException(status_code=400, detail="Only .bed and .tsv files are allowed")
         
-        # Upload metadata file
+        # Get the full S3 path for the uploaded file
+        s3_path = s3.get_bed_s3_path(user.username, dataset_name, filename)
+        
+        # Upload metadata file to S3
         s3.upload_bed_metadata(user.username, dataset_name, filename)
         
+        # Insert record into database
+        success = database_utils.insert_bed_file(
+            get_db(), 
+            user.username, 
+            dataset_name, 
+            filename, 
+            s3_path
+        )
+        
+        if not success:
+            raise fastapi.HTTPException(
+                status_code=409, 
+                detail=f"Dataset name '{dataset_name}' already exists for this user"
+            )
+        
         return Response(status_code=200)
+    except fastapi.HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         raise fastapi.HTTPException(status_code=500, detail=f"Failed to finalize upload: {str(e)}")
+
+
+@router.get("/bed-files")
+async def get_bed_files(user: User = Depends(get_current_user)):
+    """Get all BED files uploaded by the current user."""
+    try:
+        bed_files = database_utils.get_bed_files_for_user(get_db(), user.username)
+        return bed_files
+    except Exception as e:
+        raise fastapi.HTTPException(status_code=500, detail=f"Failed to retrieve BED files: {str(e)}")
+
+
+@router.delete("/bed-files/{dataset_name}")
+async def delete_bed_file_endpoint(dataset_name: str, user: User = Depends(get_current_user)):
+    """Delete a BED file record and associated S3 files."""
+    try:
+        # Delete from database
+        success = database_utils.delete_bed_file(get_db(), user.username, dataset_name)
+        
+        if not success:
+            raise fastapi.HTTPException(status_code=404, detail="BED file not found")
+        
+        # Delete S3 files (both the BED file and metadata)
+        s3_base_path = s3.get_bed_s3_path(user.username, dataset_name)
+        s3.clear_dir(s3_base_path)
+        
+        return Response(status_code=200)
+    except fastapi.HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        raise fastapi.HTTPException(status_code=500, detail=f"Failed to delete BED file: {str(e)}")
 
 
 def get_s3_path(dataset: str, user: User, filename: str=None) -> str:
