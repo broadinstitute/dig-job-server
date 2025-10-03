@@ -109,3 +109,100 @@ def test_generate_presigned_url_failure(api_client: TestClient, auth_token: str)
         response = api_client.get("/api/get-pre-signed-url/test-ds",
                                    headers={"Authorization": f"Bearer {auth_token}"})
         assert response.status_code == 500
+
+
+def test_validate_bed_file_valid(api_client: TestClient, auth_token: str):
+    # Valid BED file content
+    bed_content = "chr1\t1000\t2000\tregion1\t100\t+\nchr2\t3000\t4000\tregion2\t200\t-"
+    bed_file = io.BytesIO(bed_content.encode())
+    files = {"file": ("test.bed", bed_file, "text/plain")}
+    
+    response = api_client.post("/api/validate-bed-file", files=files, 
+                              headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    
+    result = response.json()
+    assert result['valid'] is True
+    assert result['data_lines'] == 2
+    assert result['filename'] == "test.bed"
+    assert len(result['sample_regions']) == 2
+    assert 'chr1' in result['chromosomes']
+    assert 'chr2' in result['chromosomes']
+
+
+def test_validate_bed_file_invalid_extension(api_client: TestClient, auth_token: str):
+    bed_content = "chr1\t1000\t2000"
+    bed_file = io.BytesIO(bed_content.encode())
+    files = {"file": ("test.txt", bed_file, "text/plain")}
+    
+    response = api_client.post("/api/validate-bed-file", files=files,
+                              headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 400
+    assert "File must be a BED or TSV file" in response.json()["detail"]
+
+
+def test_validate_bed_file_invalid_format(api_client: TestClient, auth_token: str):
+    # Invalid BED file - missing required fields
+    bed_content = "chr1\t1000\nchr2"
+    bed_file = io.BytesIO(bed_content.encode())
+    files = {"file": ("test.bed", bed_file, "text/plain")}
+    
+    response = api_client.post("/api/validate-bed-file", files=files,
+                              headers={"Authorization": f"Bearer {auth_token}"})
+    # This should return 200 but with validation errors in the result
+    assert response.status_code == 200
+    
+    result = response.json()
+    assert result['valid'] is False
+    assert len(result['errors']) > 0
+
+
+def test_validate_tsv_file(api_client: TestClient, auth_token: str):
+    # Valid TSV file content
+    tsv_content = "chr1\t1000\t2000\tregion1\nchr2\t3000\t4000\tregion2"
+    tsv_file = io.BytesIO(tsv_content.encode())
+    files = {"file": ("test.tsv", tsv_file, "text/tab-separated-values")}
+    
+    response = api_client.post("/api/validate-bed-file", files=files,
+                              headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    
+    result = response.json()
+    assert result['valid'] is True
+    assert result['is_compressed'] is False
+    assert result['data_lines'] == 2
+    assert result['filename'] == "test.tsv"
+
+
+def test_validate_compressed_file_rejected(api_client: TestClient, auth_token: str):
+    import gzip
+    # Valid BED file content but compressed (name it .bed to pass extension check)
+    bed_content = "chr1\t1000\t2000\tregion1\nchr2\t3000\t4000\tregion2"
+    gzipped_content = gzip.compress(bed_content.encode())
+    gz_file = io.BytesIO(gzipped_content)
+    files = {"file": ("test.bed", gz_file, "application/gzip")}
+    
+    response = api_client.post("/api/validate-bed-file", files=files,
+                              headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 400
+    assert "Compressed files are not supported" in response.json()["detail"]
+
+
+def test_validate_non_genomic_file_rejected(api_client: TestClient, auth_token: str):
+    # Non-genomic TSV file with quoted headers (like the user's example)
+    non_genomic_content = '"sys_name"\t"attr1"\t"attr2"\n"sample1"\t"text"\t"more_text"'
+    tsv_file = io.BytesIO(non_genomic_content.encode())
+    files = {"file": ("test.tsv", tsv_file, "text/tab-separated-values")}
+    
+    response = api_client.post("/api/validate-bed-file", files=files,
+                              headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    
+    result = response.json()
+    # Should be invalid because no valid genomic data lines found
+    assert result['valid'] is False
+    # Both lines with non-numeric positions should be treated as headers
+    assert result['header_lines'] == 2
+    assert result['data_lines'] == 0
+    # Should have "No valid BED data lines found" error
+    assert "No valid BED data lines found" in str(result['errors'])
