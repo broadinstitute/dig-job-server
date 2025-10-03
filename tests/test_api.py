@@ -188,6 +188,32 @@ def test_validate_compressed_file_rejected(api_client: TestClient, auth_token: s
     assert "Compressed files are not supported" in response.json()["detail"]
 
 
+def test_finalize_bed_upload(api_client: TestClient, auth_token: str):
+    import time
+    # Test finalizing a BED upload with unique dataset name
+    unique_dataset_name = f"test_bed_dataset_{int(time.time())}"
+    response = api_client.post(
+        "/api/finalize-bed-upload",
+        params={
+            "dataset_name": unique_dataset_name,
+            "filename": "test.bed"
+        },
+        headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    assert response.status_code == 200
+
+
+def test_get_bed_files(api_client: TestClient, auth_token: str):
+    # Test retrieving BED files
+    response = api_client.get(
+        "/api/bed-files",
+        headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    assert response.status_code == 200
+    bed_files = response.json()
+    assert isinstance(bed_files, list)
+
+
 def test_validate_non_genomic_file_rejected(api_client: TestClient, auth_token: str):
     # Non-genomic TSV file with quoted headers (like the user's example)
     non_genomic_content = '"sys_name"\t"attr1"\t"attr2"\n"sample1"\t"text"\t"more_text"'

@@ -185,3 +185,58 @@ def get_workflow_status_summary(db, username, dataset):
             }
 
         return workflows
+
+
+def insert_bed_file(db, username: str, dataset_name: str, filename: str, s3_path: str) -> bool:
+    """Insert a BED file record into the bed_files table"""
+    try:
+        with db as connection:
+            query = text(
+                "INSERT INTO bed_files (user, dataset_name, filename, s3_path, uploaded_at) "
+                "VALUES (:user, :dataset_name, :filename, :s3_path, NOW())"
+            )
+            connection.execute(query, {
+                "user": username,
+                "dataset_name": dataset_name,
+                "filename": filename,
+                "s3_path": s3_path
+            })
+            connection.commit()
+            return True
+    except IntegrityError:
+        return False
+
+
+def get_bed_files_for_user(db, username: str) -> list:
+    """Get all BED files uploaded by a user"""
+    with db as connection:
+        query = text(
+            "SELECT id, dataset_name, filename, s3_path, uploaded_at "
+            "FROM bed_files WHERE user = :username "
+            "ORDER BY uploaded_at DESC"
+        )
+        results = connection.execute(query, {"username": username}).fetchall()
+        return [{
+            "id": row[0],
+            "dataset_name": row[1],
+            "filename": row[2],
+            "s3_path": row[3],
+            "uploaded_at": row[4]
+        } for row in results]
+
+
+def delete_bed_file(db, username: str, dataset_name: str) -> bool:
+    """Delete a BED file record"""
+    try:
+        with db as connection:
+            query = text(
+                "DELETE FROM bed_files WHERE user = :user AND dataset_name = :dataset_name"
+            )
+            result = connection.execute(query, {
+                "user": username,
+                "dataset_name": dataset_name
+            })
+            connection.commit()
+            return result.rowcount > 0
+    except Exception:
+        return False
