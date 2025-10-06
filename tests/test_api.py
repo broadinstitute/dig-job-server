@@ -188,8 +188,12 @@ def test_validate_compressed_file_rejected(api_client: TestClient, auth_token: s
     assert "Compressed files are not supported" in response.json()["detail"]
 
 
+@mock_aws
 def test_finalize_bed_upload(api_client: TestClient, auth_token: str):
     import time
+    # Set up mocked S3 bucket
+    set_up_moto_bucket()
+    
     # Test finalizing a BED upload with unique dataset name
     unique_dataset_name = f"test_bed_dataset_{int(time.time())}"
     response = api_client.post(
@@ -203,7 +207,11 @@ def test_finalize_bed_upload(api_client: TestClient, auth_token: str):
     assert response.status_code == 200
 
 
+@mock_aws
 def test_get_bed_files(api_client: TestClient, auth_token: str):
+    # Set up mocked S3 bucket
+    set_up_moto_bucket()
+    
     # Test retrieving BED files
     response = api_client.get(
         "/api/bed-files",
