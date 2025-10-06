@@ -246,7 +246,6 @@ async def get_bed_presigned_url(dataset: str, filename: str = Query(None), user:
 
 @router.post("/finalize-bed-upload")
 async def finalize_bed_upload(dataset_name: str, filename: str, user: User = Depends(get_current_user)):
-    """Finalize BED file upload by creating metadata file and database record."""
     try:
         # Validate that it's a .bed or .tsv file
         if not (filename.lower().endswith('.bed') or filename.lower().endswith('.tsv')):
@@ -282,7 +281,6 @@ async def finalize_bed_upload(dataset_name: str, filename: str, user: User = Dep
 
 @router.get("/bed-files")
 async def get_bed_files(user: User = Depends(get_current_user)):
-    """Get all BED files uploaded by the current user."""
     try:
         bed_files = database_utils.get_bed_files_for_user(get_db(), user.username)
         return bed_files
@@ -292,7 +290,6 @@ async def get_bed_files(user: User = Depends(get_current_user)):
 
 @router.delete("/bed-files/{dataset_name}")
 async def delete_bed_file_endpoint(dataset_name: str, user: User = Depends(get_current_user)):
-    """Delete a BED file record and associated S3 files."""
     try:
         # Delete from database
         success = database_utils.delete_bed_file(get_db(), user.username, dataset_name)
