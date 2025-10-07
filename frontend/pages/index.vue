@@ -77,24 +77,24 @@
                     <template #content>
                         <div class="p-6">
                             <div
-                                class="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
+                                class="w-16 h-16 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
                             >
                                 <i
-                                    class="pi pi-chart-line text-2xl text-blue-600 dark:text-blue-400"
+                                    class="pi pi-database text-2xl text-purple-600 dark:text-purple-400"
                                 ></i>
                             </div>
                             <h3
                                 class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
                             >
-                                SLDSC Analysis
+                                Data Management
                             </h3>
                             <p class="text-gray-600 dark:text-gray-300 mb-4">
-                                Stratified Linkage Disequilibrium Score
-                                Regression for heritability analysis
+                                Upload, organize, and manage your genomic
+                                datasets with ease
                             </p>
                             <div class="flex flex-wrap gap-2 justify-center">
-                                <Tag value="Heritability" severity="primary" />
-                                <Tag value="SNP-based" severity="info" />
+                                <Tag value="Secure" severity="warn" />
+                                <Tag value="Organized" severity="info" />
                             </div>
                         </div>
                     </template>
@@ -131,24 +131,24 @@
                     <template #content>
                         <div class="p-6">
                             <div
-                                class="w-16 h-16 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
+                                class="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
                             >
                                 <i
-                                    class="pi pi-database text-2xl text-purple-600 dark:text-purple-400"
+                                    class="pi pi-chart-line text-2xl text-blue-600 dark:text-blue-400"
                                 ></i>
                             </div>
                             <h3
                                 class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
                             >
-                                Data Management
+                                SLDSC Analysis
                             </h3>
                             <p class="text-gray-600 dark:text-gray-300 mb-4">
-                                Upload, organize, and manage your genomic
-                                datasets with ease
+                                Stratified Linkage Disequilibrium Score
+                                Regression for heritability analysis
                             </p>
                             <div class="flex flex-wrap gap-2 justify-center">
-                                <Tag value="Secure" severity="warn" />
-                                <Tag value="Organized" severity="info" />
+                                <Tag value="Heritability" severity="primary" />
+                                <Tag value="SNP-based" severity="info" />
                             </div>
                         </div>
                     </template>
