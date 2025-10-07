@@ -175,11 +175,9 @@ async def validate_bed_file(file: UploadFile, user: User = Depends(get_current_u
         )
     
     try:
-        # Read the entire file content
         file_content = await file.read()
         file_size = len(file_content)
         
-        # Check if file is compressed (not supported for BED/TSV)
         is_compressed = file_content.startswith(b'\x1f\x8b')
         if is_compressed:
             raise fastapi.HTTPException(
@@ -187,7 +185,6 @@ async def validate_bed_file(file: UploadFile, user: User = Depends(get_current_u
                 detail="Compressed files are not supported. Please upload uncompressed .bed or .tsv files."
             )
         
-        # Parse file content into lines
         try:
             decompressed_content = file_content.decode('utf-8')
         except UnicodeDecodeError as e:
