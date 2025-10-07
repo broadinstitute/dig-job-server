@@ -1353,7 +1353,7 @@ async function handleDeleteBedFile(datasetName, filename) {
 
         <!-- BED Annotation Files Table -->
         <div class="col-span-12">
-            <Card>
+            <Card class="m-4">
                 <template #title>
                     <div class="flex items-center justify-between">
                         <span>Annotation Files</span>
