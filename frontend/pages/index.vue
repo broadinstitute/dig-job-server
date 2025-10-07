@@ -45,7 +45,7 @@
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button
                         label="Get Started"
-                        @click="$router.push('/upload')"
+                        @click="$router.push('/login')"
                         icon="pi pi-arrow-right"
                         size="large"
                     />
