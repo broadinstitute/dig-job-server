@@ -595,6 +595,18 @@ async def get_annot_sldsc_results(
 ):
     s3_path = get_s3_results_path(dataset, user, 'annotation', 'sldsc', 'annot-sldsc')
 
+    # Get workflow status to extract job ID
+    workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+    # Try to get job ID from MAGMA workflow
+    job_id = None
+    if 'annot-sldsc' in workflow_status and 'annot-sldsc' in workflow_status['annot-sldsc']:
+        job_id = workflow_status['annot-sldsc']['annot-sldsc'].get('job_id')
+
+    # Fallback to dataset name if no specific job ID found
+    if not job_id:
+        job_id = dataset
+
     try:
         df = get_cached_results(s3_path, 'custom.output.tsv', 'annot-sldsc', False)
         df = filter_results(df, request, sort_field, sort_order)
@@ -607,7 +619,8 @@ async def get_annot_sldsc_results(
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
-            "phenotypes": phenotypes
+            "phenotypes": phenotypes,
+            "jobId": job_id
         })
 
     except Exception as e:
