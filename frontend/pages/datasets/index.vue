@@ -10,6 +10,8 @@ const toast = useToast();
 const confirm = useConfirm();
 const datasets = ref([]);
 const totalRecords = ref(0);
+const bedFiles = ref([]);
+const totalBedFiles = ref(0);
 const config = useRuntimeConfig();
 const eventSources = ref({});
 const helpPopover = ref(null);
@@ -108,6 +110,9 @@ onMounted(async () => {
 
     // Fetch phenotypes data
     await phenotypeStore.fetchPhenotypes();
+
+    // Fetch BED annotation files
+    await fetchBedFiles();
 });
 
 onUnmounted(() => {
@@ -648,6 +653,84 @@ function viewResults(dataset) {
 function openInNewTab(dataset) {
     window.open(`/results?dataset=${dataset}`, "_blank");
 }
+
+// BED Files Functions
+async function fetchBedFiles() {
+    try {
+        const response = await userStore.getBedFiles();
+        bedFiles.value = response || [];
+        totalBedFiles.value = bedFiles.value.length;
+    } catch (error) {
+        console.error("Error fetching BED files:", error);
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: "Failed to fetch BED annotation files",
+            life: 5000,
+        });
+    }
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return "N/A";
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+    return `${size.toFixed(2)} ${units[unitIndex]}`;
+}
+
+async function downloadBedFile(datasetName, filename) {
+    try {
+        await userStore.downloadBedFile(datasetName);
+        toast.add({
+            severity: "success",
+            summary: "Success",
+            detail: `Downloading ${filename}`,
+            life: 3000,
+        });
+    } catch (error) {
+        console.error("Error downloading BED file:", error);
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: "Failed to download file",
+            life: 5000,
+        });
+    }
+}
+
+async function handleDeleteBedFile(datasetName, filename) {
+    confirm.require({
+        message: `Are you sure you want to delete ${filename}?`,
+        header: "Delete Confirmation",
+        icon: "pi pi-exclamation-triangle",
+        acceptClass: "p-button-danger",
+        accept: async () => {
+            try {
+                await userStore.deleteBedFile(datasetName);
+                await fetchBedFiles();
+                toast.add({
+                    severity: "success",
+                    summary: "Success",
+                    detail: "BED file deleted successfully",
+                    life: 3000,
+                });
+            } catch (error) {
+                console.error("Error deleting BED file:", error);
+                toast.add({
+                    severity: "error",
+                    summary: "Error",
+                    detail: "Failed to delete BED file",
+                    life: 5000,
+                });
+            }
+        },
+    });
+}
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
@@ -865,7 +948,7 @@ function openInNewTab(dataset) {
                 <Button
                     @click="router.push('/upload')"
                     icon="pi pi-upload"
-                    label="Upload Dataset"
+                    label="Upload GWAS"
                     size="small"
                     class="mx-4"
                 ></Button>
@@ -1264,6 +1347,179 @@ function openInNewTab(dataset) {
                 </template>
                 <template #footer v-if="datasets.length > 0"
                     ><small>Total records: {{ totalRecords }}</small></template
+                >
+            </Card>
+        </div>
+
+        <!-- BED Annotation Files Table -->
+        <div class="col-span-12">
+            <Card>
+                <template #title>
+                    <div class="flex items-center justify-between">
+                        <span>Annotation Files</span>
+                        <Button
+                            label="Upload Annotation"
+                            icon="pi pi-upload"
+                            @click="router.push('/bed-upload')"
+                            size="small"
+                            severity="primary"
+                        />
+                    </div>
+                </template>
+                <template #content>
+                    <DataTable
+                        :value="bedFiles"
+                        :paginator="true"
+                        :rows="10"
+                        :rowsPerPageOptions="[5, 10, 20, 50]"
+                        sortField="uploaded_at"
+                        :sortOrder="-1"
+                        dataKey="filename"
+                        filterDisplay="menu"
+                        :loading="false"
+                        :globalFilterFields="[
+                            'dataset_name',
+                            'filename',
+                            'uploader',
+                        ]"
+                        paginatorTemplate="RowsPerPageDropdown FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink"
+                        currentPageReportTemplate="{first} to {last} of {totalRecords}"
+                        class="text-sm"
+                    >
+                        <Column
+                            field="dataset_name"
+                            header="Dataset Name"
+                            sortable
+                            :style="{ minWidth: '12rem' }"
+                        >
+                            <template #body="{ data }">
+                                <span
+                                    class="font-mono text-sm font-semibold text-primary"
+                                    >{{ data.dataset_name }}</span
+                                >
+                            </template>
+                        </Column>
+
+                        <Column
+                            field="filename"
+                            header="Filename"
+                            sortable
+                            :style="{ minWidth: '12rem' }"
+                        >
+                            <template #body="{ data }">
+                                <span class="font-mono text-sm">{{
+                                    data.filename
+                                }}</span>
+                            </template>
+                        </Column>
+
+                        <Column
+                            field="uploader"
+                            header="Uploader"
+                            sortable
+                            :style="{ width: '10rem' }"
+                        >
+                            <template #body="{ data }">
+                                <span class="text-sm">{{
+                                    data.uploader || "N/A"
+                                }}</span>
+                            </template>
+                        </Column>
+
+                        <Column
+                            field="uploaded_at"
+                            header="Uploaded"
+                            sortable
+                            :style="{ width: '12rem' }"
+                        >
+                            <template #body="{ data }">
+                                <span class="text-sm">{{
+                                    data.uploaded_at
+                                        ? new Date(
+                                              data.uploaded_at,
+                                          ).toLocaleString()
+                                        : "N/A"
+                                }}</span>
+                            </template>
+                        </Column>
+
+                        <Column
+                            field="file_size"
+                            header="Size"
+                            sortable
+                            :style="{ width: '8rem' }"
+                        >
+                            <template #body="{ data }">
+                                <span class="text-sm">{{
+                                    formatFileSize(data.file_size)
+                                }}</span>
+                            </template>
+                        </Column>
+
+                        <Column
+                            field="status"
+                            header="Status"
+                            sortable
+                            :style="{ width: '10rem' }"
+                        >
+                            <template #body="{ data }">
+                                <Tag
+                                    :value="data.status || 'active'"
+                                    :severity="
+                                        data.status === 'active'
+                                            ? 'success'
+                                            : 'secondary'
+                                    "
+                                    rounded
+                                />
+                            </template>
+                        </Column>
+
+                        <Column
+                            header="Actions"
+                            :style="{ width: '10rem' }"
+                            class="text-center"
+                        >
+                            <template #body="{ data }">
+                                <div class="flex gap-2 justify-center">
+                                    <Button
+                                        icon="pi pi-download"
+                                        size="small"
+                                        @click="
+                                            downloadBedFile(
+                                                data.dataset_name,
+                                                data.filename,
+                                            )
+                                        "
+                                        v-tooltip.top="'Download file'"
+                                        outlined
+                                        severity="secondary"
+                                    />
+                                    <Button
+                                        v-if="
+                                            userStore.user.username !== 'demo'
+                                        "
+                                        icon="pi pi-trash"
+                                        size="small"
+                                        @click="
+                                            handleDeleteBedFile(
+                                                data.dataset_name,
+                                                data.filename,
+                                            )
+                                        "
+                                        v-tooltip.top="'Delete file'"
+                                        outlined
+                                        severity="danger"
+                                    />
+                                </div>
+                            </template>
+                        </Column>
+                    </DataTable>
+                </template>
+                <template #footer v-if="bedFiles.length > 0"
+                    ><small
+                        >Total annotation files: {{ totalBedFiles }}</small
+                    ></template
                 >
             </Card>
         </div>
