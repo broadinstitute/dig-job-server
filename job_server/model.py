@@ -23,7 +23,7 @@ class DatasetInfo(BaseModel):
 
 class AnalysisMethod(str, Enum):
     sldsc = "sldsc"
-    magma_genes = "magma"
+    magma = "magma"
     annot_sldsc = "annot-sldsc"
 
 class AnalysisRequest(BaseModel):
