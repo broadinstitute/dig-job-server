@@ -158,11 +158,11 @@ async def preview_file(file: UploadFile, user: User = Depends(get_current_user))
 @router.post("/validate-bed-file")
 async def validate_bed_file(file: UploadFile, user: User = Depends(get_current_user)):
     """Validate a complete BED file format and return validation results.
-    
+
     Args:
         file: The uploaded BED file to validate
         user: Current authenticated user
-        
+
     Returns:
         dict: Validation results including errors, warnings, and sample regions
     """
@@ -170,10 +170,10 @@ async def validate_bed_file(file: UploadFile, user: User = Depends(get_current_u
     filename = file.filename.lower()
     if not (filename.endswith('.bed') or filename.endswith('.tsv')):
         raise fastapi.HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="File must be a BED or TSV file (.bed or .tsv)"
         )
-    
+
     try:
         file_content = await file.read()
         file_size = len(file_content)
@@ -192,31 +192,31 @@ async def validate_bed_file(file: UploadFile, user: User = Depends(get_current_u
                 status_code=400,
                 detail=f"Error decoding file as UTF-8: {str(e)}"
             )
-        
+
         # Split into lines
         lines = decompressed_content.split('\n')
-        
+
         # Remove the last empty line if it exists
         if lines and not lines[-1].strip():
             lines = lines[:-1]
-        
+
         # Validate BED format for the entire file
         validation_result = file_utils.validate_bed_content(lines)
-        
+
         # Add file metadata
         validation_result['filename'] = file.filename
         validation_result['file_size_bytes'] = file_size
         validation_result['is_compressed'] = is_compressed
         validation_result['decompressed_size_bytes'] = len(decompressed_content)
-        
+
         # Calculate some statistics
         if validation_result['data_lines'] > 0:
             total_region_length = sum(region['length'] for region in validation_result['sample_regions'])
             if validation_result['sample_regions']:
                 validation_result['avg_region_length'] = total_region_length / len(validation_result['sample_regions'])
-        
+
         return validation_result
-        
+
     except fastapi.HTTPException:
         raise  # Re-raise HTTP exceptions
     except Exception as e:
@@ -247,28 +247,28 @@ async def finalize_bed_upload(dataset_name: str, filename: str, user: User = Dep
         # Validate that it's a .bed or .tsv file
         if not (filename.lower().endswith('.bed') or filename.lower().endswith('.tsv')):
             raise fastapi.HTTPException(status_code=400, detail="Only .bed and .tsv files are allowed")
-        
+
         # Get the full S3 path for the uploaded file
         s3_path = s3.get_bed_s3_path(user.username, dataset_name, filename)
-        
+
         # Upload metadata file to S3
         s3.upload_bed_metadata(user.username, dataset_name, filename)
-        
+
         # Insert record into database
         success = database_utils.insert_bed_file(
-            get_db(), 
-            user.username, 
-            dataset_name, 
-            filename, 
+            get_db(),
+            user.username,
+            dataset_name,
+            filename,
             s3_path
         )
-        
+
         if not success:
             raise fastapi.HTTPException(
-                status_code=409, 
+                status_code=409,
                 detail=f"Dataset name '{dataset_name}' already exists for this user"
             )
-        
+
         return Response(status_code=200)
     except fastapi.HTTPException:
         raise  # Re-raise HTTP exceptions
@@ -285,19 +285,52 @@ async def get_bed_files(user: User = Depends(get_current_user)):
         raise fastapi.HTTPException(status_code=500, detail=f"Failed to retrieve BED files: {str(e)}")
 
 
+@router.get("/bed-files/{dataset_name}/download")
+async def download_bed_file(dataset_name: str, user: User = Depends(get_current_user)):
+    """Download a BED file by generating a presigned URL."""
+    try:
+        # Get BED file info from database
+        bed_files = database_utils.get_bed_files_for_user(get_db(), user.username)
+        bed_file = next((f for f in bed_files if f['dataset_name'] == dataset_name), None)
+
+        if not bed_file:
+            raise fastapi.HTTPException(status_code=404, detail="BED file not found")
+
+        # Generate presigned URL for download
+        try:
+            presigned_url = s3.generate_presigned_url(
+                'get_object',
+                params={'Bucket': s3.BUCKET_NAME, 'Key': bed_file['s3_path']},
+                expires_in=3600
+            )
+        except ClientError as e:
+            raise fastapi.HTTPException(status_code=500, detail="Failed to generate download URL") from e
+
+        # Return the presigned URL for the frontend to download
+        return JSONResponse({
+            "download_url": presigned_url,
+            "filename": bed_file['filename']
+        })
+
+    except fastapi.HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        raise fastapi.HTTPException(status_code=500, detail=f"Failed to download BED file: {str(e)}")
+
+
 @router.delete("/bed-files/{dataset_name}")
 async def delete_bed_file_endpoint(dataset_name: str, user: User = Depends(get_current_user)):
     try:
         # Delete from database
         success = database_utils.delete_bed_file(get_db(), user.username, dataset_name)
-        
+
         if not success:
             raise fastapi.HTTPException(status_code=404, detail="BED file not found")
-        
+
         # Delete S3 files (both the BED file and metadata)
         s3_base_path = s3.get_bed_s3_path(user.username, dataset_name)
         s3.clear_dir(s3_base_path)
-        
+
         return Response(status_code=200)
     except fastapi.HTTPException:
         raise  # Re-raise HTTP exceptions

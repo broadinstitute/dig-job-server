@@ -215,16 +215,58 @@ export const useUserStore = defineStore("UserStore", {
             return data;
         },
         async finalizeBedUpload(datasetName, fileName) {
-            await this.axios.post(
-                "/api/finalize-bed-upload",
-                null,
-                {
-                    params: {
-                        dataset_name: datasetName,
-                        filename: fileName
-                    }
-                }
-            );
+            await this.axios.post("/api/finalize-bed-upload", null, {
+                params: {
+                    dataset_name: datasetName,
+                    filename: fileName,
+                },
+            });
+        },
+        async getBedFiles() {
+            try {
+                const { data } = await this.axios.get("/api/bed-files");
+                return data;
+            } catch (error) {
+                console.error("Error fetching BED files:", error);
+                throw error;
+            }
+        },
+        async downloadBedFile(datasetName) {
+            try {
+                // Get presigned URL from backend
+                const response = await this.axios.get(
+                    `/api/bed-files/${datasetName}/download`,
+                );
+
+                // Use the presigned URL to download the file
+                const downloadUrl = response.data.download_url;
+                const filename = response.data.filename;
+
+                // Fetch the file from the presigned URL
+                const fileResponse = await fetch(downloadUrl);
+                const blob = await fileResponse.blob();
+
+                // Create a download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.setAttribute("download", filename);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("Error downloading BED file:", error);
+                throw error;
+            }
+        },
+        async deleteBedFile(datasetName) {
+            try {
+                await this.axios.delete(`/api/bed-files/${datasetName}`);
+            } catch (error) {
+                console.error("Error deleting BED file:", error);
+                throw error;
+            }
         },
     },
 });
