@@ -14,110 +14,116 @@ const config = useRuntimeConfig();
 const { isDarkMode, toggleDarkMode } = useTheme();
 
 const submitForm = async () => {
-  if (password.value !== confirmPassword.value) {
-    toast.add({
-      severity: "error",
-      summary: "Error",
-      detail: "Passwords do not match",
-      life: 3000,
-    });
-    return;
-  }
-
-  try {
-    // Call your user service to create account
-    await $fetch('https://users.kpndataregistry.org/api/auth/create-user/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: {
-        token: '47c5488c-1660-4133-8700-23c14e942788', // Your application token
-        username: username.value,
-        password: password.value,
-        email: email.value
-      }
-    });
-
-    // Automatically log in the user after successful signup
-    const loginResponse = await $fetch(`${config.public.userServiceUrl}/api/auth/login/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: {
-        username: username.value,
-        password: password.value,
-        group: config.public.userGroup
-      }
-    });
-
-    if (loginResponse && loginResponse.access) {
-      localStorage.setItem("authToken", loginResponse.access);
-      localStorage.removeItem("isDefaultUser");
-      
-      toast.add({
-        severity: "success",
-        summary: "Success",
-        detail: "Account created and logged in successfully!",
-        life: 3000,
-      });
-
-      // Redirect to home page after successful signup and login
-      setTimeout(() => {
-        navigateTo("/");
-      }, 2000);
-    } else {
-      toast.add({
-        severity: "success",
-        summary: "Success",
-        detail: "Account created successfully! Please log in.",
-        life: 3000,
-      });
-
-      // Redirect to login page if auto-login failed
-      setTimeout(() => {
-        navigateTo("/login");
-      }, 2000);
+    if (password.value !== confirmPassword.value) {
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: "Passwords do not match",
+            life: 3000,
+        });
+        return;
     }
 
-  } catch (error) {
-    console.log(error);
+    try {
+        // Call your user service to create account
+        await $fetch(
+            "https://users.kpndataregistry.org/api/auth/create-user/",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: {
+                    token: "47c5488c-1660-4133-8700-23c14e942788", // Your application token
+                    username: username.value,
+                    password: password.value,
+                    email: email.value,
+                },
+            },
+        );
 
-    // Handle specific error messages from the user service
-    let errorMessage = "Failed to create account";
+        // Automatically log in the user after successful signup
+        const loginResponse = await $fetch(
+            `${config.public.userServiceUrl}/api/auth/login/`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: {
+                    username: username.value,
+                    password: password.value,
+                    group: config.public.userGroup,
+                },
+            },
+        );
 
-    if (error.data?.error) {
-      errorMessage = error.data.error;
-    } else if (error.message) {
-      errorMessage = error.message;
+        if (loginResponse && loginResponse.access) {
+            localStorage.setItem("authToken", loginResponse.access);
+            localStorage.removeItem("isDefaultUser");
+
+            toast.add({
+                severity: "success",
+                summary: "Success",
+                detail: "Account created and logged in successfully!",
+                life: 3000,
+            });
+
+            // Redirect to home page after successful signup and login
+            setTimeout(() => {
+                navigateTo("/");
+            }, 2000);
+        } else {
+            toast.add({
+                severity: "success",
+                summary: "Success",
+                detail: "Account created successfully! Please log in.",
+                life: 3000,
+            });
+
+            // Redirect to login page if auto-login failed
+            setTimeout(() => {
+                navigateTo("/login");
+            }, 2000);
+        }
+    } catch (error) {
+        console.log(error);
+
+        // Handle specific error messages from the user service
+        let errorMessage = "Failed to create account";
+
+        if (error.data?.error) {
+            errorMessage = error.data.error;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: errorMessage,
+            life: 3000,
+        });
     }
-
-    toast.add({
-      severity: "error",
-      summary: "Error",
-      detail: errorMessage,
-      life: 3000,
-    });
-  }
 };
 
 const signupWithGitHub = async () => {
     try {
-      const state = JSON.stringify({
-        action: 'signup',
-        client: 'gwas-ce',
-        group: config.public.userGroup,
-        redirect_uri: config.public.finalRedirectUri,
-        token: config.public.userServiceToken
-      });
+        const state = JSON.stringify({
+            action: "signup",
+            client: "gwas-ce",
+            group: config.public.userGroup,
+            redirect_uri: config.public.finalRedirectUri,
+            token: config.public.userServiceToken,
+        });
 
-      const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
-          `client_id=${config.public.githubAuthClientId}&` +
-          `redirect_uri=${encodeURIComponent(config.public.githubAuthRedirectUri)}&` +
-          `scope=user:email&` +
-          `state=${encodeURIComponent(state)}`;
-      window.location.href = githubAuthUrl;
+        const githubAuthUrl =
+            `https://github.com/login/oauth/authorize?` +
+            `client_id=${config.public.githubAuthClientId}&` +
+            `redirect_uri=${encodeURIComponent(config.public.githubAuthRedirectUri)}&` +
+            `scope=user:email&` +
+            `state=${encodeURIComponent(state)}`;
+        window.location.href = githubAuthUrl;
     } catch (error) {
         console.log(error);
         toast.add({
@@ -137,131 +143,181 @@ onMounted(() => {
 
 <template>
     <div
-        class="flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden"
+        class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
     >
-        <div class="flex flex-col items-center justify-center">
-            <div class="w-full bg-surface-0 dark:bg-surface-900">
-                <div class="text-center mb-4">
-                    <img 
-                        src="/images/gwas-ce-logo.png" 
-                        alt="Logo" 
-                        class="max-w-xs w-full h-auto"
+        <Card class="w-full max-w-md shadow-2xl">
+            <template #header>
+                <div class="text-center pt-8 pb-4">
+                    <img
+                        src="/images/gwas-ce-logo.png"
+                        alt="GWAS Analysis Platform"
+                        class="max-w-[200px] w-full h-auto mx-auto"
                     />
+                    <h2
+                        class="text-2xl font-bold mt-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400"
+                    >
+                        Create Account
+                    </h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                        Join the platform to start analyzing your data
+                    </p>
                 </div>
-                <form id="signup-form" class="p-8">
-                    <h2 class="text-center text-2xl font-bold text-surface-900 dark:text-surface-0 mb-6">Create Account</h2>
-                    
-                    <div class="field">
+            </template>
+
+            <template #content>
+                <form @submit.prevent="submitForm" class="space-y-5">
+                    <div class="flex flex-col gap-2">
                         <label
                             for="username"
-                            class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
-                            >Username</label
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >
+                            Username
+                        </label>
                         <InputText
                             id="username"
-                            autofocus
                             v-model="username"
                             type="text"
-                            placeholder="Enter username"
+                            placeholder="Choose a username"
                             class="w-full"
-                            style="padding: 1rem"
                             autocomplete="username"
+                            autofocus
                             required
                         />
                     </div>
 
-                    <div class="field">
+                    <div class="flex flex-col gap-2">
+                        <label
+                            for="email"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                            Email
+                        </label>
+                        <InputText
+                            id="email"
+                            v-model="email"
+                            type="email"
+                            placeholder="Enter your email"
+                            class="w-full"
+                            autocomplete="email"
+                            required
+                        />
+                    </div>
+
+                    <div class="flex flex-col gap-2">
                         <label
                             for="password"
-                            class="block text-surface-900 dark:text-surface-0 font-medium text-l mb-2"
-                            >Password</label
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >
+                            Password
+                        </label>
                         <Password
                             id="password"
-                            type="password"
                             v-model="password"
-                            placeholder="Enter password"
+                            placeholder="Create a password"
                             :toggleMask="true"
                             class="w-full"
                             inputClass="w-full"
-                            :inputStyle="{ padding: '1rem' }"
-                            :feedback="false"
+                            :feedback="true"
                             autocomplete="new-password"
                             :inputProps="{ autocomplete: 'new-password' }"
                             required
-                        ></Password>
+                        />
                     </div>
 
-                    <div class="field">
+                    <div class="flex flex-col gap-2">
                         <label
                             for="confirmPassword"
-                            class="block text-surface-900 dark:text-surface-0 font-medium text-l mb-2"
-                            >Confirm Password</label
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >
+                            Confirm Password
+                        </label>
                         <Password
                             id="confirmPassword"
-                            type="password"
                             v-model="confirmPassword"
-                            placeholder="Confirm password"
+                            placeholder="Confirm your password"
                             :toggleMask="true"
                             class="w-full"
                             inputClass="w-full"
-                            :inputStyle="{ padding: '1rem' }"
-                            @keydown.enter="submitForm()"
                             :feedback="false"
                             autocomplete="new-password"
                             :inputProps="{ autocomplete: 'new-password' }"
+                            @keydown.enter="submitForm"
                             required
-                        ></Password>
+                        />
                     </div>
 
                     <Button
+                        type="submit"
                         label="Create Account"
-                        class="w-full p-4 text-xl mt-4"
-                        icon="bi-person-plus"
-                        @click="submitForm()"
-                    ></Button>
+                        icon="pi pi-user-plus"
+                        class="w-full justify-center"
+                        size="large"
+                    />
 
-                    <div class="text-center my-4">
-                        <span class="text-surface-600 dark:text-surface-300">or</span>
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div
+                                class="w-full border-t border-gray-300 dark:border-gray-600"
+                            ></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span
+                                class="px-2 bg-white dark:bg-surface-900 text-gray-500 dark:text-gray-400"
+                            >
+                                Or sign up with
+                            </span>
+                        </div>
                     </div>
 
                     <Button
+                        type="button"
                         label="Sign up with GitHub"
-                        class="w-full p-4 text-xl"
                         icon="pi pi-github"
+                        class="w-full justify-center"
                         severity="secondary"
-                        @click="signupWithGitHub()"
-                    ></Button>
-
-                    <div class="text-center mt-6">
-                        <span class="text-surface-600 dark:text-surface-300">Already have an account? </span>
-                        <NuxtLink to="/login" class="text-primary-500 hover:text-primary-400">Sign in</NuxtLink>
-                    </div>
+                        size="large"
+                        outlined
+                        @click="signupWithGitHub"
+                    />
                 </form>
-                <div class="flex justify-center mb-4">
+            </template>
+
+            <template #footer>
+                <div
+                    class="flex flex-col items-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+                >
+                    <div class="text-sm text-center">
+                        <span class="text-gray-600 dark:text-gray-400"
+                            >Already have an account?
+                        </span>
+                        <NuxtLink
+                            to="/login"
+                            class="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                        >
+                            Sign in
+                        </NuxtLink>
+                    </div>
+
                     <Button
                         :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
-                        :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-                        class="p-button-rounded p-button-text theme-toggle-btn mt-4"
-                        :class="{ 'sun-icon': isDarkMode }"
+                        :label="isDarkMode ? 'Light Mode' : 'Dark Mode'"
+                        class="p-button-text p-button-sm"
                         @click="toggleDarkMode"
-                        v-tooltip.top="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-                        size="small"
+                        v-tooltip.top="
+                            isDarkMode
+                                ? 'Switch to light mode'
+                                : 'Switch to dark mode'
+                        "
+                        text
                     />
                 </div>
-            </div>
-        </div>
+            </template>
+        </Card>
+
+        <Toast position="top-center" />
     </div>
-    <Toast position="top-center" />
 </template>
 
 <style scoped>
-label {
-    white-space: nowrap;
-}
-
-.theme-toggle-btn.sun-icon :deep(.pi-sun) {
-    color: #ffd700;
-}
+/* Minimal custom styles - using PrimeVue and Tailwind */
 </style>
