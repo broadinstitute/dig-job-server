@@ -17,7 +17,7 @@ const submitForm = async () => {
     try {
         // Clear the default user flag when explicitly logging in
         localStorage.removeItem("isDefaultUser");
-        
+
         await userStore.login(username.value, password.value, false);
         await userStore.isUserLoggedIn();
         const defaultUrl = "/";
@@ -35,20 +35,21 @@ const submitForm = async () => {
 
 const loginWithGitHub = async () => {
     try {
-      const state = JSON.stringify({
-        action: 'login',
-        client: 'gwas-ce',
-        group: config.public.userGroup,
-        redirect_uri: config.public.finalRedirectUri,
-        token: config.public.userServiceToken
-      });
+        const state = JSON.stringify({
+            action: "login",
+            client: "gwas-ce",
+            group: config.public.userGroup,
+            redirect_uri: config.public.finalRedirectUri,
+            token: config.public.userServiceToken,
+        });
 
-      const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
-          `client_id=${config.public.githubAuthClientId}&` +
-          `redirect_uri=${encodeURIComponent(config.public.githubAuthRedirectUri)}&` +
-          `scope=user:email&` +
-          `state=${encodeURIComponent(state)}`;
-      window.location.href = githubAuthUrl;
+        const githubAuthUrl =
+            `https://github.com/login/oauth/authorize?` +
+            `client_id=${config.public.githubAuthClientId}&` +
+            `redirect_uri=${encodeURIComponent(config.public.githubAuthRedirectUri)}&` +
+            `scope=user:email&` +
+            `state=${encodeURIComponent(state)}`;
+        window.location.href = githubAuthUrl;
     } catch (error) {
         console.log(error);
         toast.add({
@@ -65,23 +66,23 @@ onMounted(async () => {
     if (userStore.isDefaultUser) {
         // Clear default user data so we don't auto-login again
         localStorage.removeItem("isDefaultUser");
-        localStorage.removeItem("authToken"); 
+        localStorage.removeItem("authToken");
         userStore.isDefaultUser = false;
         userStore.user = null;
     } else {
         // Normal flow - check if user is already logged in
         const isLoggedIn = await userStore.isUserLoggedIn();
-        
+
         // If logged in with personal account, redirect to homepage
         if (isLoggedIn && !userStore.isDefaultUser) {
             navigateTo("/");
             return;
         }
-        
+
         // If they're logged in with default account (should not happen now),
         // let them login with their own credentials
     }
-    
+
     // Focus username field for better UX
     document.getElementById("username").focus();
     if (userStore.loginError) {
@@ -98,104 +99,140 @@ onMounted(async () => {
 
 <template>
     <div
-        class="flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden"
+        class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
     >
-        <div class="flex flex-col items-center justify-center">
-            <div class="w-full bg-surface-0 dark:bg-surface-900">
-                <div class="text-center mb-4">
-                    <img 
-                        src="/images/gwas-ce-logo.png" 
-                        alt="Logo" 
-                        class="max-w-xs w-full h-auto"
+        <Card class="w-full max-w-md shadow-2xl">
+            <template #header>
+                <div class="text-center pt-8 pb-4">
+                    <img
+                        src="/images/gwas-ce-logo.png"
+                        alt="GWAS Analysis Platform"
+                        class="max-w-[200px] w-full h-auto mx-auto"
                     />
+                    <h2
+                        class="text-2xl font-bold mt-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400"
+                    >
+                        Welcome Back
+                    </h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                        Sign in to continue to your workspace
+                    </p>
                 </div>
-                <form id="login-form" class="p-8">
-                    <div class="field">
+            </template>
+
+            <template #content>
+                <form @submit.prevent="submitForm" class="space-y-5">
+                    <div class="flex flex-col gap-2">
                         <label
                             for="username"
-                            class="block text-surface-900 dark:text-surface-0 text-l font-medium mb-2"
-                            >Username</label
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >
+                            Username
+                        </label>
                         <InputText
                             id="username"
-                            autofocus
                             v-model="username"
                             type="text"
-                            placeholder="Enter username"
+                            placeholder="Enter your username"
                             class="w-full"
-                            style="padding: 1rem"
                             autocomplete="username"
+                            autofocus
                         />
                     </div>
-                    <div class="field">
+
+                    <div class="flex flex-col gap-2">
                         <label
                             for="password"
-                            class="block text-surface-900 dark:text-surface-0 font-medium text-l mb-2"
-                            >Password</label
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300"
                         >
+                            Password
+                        </label>
                         <Password
                             id="password"
-                            type="password"
                             v-model="password"
-                            placeholder="Enter password"
+                            placeholder="Enter your password"
                             :toggleMask="true"
                             class="w-full"
                             inputClass="w-full"
-                            :inputStyle="{ padding: '1rem' }"
-                            @keydown.enter="submitForm()"
                             :feedback="false"
                             autocomplete="current-password"
                             :inputProps="{ autocomplete: 'current-password' }"
-                        ></Password>
+                            @keydown.enter="submitForm"
+                        />
                     </div>
 
                     <Button
+                        type="submit"
                         label="Sign In"
-                        class="w-full p-4 text-xl mt-4"
-                        icon="bi-person"
-                        @click="submitForm()"
-                    ></Button>
+                        icon="pi pi-sign-in"
+                        class="w-full justify-center"
+                        size="large"
+                    />
 
-                    <div class="text-center my-4">
-                        <span class="text-surface-600 dark:text-surface-300">or</span>
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div
+                                class="w-full border-t border-gray-300 dark:border-gray-600"
+                            ></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span
+                                class="px-2 bg-white dark:bg-surface-900 text-gray-500 dark:text-gray-400"
+                            >
+                                Or continue with
+                            </span>
+                        </div>
                     </div>
 
                     <Button
+                        type="button"
                         label="Sign in with GitHub"
-                        class="w-full p-4 text-xl"
                         icon="pi pi-github"
+                        class="w-full justify-center"
                         severity="secondary"
-                        @click="loginWithGitHub()"
-                    ></Button>
-
-                    <div class="text-center mt-6">
-                        <span class="text-surface-600 dark:text-surface-300">Don't have an account? </span>
-                        <NuxtLink to="/signup" class="text-primary-500 hover:text-primary-400">Sign up</NuxtLink>
-                    </div>
+                        size="large"
+                        outlined
+                        @click="loginWithGitHub"
+                    />
                 </form>
-                <div class="flex justify-center mb-4">
+            </template>
+
+            <template #footer>
+                <div
+                    class="flex flex-col items-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+                >
+                    <div class="text-sm text-center">
+                        <span class="text-gray-600 dark:text-gray-400"
+                            >Don't have an account?
+                        </span>
+                        <NuxtLink
+                            to="/signup"
+                            class="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                        >
+                            Sign up
+                        </NuxtLink>
+                    </div>
+
                     <Button
                         :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
-                        :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-                        class="p-button-rounded p-button-text theme-toggle-btn mt-4"
-                        :class="{ 'sun-icon': isDarkMode }"
+                        :label="isDarkMode ? 'Light Mode' : 'Dark Mode'"
+                        class="p-button-text p-button-sm"
                         @click="toggleDarkMode"
-                        v-tooltip.top="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-                        size="small"
+                        v-tooltip.top="
+                            isDarkMode
+                                ? 'Switch to light mode'
+                                : 'Switch to dark mode'
+                        "
+                        text
                     />
                 </div>
-            </div>
-        </div>
+            </template>
+        </Card>
+
+        <Toast position="top-center" />
     </div>
-    <Toast position="top-center" />
 </template>
 
 <style scoped>
-label {
-    white-space: nowrap;
-}
-
-.theme-toggle-btn.sun-icon :deep(.pi-sun) {
-    color: #ffd700;
-}
+/* Minimal custom styles - using PrimeVue and Tailwind */
 </style>
