@@ -45,9 +45,10 @@
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button
                         label="Get Started"
-                        @click="$router.push('/login')"
+                        @click="handleGetStarted"
                         icon="pi pi-arrow-right"
                         size="large"
+                        :loading="isCheckingUser"
                     />
                     <Button
                         label="View Datasets"
@@ -159,6 +160,10 @@
 </template>
 
 <script setup>
+const router = useRouter();
+const userStore = useUserStore();
+const isCheckingUser = ref(false);
+
 useHead({
     title: "GWAS-CE - Genomic Analysis Platform",
     meta: [
@@ -169,4 +174,37 @@ useHead({
         },
     ],
 });
+
+const handleGetStarted = async () => {
+    isCheckingUser.value = true;
+
+    try {
+        // Check if user is logged in
+        const isLoggedIn = await userStore.isUserLoggedIn();
+
+        if (!isLoggedIn) {
+            // Not logged in - redirect to login page
+            router.push("/login");
+            return;
+        }
+
+        // User is logged in - check if they have data
+        const datasets = await userStore.retrieveDatasets();
+        const bedFiles = await userStore.getBedFiles();
+
+        if (datasets.length === 0 && bedFiles.length === 0) {
+            // No data uploaded - redirect to welcome page
+            router.push("/welcome");
+        } else {
+            // Has data - redirect to datasets page
+            router.push("/datasets");
+        }
+    } catch (error) {
+        console.error("Error checking user status:", error);
+        // On error, default to login page
+        router.push("/login");
+    } finally {
+        isCheckingUser.value = false;
+    }
+};
 </script>
