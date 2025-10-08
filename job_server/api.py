@@ -280,6 +280,12 @@ async def finalize_bed_upload(dataset_name: str, filename: str, user: User = Dep
 async def get_bed_files(user: User = Depends(get_current_user)):
     try:
         bed_files = database_utils.get_bed_files_for_user(get_db(), user.username)
+        workflow_jobs_for_user = database_utils.get_workflow_jobs_for_user(get_db(), user.username)
+
+        # Add workflow status to each BED file, similar to /datasets endpoint
+        for bed_file in bed_files:
+            bed_file['workflows'] = workflow_jobs_for_user.get(bed_file['id'], {})
+
         return bed_files
     except Exception as e:
         raise fastapi.HTTPException(status_code=500, detail=f"Failed to retrieve BED files: {str(e)}")
@@ -378,8 +384,8 @@ async def job_status(job_id: str):
 
     return EventSourceResponse(event_generator())
 
-async def start_job(user: User, dataset: str, method: str, background_tasks: BackgroundTasks):
-    database_utils.log_job_start(get_db(), user.username, dataset, f"RUNNING {method}")
+async def start_job(user: User, dataset: str, method: str, background_tasks: BackgroundTasks, prefix: str = ""):
+    database_utils.log_job_start(get_db(), user.username, dataset, f"RUNNING {method}", prefix=prefix)
     background_tasks.add_task(batch.submit_and_await_job, {
         'jobName': 'dig-sldsc-methods',
         'jobQueue': 'sldsc-methods-job-queue',
@@ -388,15 +394,17 @@ async def start_job(user: User, dataset: str, method: str, background_tasks: Bac
             'username': user.username,
             'dataset': dataset,
             'method': method
-        }}, user.username, dataset, method, job_queues)
+        }}, user.username, dataset, method, job_queues, prefix)
 
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
                          user: User = Depends(get_current_user)):
-    job_id = database_utils.get_dataset_hash(request.dataset, user.username)
+    # Determine if this is a BED file analysis (annot-sldsc uses BED files)
+    prefix = "bed:" if request.method == AnalysisMethod.annot_sldsc else ""
+    job_id = database_utils.get_dataset_hash(request.dataset, user.username, prefix=prefix)
     if job_id not in job_queues:
         job_queues[job_id] = Queue()
-    await start_job(user, request.dataset, request.method.value, background_tasks)
+    await start_job(user, request.dataset, request.method.value, background_tasks, prefix=prefix)
     return {"job_id": job_id}
 
 
