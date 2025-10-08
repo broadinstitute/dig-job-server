@@ -184,7 +184,7 @@ const handleGetStarted = async () => {
 
         if (!isLoggedIn) {
             // Not logged in - redirect to login page
-            router.push("/login");
+            router.push("/signup");
             return;
         }
 
