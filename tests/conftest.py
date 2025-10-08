@@ -14,6 +14,9 @@ if environ.get('TEST_DIG_JOB_SERVER_DB'):
 else:
     environ['DIG_JOB_SERVER_DB'] = 'mysql+pymysql://job_server:job_server@localhost:3305/job_server'
 
+# Enable test mode for JWT authentication
+environ['TEST_MODE'] = 'true'
+
 client = TestClient(create_app())
 
 
@@ -24,6 +27,12 @@ def before_each_test():
     with get_db() as con:
         con.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
         con.execute(text("TRUNCATE TABLE users"))
+        # Clean bed_files table if it exists
+        try:
+            con.execute(text("TRUNCATE TABLE bed_files"))
+        except Exception:
+            # Table might not exist in older test environments
+            pass
         # password is change.me
         con.execute(text("INSERT INTO users (id, user_name, password, created_at) "
                          "values (1, 'testuser', "
