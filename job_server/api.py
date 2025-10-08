@@ -579,8 +579,8 @@ async def get_results(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/magma-genes-results/{dataset}")
-async def get_magma_genes_results(
+@router.get("/magma-results/{dataset}")
+async def get_magma_results(
         dataset: str,
         request: Request,
         first: int = Query(0, description="First record index"),
