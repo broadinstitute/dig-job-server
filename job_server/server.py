@@ -5,6 +5,8 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 
+# Load environment variables by default
+load_dotenv()
 
 from job_server.api import router
 from job_server.api import get_current_user
@@ -40,7 +42,8 @@ def cli_serve(port):
         "http://localhost:3000",
         "https://local.kpndataregistry.org:8000",
         "https://ldserver.kpndataregistry.org",
-        "https://gwas-ce.kpndataregistry.org"
+        "https://gwas-ce.kpndataregistry.org",
+        "https://gwasce.org"
     ]
     app.add_middleware(
         CORSMiddleware,
