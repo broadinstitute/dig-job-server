@@ -43,7 +43,7 @@ def cli_serve(port):
         "https://local.kpndataregistry.org:8000",
         "https://ldserver.kpndataregistry.org",
         "https://gwas-ce.kpndataregistry.org",
-        "https://gwasce,org"
+        "https://gwasce.org"
     ]
     app.add_middleware(
         CORSMiddleware,
