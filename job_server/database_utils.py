@@ -32,7 +32,7 @@ def insert_dataset(db, username: str, dataset: DatasetInfo) -> bool:
         return False
 
 # Simplified job tracking functions (no workflow column needed)
-def log_job_start(db, username, dataset, status):
+def log_job_start(db, username, dataset, status, prefix=""):
     # Parse status like "RUNNING sldsc" to extract method
     if status.startswith("RUNNING "):
         method = status.replace("RUNNING ", "")
@@ -41,13 +41,13 @@ def log_job_start(db, username, dataset, status):
                          "VALUES (:id, :username, :method, 'RUNNING', NOW(), NOW()) "
                          "ON DUPLICATE KEY UPDATE status='RUNNING', updated_at=NOW(), job_log=NULL")
             connection.execute(query, {
-                "id": get_dataset_hash(dataset, username),
+                "id": get_dataset_hash(dataset, username, prefix=prefix),
                 "username": username,
                 "method": method
             })
             connection.commit()
 
-def log_job_end(db, username, dataset, status, job_log):
+def log_job_end(db, username, dataset, status, job_log, prefix=""):
     # Parse status like "sldsc SUCCEEDED" to extract method and result
     parts = status.split()
     if len(parts) >= 2:
@@ -57,7 +57,7 @@ def log_job_end(db, username, dataset, status, job_log):
             query = text("UPDATE workflow_jobs SET status=:status, job_log=:job_log, updated_at=NOW() "
                          "WHERE id=:id AND method=:method")
             connection.execute(query, {
-                "id": get_dataset_hash(dataset, username),
+                "id": get_dataset_hash(dataset, username, prefix=prefix),
                 "method": method,
                 "status": result,
                 "job_log": LogCompressor.compress(job_log)
@@ -104,8 +104,9 @@ def get_workflow_jobs_for_user(db, username):
             }
         return jobs_by_dataset
 
-def get_dataset_hash(dataset: str, username: str) -> str:
-    return hashlib.sha256(f"{dataset}-{username}".encode('utf-8')).hexdigest()
+def get_dataset_hash(dataset: str, username: str, prefix: str = "") -> str:
+    identifier = f"{prefix}{dataset}-{username}" if prefix else f"{dataset}-{username}"
+    return hashlib.sha256(identifier.encode('utf-8')).hexdigest()
 
 def delete_dataset(db, username, dataset):
     with db as connection:
@@ -191,11 +192,14 @@ def insert_bed_file(db, username: str, dataset_name: str, filename: str, s3_path
     """Insert a BED file record into the bed_files table"""
     try:
         with db as connection:
+            # Generate hash with bed: prefix to avoid collisions with GWAS datasets
+            bed_id = get_dataset_hash(dataset_name, username, prefix="bed:")
             query = text(
-                "INSERT INTO bed_files (user, dataset_name, filename, s3_path, uploaded_at) "
-                "VALUES (:user, :dataset_name, :filename, :s3_path, NOW())"
+                "INSERT INTO bed_files (id, user, dataset_name, filename, s3_path, uploaded_at) "
+                "VALUES (:id, :user, :dataset_name, :filename, :s3_path, NOW())"
             )
             connection.execute(query, {
+                "id": bed_id,
                 "user": username,
                 "dataset_name": dataset_name,
                 "filename": filename,
@@ -226,9 +230,17 @@ def get_bed_files_for_user(db, username: str) -> list:
 
 
 def delete_bed_file(db, username: str, dataset_name: str) -> bool:
-    """Delete a BED file record"""
+    """Delete a BED file record and associated workflow jobs"""
     try:
         with db as connection:
+            # Generate the same hash used when creating the BED file
+            bed_id = get_dataset_hash(dataset_name, username, prefix="bed:")
+
+            # Delete workflow jobs associated with this BED file
+            workflow_query = text("DELETE FROM workflow_jobs WHERE id = :id")
+            connection.execute(workflow_query, {"id": bed_id})
+
+            # Delete the BED file record
             query = text(
                 "DELETE FROM bed_files WHERE user = :user AND dataset_name = :dataset_name"
             )
