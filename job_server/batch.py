@@ -8,7 +8,7 @@ from job_server.database import get_db
 
 S3_REGION = 'us-east-1'
 
-async def submit_and_await_job(job_config, user, dataset, method, job_queues):
+async def submit_and_await_job(job_config, user, dataset, method, job_queues, prefix=""):
     batch_client = boto3.client('batch', region_name=S3_REGION)
 
     response = batch_client.submit_job(**job_config)
@@ -26,10 +26,10 @@ async def submit_and_await_job(job_config, user, dataset, method, job_queues):
             )
             log_messages = [event['message'] for event in log_events['events']]
             complete_log = '\n'.join(log_messages)
-            
+
             status = f"{method} {job_status}"
-            database_utils.log_job_end(get_db(), user, dataset, status, complete_log)
-            job_id = database_utils.get_dataset_hash(dataset, user)
+            database_utils.log_job_end(get_db(), user, dataset, status, complete_log, prefix=prefix)
+            job_id = database_utils.get_dataset_hash(dataset, user, prefix=prefix)
             if job_id in job_queues:
                 await job_queues[job_id].put({
                     "status": status,
