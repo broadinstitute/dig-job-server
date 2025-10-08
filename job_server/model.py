@@ -22,11 +22,9 @@ class DatasetInfo(BaseModel):
     col_map: dict
 
 class AnalysisMethod(str, Enum):
-    sumstats = "sumstats"
     sldsc = "sldsc"
     magma = "magma"
     annot_sldsc = "annot-sldsc"
-
 
 class AnalysisRequest(BaseModel):
     dataset: str
