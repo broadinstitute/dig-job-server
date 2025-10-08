@@ -399,7 +399,6 @@ async def start_job(user: User, dataset: str, method: str, background_tasks: Bac
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
                          user: User = Depends(get_current_user)):
-    # Determine if this is a BED file analysis (annot-sldsc uses BED files)
     prefix = "bed:" if request.method == AnalysisMethod.annot_sldsc else ""
     job_id = database_utils.get_dataset_hash(request.dataset, user.username, prefix=prefix)
     if job_id not in job_queues:
