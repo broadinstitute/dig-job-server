@@ -7,9 +7,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return;
     }
 
-    if (to.path.startsWith("/login") || to.path.startsWith("/signup")) {
+    // Public routes that don't require authentication
+    const publicRoutes = ["/", "/login", "/signup"];
+    if (publicRoutes.includes(to.path)) {
         return;
     }
+
     const userStore = useUserStore();
     const isLoggedIn = await userStore.isUserLoggedIn();
 
