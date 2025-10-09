@@ -676,21 +676,35 @@ async def get_magma_pathways_results(
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
-    s3_path = get_s3_results_path(dataset, user, 'magma', 'genes')
+    # Correct S3 path with all 5 parameters
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'magma', 'pathways')
 
     try:
+        # Get workflow status to extract job ID
+        workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+        # Try to get job ID from MAGMA workflow
+        job_id = None
+        if 'magma' in workflow_status and 'magma' in workflow_status['magma']:
+            job_id = workflow_status['magma']['magma'].get('job_id')
+
+        # Fallback to dataset name if no specific job ID found
+        if not job_id:
+            job_id = dataset
+
         df = get_cached_results(s3_path, 'associations.pathways.json.gz', 'magma', True)
         df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
-        pathways = df[('pathwayName')].unique().tolist()
+        pathways = df['pathwayName'].unique().tolist()
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
-            "pathways": pathways
+            "pathways": pathways,
+            "jobId": job_id
         })
 
     except Exception as e:
