@@ -543,8 +543,178 @@
                                 class="text-center p-4"
                             >
                                 <p class="text-gray-500">
-                                    No MAGMA results available for this dataset.
+                                    No MAGMA gene results available for this
+                                    dataset.
                                 </p>
+                            </div>
+
+                            <!-- MAGMA Pathways Results Section -->
+                            <div
+                                v-if="
+                                    hasMagmaPathwaysResults ||
+                                    magmaPathwaysLoading
+                                "
+                                class="mt-8"
+                            >
+                                <h3 class="text-xl font-semibold mb-4">
+                                    Pathway Enrichment Analysis
+                                </h3>
+
+                                <!-- Show loading skeleton while data is loading -->
+                                <div v-if="magmaPathwaysLoading" class="p-4">
+                                    <div class="mb-2" v-for="i in 5" :key="i">
+                                        <Skeleton height="3rem" />
+                                    </div>
+                                </div>
+
+                                <!-- MAGMA Pathways Results Table -->
+                                <DataTable
+                                    v-else-if="magmaPathwaysResults.length > 0"
+                                    :first="magmaPathwaysFirst"
+                                    :rows="magmaPathwaysRows"
+                                    :sortField="magmaPathwaysSortField"
+                                    :sortOrder="magmaPathwaysSortOrder"
+                                    :value="magmaPathwaysResults"
+                                    ref="magmaPathwaysDt"
+                                    :lazy="true"
+                                    :totalRecords="magmaPathwaysTotalRecords"
+                                    :loading="magmaPathwaysLoading"
+                                    paginator
+                                    :rows-per-page-options="[10, 20, 50]"
+                                    @page="onMagmaPathwaysPage"
+                                    @sort="onMagmaPathwaysSort"
+                                    :filters="magmaPathwaysFilters"
+                                    @filter="onMagmaPathwaysFilter"
+                                    stripedRows
+                                    class="p-datatable-sm"
+                                    filterDisplay="row"
+                                    :showFilterOperator="false"
+                                    :showFilterMatchModes="false"
+                                    :showFilterMenu="false"
+                                    :showClearButton="false"
+                                >
+                                    <Column
+                                        field="pathwayId"
+                                        header="Pathway ID"
+                                        sortable
+                                    ></Column>
+                                    <Column
+                                        field="pathwayName"
+                                        header="Pathway Name"
+                                        sortable
+                                        filterMatchMode="contains"
+                                        :showFilterMenu="false"
+                                    >
+                                        <template #filter>
+                                            <InputText
+                                                v-model="
+                                                    magmaPathwaysFilters[
+                                                        'pathwayName'
+                                                    ].value
+                                                "
+                                                placeholder="Search pathway"
+                                                class="p-column-filter w-full"
+                                                @keydown.enter="
+                                                    onMagmaPathwaysFilter
+                                                "
+                                            />
+                                        </template>
+                                    </Column>
+                                    <Column
+                                        field="ngenes"
+                                        header="# Genes"
+                                        sortable
+                                    ></Column>
+                                    <Column field="beta" header="Beta" sortable>
+                                        <template #body="slotProps">
+                                            {{
+                                                formatNumber(
+                                                    slotProps.data.beta,
+                                                )
+                                            }}
+                                        </template>
+                                    </Column>
+                                    <Column field="se" header="SE" sortable>
+                                        <template #body="slotProps">
+                                            {{
+                                                formatNumber(slotProps.data.se)
+                                            }}
+                                        </template>
+                                    </Column>
+                                    <Column
+                                        field="pValue"
+                                        header="P-Value"
+                                        sortable
+                                        filterMatchMode="lte"
+                                        :showFilterMenu="false"
+                                    >
+                                        <template #filter>
+                                            <InputNumber
+                                                v-model="
+                                                    magmaPathwaysFilters[
+                                                        'pValue'
+                                                    ].value
+                                                "
+                                                placeholder="≤ Value"
+                                                class="p-column-filter w-full"
+                                                mode="decimal"
+                                                :minFractionDigits="3"
+                                                :maxFractionDigits="3"
+                                                @keydown.enter="
+                                                    onMagmaPathwaysFilter
+                                                "
+                                            />
+                                        </template>
+                                        <template #body="slotProps">
+                                            {{
+                                                formatPValue(
+                                                    slotProps.data.pValue,
+                                                )
+                                            }}
+                                        </template>
+                                    </Column>
+
+                                    <template #empty>
+                                        <div class="text-center p-4">
+                                            No MAGMA pathway results found.
+                                        </div>
+                                    </template>
+                                    <template #loading>
+                                        <div class="p-4">
+                                            <div
+                                                class="mb-2"
+                                                v-for="i in 5"
+                                                :key="i"
+                                            >
+                                                <Skeleton height="3rem" />
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template #footer>
+                                        <div
+                                            class="flex justify-between items-center"
+                                        >
+                                            <small
+                                                >Total records:
+                                                {{
+                                                    magmaPathwaysTotalRecords
+                                                }}</small
+                                            >
+                                        </div>
+                                    </template>
+                                </DataTable>
+                                <div
+                                    v-else-if="
+                                        !magmaPathwaysLoading &&
+                                        magmaPathwaysResults.length === 0
+                                    "
+                                    class="text-center p-4"
+                                >
+                                    <p class="text-gray-500">
+                                        No MAGMA pathway results available for
+                                        this dataset.
+                                    </p>
+                                </div>
                             </div>
                         </TabPanel>
                     </TabPanels>
@@ -597,9 +767,21 @@ const magmaSortOrder = ref(1);
 const magmaDt = ref();
 const hasMagmaResults = ref(false);
 
+// MAGMA Pathways specific data
+const magmaPathwaysResults = ref([]);
+const magmaPathwaysTotalRecords = ref(0);
+const magmaPathwaysLoading = ref(false);
+const magmaPathwaysFirst = ref(0);
+const magmaPathwaysRows = ref(10);
+const magmaPathwaysSortField = ref("pValue");
+const magmaPathwaysSortOrder = ref(1);
+const magmaPathwaysDt = ref();
+const hasMagmaPathwaysResults = ref(false);
+
 // Job IDs for linking to logs
 const sldscJobId = ref(null);
 const magmaJobId = ref(null);
+const magmaPathwaysJobId = ref(null);
 
 // Shared data from store
 const {
@@ -921,6 +1103,11 @@ const magmaFilters = ref({
     pValue: { value: null, matchMode: "lte" },
 });
 
+const magmaPathwaysFilters = ref({
+    pathwayName: { value: null, matchMode: "contains" },
+    pValue: { value: null, matchMode: "lte" },
+});
+
 const transformFilters = (filters) => {
     const transformedFilters = {};
     Object.entries(filters).forEach(([key, filter]) => {
@@ -1001,6 +1188,15 @@ const onTabChange = (event) => {
         hasMagmaResults.value
     ) {
         loadMagmaResults();
+    }
+
+    // Also load pathways if on magma tab
+    if (
+        newValue === "magma" &&
+        magmaPathwaysResults.value.length === 0 &&
+        hasMagmaPathwaysResults.value
+    ) {
+        loadMagmaPathwaysResults();
     }
 };
 
@@ -1112,6 +1308,60 @@ const onMagmaFilter = () => {
     loadMagmaResults();
 };
 
+// MAGMA Pathways Results functions
+const loadMagmaPathwaysResults = async () => {
+    try {
+        magmaPathwaysLoading.value = true;
+        resultsStore.init();
+
+        const queryParams = new URLSearchParams({
+            first: magmaPathwaysFirst.value,
+            rows: magmaPathwaysRows.value,
+            sort_field: magmaPathwaysSortField.value,
+            sort_order: magmaPathwaysSortOrder.value,
+        });
+
+        // Add any filter parameters
+        const transformedFilters = transformFilters(magmaPathwaysFilters.value);
+        Object.entries(transformedFilters).forEach(([key, value]) => {
+            queryParams.append(key, value);
+        });
+
+        const endpoint = `/api/magma-pathways-results/${dataset.value}?${queryParams.toString()}`;
+        const { data } = await resultsStore.axios.get(endpoint);
+
+        if (data.items) {
+            magmaPathwaysResults.value = data.items;
+            hasMagmaPathwaysResults.value = data.items.length > 0;
+        }
+        if (data.totalRecords)
+            magmaPathwaysTotalRecords.value = data.totalRecords;
+        if (data.jobId) magmaPathwaysJobId.value = data.jobId;
+    } catch (err) {
+        console.error("Failed to load MAGMA pathways results:", err);
+        hasMagmaPathwaysResults.value = false;
+    } finally {
+        magmaPathwaysLoading.value = false;
+    }
+};
+
+const onMagmaPathwaysPage = (event) => {
+    magmaPathwaysFirst.value = event.first;
+    magmaPathwaysRows.value = event.rows;
+    loadMagmaPathwaysResults();
+};
+
+const onMagmaPathwaysSort = (event) => {
+    magmaPathwaysSortField.value = event.sortField;
+    magmaPathwaysSortOrder.value = event.sortOrder;
+    loadMagmaPathwaysResults();
+};
+
+const onMagmaPathwaysFilter = () => {
+    magmaPathwaysFirst.value = 0;
+    loadMagmaPathwaysResults();
+};
+
 // Check both result types availability and set initial tab
 const checkResultsAvailability = async () => {
     try {
@@ -1162,12 +1412,14 @@ const checkResultsAvailability = async () => {
 
         if (magmaSucceeded) {
             hasMagmaResults.value = true;
+            hasMagmaPathwaysResults.value = true;
             console.log(
                 "MAGMA workflow succeeded, marking results as available",
             );
         } else if (hasMagmaWorkflow) {
             // Workflow exists but hasn't succeeded - don't show results
             hasMagmaResults.value = false;
+            hasMagmaPathwaysResults.value = false;
         } else {
             // No workflow info - fallback to checking for existing data
             try {
@@ -1183,9 +1435,23 @@ const checkResultsAvailability = async () => {
                     hasMagmaResults.value,
                     magmaResponse.data,
                 );
+
+                // Also check for pathways
+                try {
+                    const magmaPathwaysResponse = await resultsStore.axios.get(
+                        `/api/magma-pathways-results/${dataset.value}?first=0&rows=1`,
+                    );
+                    hasMagmaPathwaysResults.value =
+                        magmaPathwaysResponse.data.items &&
+                        magmaPathwaysResponse.data.items.length > 0;
+                } catch (pathwaysErr) {
+                    console.log("MAGMA pathways check failed:", pathwaysErr);
+                    hasMagmaPathwaysResults.value = false;
+                }
             } catch (e) {
                 console.log("MAGMA API check failed:", e);
                 hasMagmaResults.value = false;
+                hasMagmaPathwaysResults.value = false;
             }
         }
 
@@ -1214,6 +1480,13 @@ const checkResultsAvailability = async () => {
             console.log("MAGMA results detected as available, loading data...");
             loadMagmaResults();
         }
+
+        if (magmaSucceeded && magmaPathwaysResults.value.length === 0) {
+            console.log(
+                "MAGMA pathways results detected as available, loading data...",
+            );
+            loadMagmaPathwaysResults();
+        }
     } catch (err) {
         console.error("Failed to check results availability:", err);
         // Fallback to trying to load results directly
@@ -1236,6 +1509,17 @@ const checkResultsAvailability = async () => {
         } catch (e) {
             hasMagmaResults.value = false;
         }
+
+        try {
+            const magmaPathwaysResponse = await resultsStore.axios.get(
+                `/api/magma-pathways-results/${dataset.value}?first=0&rows=1`,
+            );
+            hasMagmaPathwaysResults.value =
+                magmaPathwaysResponse.data.items &&
+                magmaPathwaysResponse.data.items.length > 0;
+        } catch (e) {
+            hasMagmaPathwaysResults.value = false;
+        }
     }
 };
 
@@ -1253,6 +1537,15 @@ watch(activeTab, (newTab) => {
         magmaResults.value.length === 0
     ) {
         loadMagmaResults();
+    }
+
+    // Also load pathways if on magma tab
+    if (
+        newTab === "magma" &&
+        hasMagmaPathwaysResults.value &&
+        magmaPathwaysResults.value.length === 0
+    ) {
+        loadMagmaPathwaysResults();
     }
 });
 
@@ -1285,6 +1578,15 @@ onMounted(async () => {
         sldscResults.value.length === 0
     ) {
         loadSldscResults();
+    }
+
+    // Also load pathways if on magma tab
+    if (
+        activeTab.value === "magma" &&
+        hasMagmaPathwaysResults.value &&
+        magmaPathwaysResults.value.length === 0
+    ) {
+        loadMagmaPathwaysResults();
     }
 });
 </script>
