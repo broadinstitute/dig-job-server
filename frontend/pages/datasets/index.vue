@@ -887,6 +887,38 @@ async function confirmAndRunBedWorkflow(data, workflow) {
         },
     });
 }
+
+// Helper function to get result button configuration for BED files
+function getBedResultButtonConfig(data) {
+    // Check if annot-sldsc has succeeded
+    const annotSldscStatus =
+        data.workflows?.["annot-sldsc"]?.["annot-sldsc"]?.status;
+
+    if (annotSldscStatus === "SUCCEEDED") {
+        return {
+            label: "View Results",
+            icon: "pi pi-eye",
+            command: () => viewBedResults(data.dataset_name),
+            dropdownItems: [
+                {
+                    label: "Open in new tab",
+                    icon: "pi pi-external-link",
+                    command: () => openBedResultsInNewTab(data.dataset_name),
+                },
+            ],
+        };
+    }
+
+    return null;
+}
+
+function viewBedResults(dataset) {
+    router.push(`/annot-results?dataset=${dataset}`);
+}
+
+function openBedResultsInNewTab(dataset) {
+    window.open(`/annot-results?dataset=${dataset}`, "_blank");
+}
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
@@ -1816,10 +1848,34 @@ async function confirmAndRunBedWorkflow(data, workflow) {
                                 </template>
                             </template>
                         </Column>
-                        <Column
-                            header="Results"
-                            :style="{ width: '15rem' }"
-                        ></Column>
+                        <Column header="Results" :style="{ width: '15rem' }">
+                            <template #body="{ data }">
+                                <div class="flex gap-2 flex-wrap">
+                                    <SplitButton
+                                        v-if="getBedResultButtonConfig(data)"
+                                        :label="
+                                            getBedResultButtonConfig(data).label
+                                        "
+                                        class="whitespace-nowrap flex-1 min-w-0"
+                                        :icon="
+                                            getBedResultButtonConfig(data).icon
+                                        "
+                                        size="small"
+                                        outlined
+                                        @click="
+                                            getBedResultButtonConfig(
+                                                data,
+                                            ).command()
+                                        "
+                                        severity="primary"
+                                        :model="
+                                            getBedResultButtonConfig(data)
+                                                .dropdownItems
+                                        "
+                                    />
+                                </div>
+                            </template>
+                        </Column>
                         <Column
                             header="Actions"
                             :style="{ width: '10rem' }"

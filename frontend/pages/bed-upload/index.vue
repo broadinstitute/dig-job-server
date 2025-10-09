@@ -2,10 +2,20 @@
     <div class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col">
         <!-- Fix the container width and ensure proper display -->
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-            <h1 class="text-3xl font-bold text-center my-8 text-surface-900 dark:text-surface-50">
+            <Button
+                label="Back to Datasets"
+                icon="pi pi-arrow-left"
+                @click="$router.push('/datasets')"
+                class="mt-6"
+                outlined
+                size="small"
+            />
+            <h1
+                class="text-3xl font-bold text-center my-8 text-surface-900 dark:text-surface-50"
+            >
                 Upload BED File
             </h1>
-            
+
             <!-- Single Column Layout for BED Upload -->
             <div class="max-w-2xl mx-auto">
                 <Card class="shadow-sm">
@@ -28,10 +38,11 @@
                                     class="w-full"
                                 />
                                 <small class="text-surface-500 ml-2">
-                                    Choose a descriptive name for your BED file dataset
+                                    Choose a descriptive name for your BED file
+                                    dataset
                                 </small>
                             </div>
-                            
+
                             <div class="field mt-4">
                                 <label
                                     for="bedFile"
@@ -52,66 +63,152 @@
                                     class="file-upload"
                                 />
                                 <small class="text-surface-500 ml-2 block mt-2">
-                                    Supported formats: .bed or .tsv files (tab-separated values with chromosome, start, end positions)
+                                    Supported formats: .bed or .tsv files
+                                    (tab-separated values with chromosome,
+                                    start, end positions)
                                 </small>
-                                
+
                                 <!-- Validation Status -->
-                                <div v-if="isValidating" class="mt-3 p-2 bg-blue-50 dark:bg-blue-900 rounded border">
+                                <div
+                                    v-if="isValidating"
+                                    class="mt-3 p-2 bg-blue-50 dark:bg-blue-900 rounded border"
+                                >
                                     <div class="flex items-center">
-                                        <ProgressSpinner style="width: 20px; height: 20px" strokeWidth="4" class="mr-2"/>
-                                        <span class="text-sm">Validating BED file...</span>
+                                        <ProgressSpinner
+                                            style="width: 20px; height: 20px"
+                                            strokeWidth="4"
+                                            class="mr-2"
+                                        />
+                                        <span class="text-sm"
+                                            >Validating BED file...</span
+                                        >
                                     </div>
                                 </div>
-                                
+
                                 <!-- Validation Results -->
                                 <div v-if="validationResult" class="mt-3">
                                     <!-- Success case -->
-                                    <div v-if="validationResult.valid" class="p-3 bg-green-50 dark:bg-green-900 rounded border border-green-200 dark:border-green-800">
+                                    <div
+                                        v-if="validationResult.valid"
+                                        class="p-3 bg-green-50 dark:bg-green-900 rounded border border-green-200 dark:border-green-800"
+                                    >
                                         <div class="flex items-center">
-                                            <i class="pi pi-check-circle text-green-600 mr-2"></i>
-                                            <span class="font-medium text-green-800 dark:text-green-200">Valid BED file</span>
+                                            <i
+                                                class="pi pi-check-circle text-green-600 mr-2"
+                                            ></i>
+                                            <span
+                                                class="font-medium text-green-800 dark:text-green-200"
+                                                >Valid BED file</span
+                                            >
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Error case -->
-                                    <div v-else class="p-3 bg-red-50 dark:bg-red-900 rounded border border-red-200 dark:border-red-800">
+                                    <div
+                                        v-else
+                                        class="p-3 bg-red-50 dark:bg-red-900 rounded border border-red-200 dark:border-red-800"
+                                    >
                                         <div class="flex items-center mb-2">
-                                            <i class="pi pi-exclamation-triangle text-red-600 mr-2"></i>
-                                            <span class="font-medium text-red-800 dark:text-red-200">BED File Issues Found</span>
+                                            <i
+                                                class="pi pi-exclamation-triangle text-red-600 mr-2"
+                                            ></i>
+                                            <span
+                                                class="font-medium text-red-800 dark:text-red-200"
+                                                >BED File Issues Found</span
+                                            >
                                         </div>
-                                        <div class="text-sm text-red-700 dark:text-red-300 max-h-32 overflow-y-auto">
-                                            <ul class="list-disc list-inside" v-if="validationResult.errors">
-                                                <li v-for="error in validationResult.errors.slice(0, 5)" :key="error">{{ error }}</li>
-                                                <li v-if="validationResult.errors.length > 5" class="text-xs italic">...and {{ validationResult.errors.length - 5 }} more errors</li>
+                                        <div
+                                            class="text-sm text-red-700 dark:text-red-300 max-h-32 overflow-y-auto"
+                                        >
+                                            <ul
+                                                class="list-disc list-inside"
+                                                v-if="validationResult.errors"
+                                            >
+                                                <li
+                                                    v-for="error in validationResult.errors.slice(
+                                                        0,
+                                                        5,
+                                                    )"
+                                                    :key="error"
+                                                >
+                                                    {{ error }}
+                                                </li>
+                                                <li
+                                                    v-if="
+                                                        validationResult.errors
+                                                            .length > 5
+                                                    "
+                                                    class="text-xs italic"
+                                                >
+                                                    ...and
+                                                    {{
+                                                        validationResult.errors
+                                                            .length - 5
+                                                    }}
+                                                    more errors
+                                                </li>
                                             </ul>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Warnings (if any) -->
-                                    <div v-if="validationResult.warnings && validationResult.warnings.length > 0" 
-                                         class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900 rounded border border-yellow-200 dark:border-yellow-800">
+                                    <div
+                                        v-if="
+                                            validationResult.warnings &&
+                                            validationResult.warnings.length > 0
+                                        "
+                                        class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900 rounded border border-yellow-200 dark:border-yellow-800"
+                                    >
                                         <div class="flex items-center mb-1">
-                                            <i class="pi pi-exclamation-triangle text-yellow-600 mr-2 text-xs"></i>
-                                            <span class="font-medium text-yellow-800 dark:text-yellow-200 text-sm">Warnings</span>
+                                            <i
+                                                class="pi pi-exclamation-triangle text-yellow-600 mr-2 text-xs"
+                                            ></i>
+                                            <span
+                                                class="font-medium text-yellow-800 dark:text-yellow-200 text-sm"
+                                                >Warnings</span
+                                            >
                                         </div>
-                                        <div class="text-xs text-yellow-700 dark:text-yellow-300 max-h-20 overflow-y-auto">
+                                        <div
+                                            class="text-xs text-yellow-700 dark:text-yellow-300 max-h-20 overflow-y-auto"
+                                        >
                                             <ul class="list-disc list-inside">
-                                                <li v-for="warning in validationResult.warnings.slice(0, 3)" :key="warning">{{ warning }}</li>
-                                                <li v-if="validationResult.warnings.length > 3" class="italic">...and {{ validationResult.warnings.length - 3 }} more warnings</li>
+                                                <li
+                                                    v-for="warning in validationResult.warnings.slice(
+                                                        0,
+                                                        3,
+                                                    )"
+                                                    :key="warning"
+                                                >
+                                                    {{ warning }}
+                                                </li>
+                                                <li
+                                                    v-if="
+                                                        validationResult
+                                                            .warnings.length > 3
+                                                    "
+                                                    class="italic"
+                                                >
+                                                    ...and
+                                                    {{
+                                                        validationResult
+                                                            .warnings.length - 3
+                                                    }}
+                                                    more warnings
+                                                </li>
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </Fieldset>
-                        
+
                         <div class="text-right mb-4">
                             <small>
                                 <span style="color: darkred">*</span>
                                 Required field
                             </small>
                         </div>
-                        
+
                         <div class="field">
                             <Button
                                 label="Upload BED Dataset"
@@ -178,11 +275,11 @@ function selectBedFile(event) {
     bedFile.value = selectedFile;
     bedFileName.value = selectedFile.name;
     validationResult.value = null; // Reset previous validation
-    
+
     // Validate file extension
     const fileName = selectedFile.name.toLowerCase();
-    const isValidFile = fileName.endsWith('.bed') || fileName.endsWith('.tsv');
-    
+    const isValidFile = fileName.endsWith(".bed") || fileName.endsWith(".tsv");
+
     if (!isValidFile) {
         toast.add({
             severity: "error",
@@ -192,28 +289,27 @@ function selectBedFile(event) {
         resetBedFile();
         return;
     }
-    
+
     // Auto-validate the BED file
     validateBedFile();
 }
 
 async function validateBedFile() {
     if (!bedFile.value) return;
-    
+
     isValidating.value = true;
-    
+
     try {
         const formData = new FormData();
-        formData.append('file', bedFile.value);
-        
+        formData.append("file", bedFile.value);
+
         const response = await store.validateBedFile(formData);
         validationResult.value = response;
-        
+
         // Validation results are displayed inline below the file input
         // No toast notifications needed
-        
     } catch (error) {
-        console.error('BED validation error:', error);
+        console.error("BED validation error:", error);
         toast.add({
             severity: "error",
             summary: "Validation Failed",
@@ -242,14 +338,14 @@ async function uploadBedData() {
     }
 
     uploading.value = true;
-    
+
     try {
         // Get presigned URL for BED upload
         const { presigned_url } = await store.getBedPresignedUrl(
             bedFileName.value,
             bedDatasetName.value,
         );
-        
+
         // Upload file to S3
         const strippedFile = new Blob([bedFile.value], { type: "" });
         await axios.put(presigned_url, strippedFile, {
@@ -265,22 +361,18 @@ async function uploadBedData() {
         });
 
         // Finalize BED upload with metadata
-        await store.finalizeBedUpload(
-            bedDatasetName.value,
-            bedFileName.value
-        );
-        
+        await store.finalizeBedUpload(bedDatasetName.value, bedFileName.value);
+
         toast.add({
             severity: "success",
             summary: "Upload Successful",
             detail: "BED/TSV file has been uploaded successfully to annotation storage",
         });
-        
+
         console.log("BED/TSV file uploaded successfully");
-        
+
         // Clear the form after successful upload
         clearForm();
-        
     } catch (error) {
         if (error.response?.status === 409) {
             toast.add({
@@ -290,7 +382,7 @@ async function uploadBedData() {
             });
         } else {
             toast.add({
-                severity: "error", 
+                severity: "error",
                 summary: "Upload Failed",
                 detail: "Failed to upload BED file. Please try again.",
             });
@@ -312,7 +404,7 @@ function clearForm() {
     bedFile.value = null;
     bedFileName.value = "";
     validationResult.value = null;
-    
+
     // Clear the file input component
     if (bedFileInput.value) {
         bedFileInput.value.clear();
