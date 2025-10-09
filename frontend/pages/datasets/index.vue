@@ -659,6 +659,35 @@ async function fetchBedFiles() {
     try {
         const response = await userStore.getBedFiles();
         bedFiles.value = response || [];
+
+        // Check for running jobs and reconnect to their status streams
+        bedFiles.value.forEach((bedFile) => {
+            // Check if any workflow is running
+            if (bedFile.workflows) {
+                for (const [method, workflows] of Object.entries(
+                    bedFile.workflows,
+                )) {
+                    for (const [workflowName, workflowData] of Object.entries(
+                        workflows,
+                    )) {
+                        if (workflowData.status === "RUNNING") {
+                            console.log(
+                                `Reconnecting to running ${method} job for BED file: ${bedFile.dataset_name}`,
+                            );
+                            bedFile.status = `RUNNING ${method}`;
+                            listenForJobStatus(bedFile.id, bedFile);
+                        } else if (
+                            workflowData.status === "SUCCEEDED" ||
+                            workflowData.status === "FAILED"
+                        ) {
+                            // Set the status for display
+                            bedFile.status = `${method} ${workflowData.status}`;
+                        }
+                    }
+                }
+            }
+        });
+
         totalBedFiles.value = bedFiles.value.length;
     } catch (error) {
         console.error("Error fetching BED files:", error);
@@ -728,6 +757,133 @@ async function handleDeleteBedFile(datasetName, filename) {
                     life: 5000,
                 });
             }
+        },
+    });
+}
+
+// BED File Workflow Functions
+function getBedWorkflowOptions(data) {
+    const options = [];
+
+    // Check if annot-sldsc has been run
+    const annotSldscStatus =
+        data.workflows?.["annot-sldsc"]?.["annot-sldsc"]?.status;
+
+    if (!annotSldscStatus) {
+        // Not run yet - available to run
+        options.push({
+            label: "Run Annot-SLDSC",
+            icon: "pi pi-chart-line",
+            method: "annot-sldsc",
+            status: "available",
+            severity: "secondary",
+            command: () => runBedAnalysis(data, "annot-sldsc"),
+            disabled: false,
+        });
+    } else if (annotSldscStatus === "FAILED") {
+        // Failed - show as failed option
+        options.push({
+            label: "Annot-SLDSC (Failed)",
+            icon: "pi pi-times-circle",
+            method: "annot-sldsc",
+            status: "failed",
+            severity: "danger",
+            command: () => {
+                // Navigate to log page
+                router.push(`/log/${data.id}?method=annot-sldsc`);
+            },
+            disabled: false,
+        });
+    } else if (annotSldscStatus === "SUCCEEDED") {
+        // Succeeded - show as succeeded option
+        options.push({
+            label: "Annot-SLDSC (Completed)",
+            icon: "pi pi-check-circle",
+            method: "annot-sldsc",
+            status: "succeeded",
+            severity: "success",
+            command: () => {
+                // Navigate to results or log page
+                router.push(`/log/${data.id}?method=annot-sldsc`);
+            },
+            disabled: false,
+        });
+    } else if (annotSldscStatus === "RUNNING") {
+        // Running - show as running option
+        options.push({
+            label: "Annot-SLDSC (Running)",
+            icon: "pi pi-spin pi-spinner",
+            method: "annot-sldsc",
+            status: "running",
+            severity: "warn",
+            command: () => {},
+            disabled: true,
+        });
+    }
+
+    return options;
+}
+
+async function runBedAnalysis(data, method) {
+    try {
+        const { job_id } = await userStore.startAnalysis(
+            data.dataset_name,
+            method,
+        );
+
+        // Update status and start listening for updates
+        data.status = `RUNNING ${method}`;
+        listenForJobStatus(job_id, data);
+
+        toast.add({
+            severity: "success",
+            summary: "Success",
+            detail: `${method.toUpperCase()} analysis started successfully`,
+            life: 5000,
+        });
+    } catch (error) {
+        console.error("Error starting BED analysis:", error);
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: "Failed to start analysis",
+            life: 5000,
+        });
+    }
+}
+
+async function confirmAndRunBedWorkflow(data, workflow) {
+    confirm.require({
+        group: "workflow-confirmation",
+        header: "Confirm analysis to run.",
+        icon: "pi pi-question-circle",
+        acceptClass: "p-button-primary",
+        rejectClass: "p-button-secondary",
+        data: {
+            workflow: workflow,
+            dataset: data.dataset_name,
+            description:
+                "Annotation-based SLDSC analysis will calculate cell-type-specific enrichment using your BED file annotations.",
+        },
+        accept: async () => {
+            try {
+                await workflow.command();
+            } catch (error) {
+                toast.add({
+                    severity: "error",
+                    summary: "Error",
+                    detail: "Failed to start analysis",
+                    life: 5000,
+                });
+            }
+        },
+        reject: () => {
+            toast.add({
+                severity: "info",
+                summary: "Cancelled",
+                detail: "Analysis cancelled",
+                life: 3000,
+            });
         },
     });
 }
@@ -1064,7 +1220,7 @@ async function handleDeleteBedFile(datasetName, filename) {
                                 {{ data.uploaded_by }}
                             </template>
                         </Column>
-                        <Column header="Date Uploaded">
+                        <Column header="Uploaded">
                             <template #body="{ data }">
                                 {{
                                     data.uploaded_at
@@ -1371,7 +1527,7 @@ async function handleDeleteBedFile(datasetName, filename) {
                         :value="bedFiles"
                         :paginator="true"
                         :rows="10"
-                        :rowsPerPageOptions="[5, 10, 20, 50]"
+                        :rowsPerPageOptions="[5, 10, 20]"
                         sortField="uploaded_at"
                         :sortOrder="-1"
                         dataKey="filename"
@@ -1382,41 +1538,27 @@ async function handleDeleteBedFile(datasetName, filename) {
                             'filename',
                             'uploader',
                         ]"
-                        paginatorTemplate="RowsPerPageDropdown FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink"
-                        currentPageReportTemplate="{first} to {last} of {totalRecords}"
-                        class="text-sm"
                     >
                         <Column
                             field="dataset_name"
-                            header="Dataset Name"
-                            sortable
+                            header="Dataset"
                             :style="{ minWidth: '12rem' }"
                         >
                             <template #body="{ data }">
                                 <span
-                                    class="font-mono text-sm font-semibold text-primary"
+                                    class="filename"
+                                    v-tooltip.right="{
+                                        value: `${data.filename}`,
+                                        class: 'filename-tooltip',
+                                    }"
                                     >{{ data.dataset_name }}</span
                                 >
                             </template>
                         </Column>
 
                         <Column
-                            field="filename"
-                            header="Filename"
-                            sortable
-                            :style="{ minWidth: '12rem' }"
-                        >
-                            <template #body="{ data }">
-                                <span class="font-mono text-sm">{{
-                                    data.filename
-                                }}</span>
-                            </template>
-                        </Column>
-
-                        <Column
                             field="uploader"
                             header="Uploader"
-                            sortable
                             :style="{ width: '10rem' }"
                         >
                             <template #body="{ data }">
@@ -1429,7 +1571,6 @@ async function handleDeleteBedFile(datasetName, filename) {
                         <Column
                             field="uploaded_at"
                             header="Uploaded"
-                            sortable
                             :style="{ width: '12rem' }"
                         >
                             <template #body="{ data }">
@@ -1437,8 +1578,8 @@ async function handleDeleteBedFile(datasetName, filename) {
                                     data.uploaded_at
                                         ? new Date(
                                               data.uploaded_at,
-                                          ).toLocaleString()
-                                        : "N/A"
+                                          ).toLocaleDateString()
+                                        : ""
                                 }}</span>
                             </template>
                         </Column>
@@ -1446,7 +1587,6 @@ async function handleDeleteBedFile(datasetName, filename) {
                         <Column
                             field="file_size"
                             header="Size"
-                            sortable
                             :style="{ width: '8rem' }"
                         >
                             <template #body="{ data }">
@@ -1455,26 +1595,231 @@ async function handleDeleteBedFile(datasetName, filename) {
                                 }}</span>
                             </template>
                         </Column>
+                        <Column
+                            header="Run Analysis"
+                            :style="{ width: '15rem' }"
+                        >
+                            <template #body="{ data }">
+                                <div class="flex gap-2 flex-wrap">
+                                    <Select
+                                        v-if="
+                                            getBedWorkflowOptions(data).length >
+                                            0
+                                        "
+                                        :options="getBedWorkflowOptions(data)"
+                                        optionLabel="label"
+                                        optionDisabled="disabled"
+                                        placeholder="Select Analysis"
+                                        class="flex-1 min-w-0"
+                                        @change="
+                                            (event) => {
+                                                if (
+                                                    event.value &&
+                                                    !event.value.disabled
+                                                ) {
+                                                    if (
+                                                        event.value.status ===
+                                                        'available'
+                                                    ) {
+                                                        confirmAndRunBedWorkflow(
+                                                            data,
+                                                            event.value,
+                                                        );
+                                                    } else {
+                                                        event.value.command();
+                                                    }
+                                                    // Clear the selection after action
+                                                    event.target.writeValue(
+                                                        null,
+                                                    );
+                                                }
+                                            }
+                                        "
+                                    >
+                                        <template #option="slotProps">
+                                            <div
+                                                class="flex items-center gap-1.5 px-3 py-1.5"
+                                                :class="{
+                                                    'opacity-50 cursor-not-allowed':
+                                                        slotProps.option
+                                                            .disabled,
+                                                    'text-blue-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'primary',
+                                                    'text-red-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'danger',
+                                                    'text-green-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'success',
+                                                    'text-orange-600':
+                                                        slotProps.option
+                                                            .severity ===
+                                                        'warn',
+                                                }"
+                                            >
+                                                <i
+                                                    :class="
+                                                        slotProps.option.icon
+                                                    "
+                                                    class="w-4 text-center"
+                                                    style="
+                                                        font-size: 14px;
+                                                        line-height: 1;
+                                                    "
+                                                    :style="{
+                                                        color:
+                                                            slotProps.option
+                                                                .severity ===
+                                                            'primary'
+                                                                ? '#3b82f6'
+                                                                : slotProps
+                                                                        .option
+                                                                        .severity ===
+                                                                    'danger'
+                                                                  ? '#ef4444'
+                                                                  : slotProps
+                                                                          .option
+                                                                          .severity ===
+                                                                      'success'
+                                                                    ? '#10b981'
+                                                                    : slotProps
+                                                                            .option
+                                                                            .severity ===
+                                                                        'warn'
+                                                                      ? '#f59e0b'
+                                                                      : 'inherit',
+                                                    }"
+                                                ></i>
+                                                <span
+                                                    class="font-medium flex-1"
+                                                >
+                                                    {{ slotProps.option.label }}
+                                                </span>
+                                            </div>
+                                        </template>
 
+                                        <template #value="slotProps">
+                                            <div
+                                                v-if="slotProps.value"
+                                                class="flex items-center gap-1.5"
+                                            >
+                                                <i
+                                                    :class="
+                                                        slotProps.value.icon
+                                                    "
+                                                    class="w-4 text-center"
+                                                    style="
+                                                        font-size: 14px;
+                                                        line-height: 1;
+                                                    "
+                                                    :style="{
+                                                        color:
+                                                            slotProps.value
+                                                                .severity ===
+                                                            'primary'
+                                                                ? '#3b82f6'
+                                                                : slotProps
+                                                                        .value
+                                                                        .severity ===
+                                                                    'danger'
+                                                                  ? '#ef4444'
+                                                                  : slotProps
+                                                                          .value
+                                                                          .severity ===
+                                                                      'success'
+                                                                    ? '#10b981'
+                                                                    : slotProps
+                                                                            .value
+                                                                            .severity ===
+                                                                        'warn'
+                                                                      ? '#f59e0b'
+                                                                      : 'inherit',
+                                                    }"
+                                                ></i>
+                                                <span>{{
+                                                    slotProps.value.label
+                                                }}</span>
+                                            </div>
+                                            <span v-else class="text-gray-500"
+                                                >Select Analysis</span
+                                            >
+                                        </template>
+                                    </Select>
+                                </div>
+                            </template>
+                        </Column>
                         <Column
                             field="status"
                             header="Status"
-                            sortable
-                            :style="{ width: '10rem' }"
+                            :style="{ width: '12rem' }"
                         >
                             <template #body="{ data }">
-                                <Tag
-                                    :value="data.status || 'active'"
-                                    :severity="
-                                        data.status === 'active'
-                                            ? 'success'
-                                            : 'secondary'
+                                <template
+                                    v-if="
+                                        data.status &&
+                                        (data.status.includes('RUNNING') ||
+                                            data.status.endsWith('SUCCEEDED') ||
+                                            data.status.endsWith('FAILED'))
                                     "
-                                    rounded
-                                />
+                                >
+                                    <!-- Show Tag/link for FAILED status -->
+                                    <router-link
+                                        v-if="data.status.endsWith('FAILED')"
+                                        :to="`/log/${data.id}?method=${data.status.split(' ')[0]}`"
+                                        v-tooltip.top="'View log'"
+                                    >
+                                        <Tag severity="danger" rounded>
+                                            {{ data.status }}
+                                        </Tag>
+                                    </router-link>
+
+                                    <!-- Plain text for RUNNING status -->
+                                    <span
+                                        v-else-if="
+                                            data.status.includes('RUNNING')
+                                        "
+                                        class="text-orange-600 font-medium"
+                                    >
+                                        <i
+                                            class="pi pi-spin pi-spinner mr-2"
+                                        ></i>
+                                        {{ data.status }}
+                                    </span>
+
+                                    <!-- Clickable Tag for SUCCEEDED status -->
+                                    <router-link
+                                        v-else-if="
+                                            data.status.endsWith('SUCCEEDED')
+                                        "
+                                        :to="`/log/${data.id}?method=${data.status.split(' ')[0]}`"
+                                        v-tooltip.top="'View log'"
+                                    >
+                                        <Tag severity="success" rounded>
+                                            {{ data.status }}
+                                        </Tag>
+                                    </router-link>
+                                </template>
+                                <template v-else>
+                                    <Tag
+                                        :value="data.status || 'active'"
+                                        :severity="
+                                            data.status === 'active'
+                                                ? 'info'
+                                                : 'secondary'
+                                        "
+                                        rounded
+                                    />
+                                </template>
                             </template>
                         </Column>
-
+                        <Column
+                            header="Results"
+                            :style="{ width: '15rem' }"
+                        ></Column>
                         <Column
                             header="Actions"
                             :style="{ width: '10rem' }"
@@ -1517,9 +1862,7 @@ async function handleDeleteBedFile(datasetName, filename) {
                     </DataTable>
                 </template>
                 <template #footer v-if="bedFiles.length > 0"
-                    ><small
-                        >Total annotation files: {{ totalBedFiles }}</small
-                    ></template
+                    ><small>Total records: {{ totalBedFiles }}</small></template
                 >
             </Card>
         </div>

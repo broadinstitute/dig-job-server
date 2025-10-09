@@ -487,7 +487,7 @@
                                             class="p-column-filter w-full"
                                             mode="decimal"
                                             :minFractionDigits="3"
-                                            :maxFractionDigits="3"
+                                            :maxFractionDigits="9"
                                             @keydown.enter="onMagmaFilter"
                                         />
                                     </template>
@@ -556,10 +556,6 @@
                                 "
                                 class="mt-8"
                             >
-                                <h3 class="text-xl font-semibold mb-4">
-                                    Pathway Enrichment Analysis
-                                </h3>
-
                                 <!-- Show loading skeleton while data is loading -->
                                 <div v-if="magmaPathwaysLoading" class="p-4">
                                     <div class="mb-2" v-for="i in 5" :key="i">
@@ -594,13 +590,8 @@
                                     :showClearButton="false"
                                 >
                                     <Column
-                                        field="pathwayId"
-                                        header="Pathway ID"
-                                        sortable
-                                    ></Column>
-                                    <Column
                                         field="pathwayName"
-                                        header="Pathway Name"
+                                        header="Pathway"
                                         sortable
                                         filterMatchMode="contains"
                                         :showFilterMenu="false"
@@ -621,27 +612,6 @@
                                         </template>
                                     </Column>
                                     <Column
-                                        field="ngenes"
-                                        header="# Genes"
-                                        sortable
-                                    ></Column>
-                                    <Column field="beta" header="Beta" sortable>
-                                        <template #body="slotProps">
-                                            {{
-                                                formatNumber(
-                                                    slotProps.data.beta,
-                                                )
-                                            }}
-                                        </template>
-                                    </Column>
-                                    <Column field="se" header="SE" sortable>
-                                        <template #body="slotProps">
-                                            {{
-                                                formatNumber(slotProps.data.se)
-                                            }}
-                                        </template>
-                                    </Column>
-                                    <Column
                                         field="pValue"
                                         header="P-Value"
                                         sortable
@@ -659,7 +629,7 @@
                                                 class="p-column-filter w-full"
                                                 mode="decimal"
                                                 :minFractionDigits="3"
-                                                :maxFractionDigits="3"
+                                                :maxFractionDigits="9"
                                                 @keydown.enter="
                                                     onMagmaPathwaysFilter
                                                 "
@@ -669,6 +639,29 @@
                                             {{
                                                 formatPValue(
                                                     slotProps.data.pValue,
+                                                )
+                                            }}
+                                        </template>
+                                    </Column>
+                                    <Column
+                                        field="numGenes"
+                                        header="# Genes"
+                                        sortable
+                                    ></Column>
+                                    <Column field="beta" header="Beta" sortable>
+                                        <template #body="slotProps">
+                                            {{
+                                                formatNumber(
+                                                    slotProps.data.beta,
+                                                )
+                                            }}
+                                        </template>
+                                    </Column>
+                                    <Column field="stdErr" header="SE" sortable>
+                                        <template #body="slotProps">
+                                            {{
+                                                formatNumber(
+                                                    slotProps.data.stdErr,
                                                 )
                                             }}
                                         </template>
