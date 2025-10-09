@@ -5,10 +5,8 @@
                 <div class="logo-container">
                     <a href="/datasets">
                         <img
-                            :src="
-                                isDarkMode
-                                    ? '/images/dr-logo-dark.png'
-                                    : '/images/dr-logo.png'
+                            src="
+                               /images/gwas_ce_logo_header.png
                             "
                             alt="Logo"
                             class="logo-image"
