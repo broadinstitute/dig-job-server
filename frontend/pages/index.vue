@@ -2,28 +2,6 @@
     <div
         class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800"
     >
-        <nav
-            class="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700"
-        >
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-end h-16">
-                    <div class="flex items-center gap-4">
-                        <Button
-                            label="View Datasets"
-                            @click="$router.push('/datasets')"
-                            icon="pi pi-database"
-                            outlined
-                        />
-                        <Button
-                            label="Upload Data"
-                            @click="$router.push('/upload')"
-                            icon="pi pi-upload"
-                        />
-                    </div>
-                </div>
-            </div>
-        </nav>
-
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
             <div class="text-center">
                 <h1
@@ -42,37 +20,10 @@
                     ease. Upload your data, run your analysis, and get results
                     in few easy steps.
                 </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Button
-                        label="Get Started"
-                        @click="handleGetStarted"
-                        icon="pi pi-arrow-right"
-                        size="large"
-                        :loading="isCheckingUser"
-                    />
-                    <Button
-                        label="View Datasets"
-                        @click="$router.push('/datasets')"
-                        icon="pi pi-database"
-                        outlined
-                        size="large"
-                    />
-                </div>
             </div>
         </div>
 
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div class="text-center mb-16">
-                <h2
-                    class="text-3xl font-bold text-gray-900 dark:text-white mb-4"
-                >
-                    Powerful Analysis Tools
-                </h2>
-                <p class="text-lg text-gray-600 dark:text-gray-300">
-                    Everything you need for genomic analysis in one platform
-                </p>
-            </div>
-
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <Card class="text-center h-full">
                     <template #content>
@@ -154,6 +105,27 @@
                         </div>
                     </template>
                 </Card>
+            </div>
+
+            <div class="text-center mt-16">
+                <div
+                    class="flex flex-col sm:flex-row gap-4 justify-center mb-8"
+                >
+                    <Button
+                        label="Create Account"
+                        @click="$router.push('/signup')"
+                        icon="pi pi-user-plus"
+                        size="large"
+                    />
+                </div>
+                <h2
+                    class="text-3xl font-bold text-gray-900 dark:text-white mb-4"
+                >
+                    Powerful Analysis Tools
+                </h2>
+                <p class="text-lg text-gray-600 dark:text-gray-300">
+                    Everything you need for genomic analysis in one platform
+                </p>
             </div>
         </div>
     </div>
