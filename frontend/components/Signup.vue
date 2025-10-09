@@ -149,7 +149,7 @@ onMounted(() => {
             <template #header>
                 <div class="text-center pt-8 pb-4">
                     <img
-                        src="/images/gwas-ce-logo.png"
+                        src="/images/gwas_ce_logo.png"
                         alt="GWAS Analysis Platform"
                         class="max-w-[200px] w-full h-auto mx-auto"
                     />
