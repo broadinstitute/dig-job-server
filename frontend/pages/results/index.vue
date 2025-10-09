@@ -355,17 +355,6 @@
                                             >Total records:
                                             {{ sldscTotalRecords }}</small
                                         >
-                                        <Button
-                                            label="View SLDSC Log"
-                                            icon="pi pi-file-check"
-                                            @click="
-                                                $router.push(
-                                                    `/log/${jobId}?method=sldsc`,
-                                                )
-                                            "
-                                            size="small"
-                                            outlined
-                                        />
                                     </div>
                                 </template>
                             </DataTable>
@@ -378,6 +367,19 @@
                                 <p class="text-gray-500">
                                     No SLDSC results available for this dataset.
                                 </p>
+                            </div>
+                            <div class="mt-4 flex justify-end">
+                                <Button
+                                    label="View SLDSC Log"
+                                    icon="pi pi-file-check"
+                                    @click="
+                                        $router.push(
+                                            `/log/${jobId}?method=sldsc`,
+                                        )
+                                    "
+                                    size="small"
+                                    outlined
+                                />
                             </div>
                         </TabPanel>
 
@@ -418,296 +420,341 @@
                             </div>
 
                             <!-- Show loading skeleton while data is loading -->
-                            <div v-else-if="magmaLoading" class="p-4">
+                            <div
+                                v-else-if="magmaLoading || magmaPathwaysLoading"
+                                class="p-4"
+                            >
                                 <div class="mb-2" v-for="i in 5" :key="i">
                                     <Skeleton height="3rem" />
                                 </div>
                             </div>
-                            <!-- MAGMA Results Table -->
-                            <DataTable
-                                v-else-if="magmaResults.length > 0"
-                                :first="magmaFirst"
-                                :rows="magmaRows"
-                                :sortField="magmaSortField"
-                                :sortOrder="magmaSortOrder"
-                                :value="magmaResults"
-                                ref="magmaDt"
-                                :lazy="true"
-                                :totalRecords="magmaTotalRecords"
-                                :loading="magmaLoading"
-                                paginator
-                                :rows-per-page-options="[10, 20, 50]"
-                                @page="onMagmaPage"
-                                @sort="onMagmaSort"
-                                :filters="magmaFilters"
-                                @filter="onMagmaFilter"
-                                stripedRows
-                                class="p-datatable-sm"
-                                filterDisplay="row"
-                                :showFilterOperator="false"
-                                :showFilterMatchModes="false"
-                                :showFilterMenu="false"
-                                :showClearButton="false"
-                            >
-                                <Column
-                                    field="gene"
-                                    header="Gene"
-                                    sortable
-                                    filterMatchMode="equals"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <AutoComplete
-                                            v-model="magmaFilters['gene'].value"
-                                            :suggestions="filteredGenes"
-                                            @complete="searchGenes"
-                                            placeholder="Search gene"
-                                            class="p-column-filter w-full"
-                                            @item-select="onGeneSelect"
-                                            @clear="onGeneClear"
-                                            :delay="300"
-                                            dropdown
-                                            forceSelection
-                                        />
-                                    </template>
-                                </Column>
-                                <Column
-                                    field="pValue"
-                                    header="P-Value"
-                                    sortable
-                                    filterMatchMode="lte"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <InputNumber
-                                            v-model="
-                                                magmaFilters['pValue'].value
-                                            "
-                                            placeholder="≤ Value"
-                                            class="p-column-filter w-full"
-                                            mode="decimal"
-                                            :minFractionDigits="3"
-                                            :maxFractionDigits="9"
-                                            @keydown.enter="onMagmaFilter"
-                                        />
-                                    </template>
-                                    <template #body="slotProps">
-                                        {{
-                                            formatPValue(slotProps.data.pValue)
-                                        }}
-                                    </template>
-                                </Column>
 
-                                <template #empty>
-                                    <div class="text-center p-4">
-                                        No MAGMA results found.
-                                    </div>
-                                </template>
-                                <template #loading>
-                                    <div class="p-4">
+                            <!-- MAGMA Accordion with both tables -->
+                            <Accordion
+                                v-else-if="
+                                    magmaResults.length > 0 ||
+                                    magmaPathwaysResults.length > 0
+                                "
+                                :value="['0']"
+                                multiple
+                            >
+                                <!-- MAGMA Gene Results -->
+                                <AccordionPanel value="0">
+                                    <AccordionHeader>
                                         <div
-                                            class="mb-2"
-                                            v-for="i in 5"
-                                            :key="i"
+                                            class="flex items-center justify-between w-full pr-4 py-1 px-2 bg-gray-50 dark:bg-gray-800 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                         >
-                                            <Skeleton height="3rem" />
+                                            <span class="font-semibold text-lg"
+                                                >Genes</span
+                                            >
+                                            <Tag
+                                                :value="`${magmaTotalRecords} genes`"
+                                                severity="info"
+                                            />
                                         </div>
-                                    </div>
-                                </template>
-                                <template #footer>
-                                    <div
-                                        class="flex justify-between items-center"
-                                    >
-                                        <small
-                                            >Total records:
-                                            {{ magmaTotalRecords }}</small
+                                    </AccordionHeader>
+                                    <AccordionContent>
+                                        <!-- MAGMA Gene Results Table -->
+                                        <DataTable
+                                            :first="magmaFirst"
+                                            :rows="magmaRows"
+                                            :sortField="magmaSortField"
+                                            :sortOrder="magmaSortOrder"
+                                            :value="magmaResults"
+                                            ref="magmaDt"
+                                            :lazy="true"
+                                            :totalRecords="magmaTotalRecords"
+                                            :loading="magmaLoading"
+                                            paginator
+                                            :rows-per-page-options="[
+                                                10, 20, 50,
+                                            ]"
+                                            @page="onMagmaPage"
+                                            @sort="onMagmaSort"
+                                            :filters="magmaFilters"
+                                            @filter="onMagmaFilter"
+                                            stripedRows
+                                            class="p-datatable-sm"
+                                            filterDisplay="row"
+                                            :showFilterOperator="false"
+                                            :showFilterMatchModes="false"
+                                            :showFilterMenu="false"
+                                            :showClearButton="false"
                                         >
-                                        <Button
-                                            label="View MAGMA Log"
-                                            icon="pi pi-file-check"
-                                            @click="
-                                                $router.push(
-                                                    `/log/${jobId}?method=magma`,
-                                                )
+                                            <Column
+                                                field="gene"
+                                                header="Gene"
+                                                sortable
+                                                filterMatchMode="equals"
+                                                :showFilterMenu="false"
+                                            >
+                                                <template #filter>
+                                                    <AutoComplete
+                                                        v-model="
+                                                            magmaFilters['gene']
+                                                                .value
+                                                        "
+                                                        :suggestions="
+                                                            filteredGenes
+                                                        "
+                                                        @complete="searchGenes"
+                                                        placeholder="Search gene"
+                                                        class="p-column-filter w-full"
+                                                        @item-select="
+                                                            onGeneSelect
+                                                        "
+                                                        @clear="onGeneClear"
+                                                        :delay="300"
+                                                        dropdown
+                                                        forceSelection
+                                                    />
+                                                </template>
+                                            </Column>
+                                            <Column
+                                                field="pValue"
+                                                header="P-Value"
+                                                sortable
+                                                filterMatchMode="lte"
+                                                :showFilterMenu="false"
+                                            >
+                                                <template #filter>
+                                                    <InputNumber
+                                                        v-model="
+                                                            magmaFilters[
+                                                                'pValue'
+                                                            ].value
+                                                        "
+                                                        placeholder="≤ Value"
+                                                        class="p-column-filter w-full"
+                                                        mode="decimal"
+                                                        :minFractionDigits="3"
+                                                        :maxFractionDigits="9"
+                                                        @keydown.enter="
+                                                            onMagmaFilter
+                                                        "
+                                                    />
+                                                </template>
+                                                <template #body="slotProps">
+                                                    {{
+                                                        formatPValue(
+                                                            slotProps.data
+                                                                .pValue,
+                                                        )
+                                                    }}
+                                                </template>
+                                            </Column>
+
+                                            <template #empty>
+                                                <div class="text-center p-4">
+                                                    No MAGMA results found.
+                                                </div>
+                                            </template>
+                                            <template #loading>
+                                                <div class="p-4">
+                                                    <div
+                                                        class="mb-2"
+                                                        v-for="i in 5"
+                                                        :key="i"
+                                                    >
+                                                        <Skeleton
+                                                            height="3rem"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </DataTable>
+                                    </AccordionContent>
+                                </AccordionPanel>
+
+                                <!-- MAGMA Pathways Results -->
+                                <AccordionPanel
+                                    value="1"
+                                    v-if="
+                                        hasMagmaPathwaysResults ||
+                                        magmaPathwaysLoading
+                                    "
+                                >
+                                    <AccordionHeader>
+                                        <div
+                                            class="flex items-center justify-between w-full pr-4 py-1 px-2 bg-gray-50 dark:bg-gray-800 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                        >
+                                            <span class="font-semibold text-lg"
+                                                >Pathways</span
+                                            >
+                                            <Tag
+                                                :value="`${magmaPathwaysTotalRecords} pathways`"
+                                                severity="info"
+                                            />
+                                        </div>
+                                    </AccordionHeader>
+                                    <AccordionContent>
+                                        <!-- MAGMA Pathways Results Table -->
+                                        <DataTable
+                                            :first="magmaPathwaysFirst"
+                                            :rows="magmaPathwaysRows"
+                                            :sortField="magmaPathwaysSortField"
+                                            :sortOrder="magmaPathwaysSortOrder"
+                                            :value="magmaPathwaysResults"
+                                            ref="magmaPathwaysDt"
+                                            :lazy="true"
+                                            :totalRecords="
+                                                magmaPathwaysTotalRecords
                                             "
-                                            size="small"
-                                            outlined
-                                        />
-                                    </div>
-                                </template>
-                            </DataTable>
+                                            :loading="magmaPathwaysLoading"
+                                            paginator
+                                            :rows-per-page-options="[
+                                                10, 20, 50,
+                                            ]"
+                                            @page="onMagmaPathwaysPage"
+                                            @sort="onMagmaPathwaysSort"
+                                            :filters="magmaPathwaysFilters"
+                                            @filter="onMagmaPathwaysFilter"
+                                            stripedRows
+                                            class="p-datatable-sm"
+                                            filterDisplay="row"
+                                            :showFilterOperator="false"
+                                            :showFilterMatchModes="false"
+                                            :showFilterMenu="false"
+                                            :showClearButton="false"
+                                        >
+                                            <Column
+                                                field="pathwayName"
+                                                header="Pathway"
+                                                sortable
+                                                filterMatchMode="contains"
+                                                :showFilterMenu="false"
+                                            >
+                                                <template #filter>
+                                                    <InputText
+                                                        v-model="
+                                                            magmaPathwaysFilters[
+                                                                'pathwayName'
+                                                            ].value
+                                                        "
+                                                        placeholder="Search pathway"
+                                                        class="p-column-filter w-full"
+                                                        @keydown.enter="
+                                                            onMagmaPathwaysFilter
+                                                        "
+                                                    />
+                                                </template>
+                                            </Column>
+                                            <Column
+                                                field="pValue"
+                                                header="P-Value"
+                                                sortable
+                                                filterMatchMode="lte"
+                                                :showFilterMenu="false"
+                                            >
+                                                <template #filter>
+                                                    <InputNumber
+                                                        v-model="
+                                                            magmaPathwaysFilters[
+                                                                'pValue'
+                                                            ].value
+                                                        "
+                                                        placeholder="≤ Value"
+                                                        class="p-column-filter w-full"
+                                                        mode="decimal"
+                                                        :minFractionDigits="3"
+                                                        :maxFractionDigits="9"
+                                                        @keydown.enter="
+                                                            onMagmaPathwaysFilter
+                                                        "
+                                                    />
+                                                </template>
+                                                <template #body="slotProps">
+                                                    {{
+                                                        formatPValue(
+                                                            slotProps.data
+                                                                .pValue,
+                                                        )
+                                                    }}
+                                                </template>
+                                            </Column>
+                                            <Column
+                                                field="numGenes"
+                                                header="# Genes"
+                                                sortable
+                                            ></Column>
+                                            <Column
+                                                field="beta"
+                                                header="Beta"
+                                                sortable
+                                            >
+                                                <template #body="slotProps">
+                                                    {{
+                                                        formatNumber(
+                                                            slotProps.data.beta,
+                                                        )
+                                                    }}
+                                                </template>
+                                            </Column>
+                                            <Column
+                                                field="stdErr"
+                                                header="SE"
+                                                sortable
+                                            >
+                                                <template #body="slotProps">
+                                                    {{
+                                                        formatNumber(
+                                                            slotProps.data
+                                                                .stdErr,
+                                                        )
+                                                    }}
+                                                </template>
+                                            </Column>
+
+                                            <template #empty>
+                                                <div class="text-center p-4">
+                                                    No MAGMA pathway results
+                                                    found.
+                                                </div>
+                                            </template>
+                                            <template #loading>
+                                                <div class="p-4">
+                                                    <div
+                                                        class="mb-2"
+                                                        v-for="i in 5"
+                                                        :key="i"
+                                                    >
+                                                        <Skeleton
+                                                            height="3rem"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </DataTable>
+                                    </AccordionContent>
+                                </AccordionPanel>
+                            </Accordion>
+
+                            <!-- No results message -->
                             <div
                                 v-else-if="
-                                    !magmaLoading && magmaResults.length === 0
+                                    !magmaLoading &&
+                                    !magmaPathwaysLoading &&
+                                    magmaResults.length === 0 &&
+                                    magmaPathwaysResults.length === 0
                                 "
                                 class="text-center p-4"
                             >
                                 <p class="text-gray-500">
-                                    No MAGMA gene results available for this
-                                    dataset.
+                                    No MAGMA results available for this dataset.
                                 </p>
                             </div>
-
-                            <!-- MAGMA Pathways Results Section -->
-                            <div
-                                v-if="
-                                    hasMagmaPathwaysResults ||
-                                    magmaPathwaysLoading
-                                "
-                                class="mt-8"
-                            >
-                                <!-- Show loading skeleton while data is loading -->
-                                <div v-if="magmaPathwaysLoading" class="p-4">
-                                    <div class="mb-2" v-for="i in 5" :key="i">
-                                        <Skeleton height="3rem" />
-                                    </div>
-                                </div>
-
-                                <!-- MAGMA Pathways Results Table -->
-                                <DataTable
-                                    v-else-if="magmaPathwaysResults.length > 0"
-                                    :first="magmaPathwaysFirst"
-                                    :rows="magmaPathwaysRows"
-                                    :sortField="magmaPathwaysSortField"
-                                    :sortOrder="magmaPathwaysSortOrder"
-                                    :value="magmaPathwaysResults"
-                                    ref="magmaPathwaysDt"
-                                    :lazy="true"
-                                    :totalRecords="magmaPathwaysTotalRecords"
-                                    :loading="magmaPathwaysLoading"
-                                    paginator
-                                    :rows-per-page-options="[10, 20, 50]"
-                                    @page="onMagmaPathwaysPage"
-                                    @sort="onMagmaPathwaysSort"
-                                    :filters="magmaPathwaysFilters"
-                                    @filter="onMagmaPathwaysFilter"
-                                    stripedRows
-                                    class="p-datatable-sm"
-                                    filterDisplay="row"
-                                    :showFilterOperator="false"
-                                    :showFilterMatchModes="false"
-                                    :showFilterMenu="false"
-                                    :showClearButton="false"
-                                >
-                                    <Column
-                                        field="pathwayName"
-                                        header="Pathway"
-                                        sortable
-                                        filterMatchMode="contains"
-                                        :showFilterMenu="false"
-                                    >
-                                        <template #filter>
-                                            <InputText
-                                                v-model="
-                                                    magmaPathwaysFilters[
-                                                        'pathwayName'
-                                                    ].value
-                                                "
-                                                placeholder="Search pathway"
-                                                class="p-column-filter w-full"
-                                                @keydown.enter="
-                                                    onMagmaPathwaysFilter
-                                                "
-                                            />
-                                        </template>
-                                    </Column>
-                                    <Column
-                                        field="pValue"
-                                        header="P-Value"
-                                        sortable
-                                        filterMatchMode="lte"
-                                        :showFilterMenu="false"
-                                    >
-                                        <template #filter>
-                                            <InputNumber
-                                                v-model="
-                                                    magmaPathwaysFilters[
-                                                        'pValue'
-                                                    ].value
-                                                "
-                                                placeholder="≤ Value"
-                                                class="p-column-filter w-full"
-                                                mode="decimal"
-                                                :minFractionDigits="3"
-                                                :maxFractionDigits="9"
-                                                @keydown.enter="
-                                                    onMagmaPathwaysFilter
-                                                "
-                                            />
-                                        </template>
-                                        <template #body="slotProps">
-                                            {{
-                                                formatPValue(
-                                                    slotProps.data.pValue,
-                                                )
-                                            }}
-                                        </template>
-                                    </Column>
-                                    <Column
-                                        field="numGenes"
-                                        header="# Genes"
-                                        sortable
-                                    ></Column>
-                                    <Column field="beta" header="Beta" sortable>
-                                        <template #body="slotProps">
-                                            {{
-                                                formatNumber(
-                                                    slotProps.data.beta,
-                                                )
-                                            }}
-                                        </template>
-                                    </Column>
-                                    <Column field="stdErr" header="SE" sortable>
-                                        <template #body="slotProps">
-                                            {{
-                                                formatNumber(
-                                                    slotProps.data.stdErr,
-                                                )
-                                            }}
-                                        </template>
-                                    </Column>
-
-                                    <template #empty>
-                                        <div class="text-center p-4">
-                                            No MAGMA pathway results found.
-                                        </div>
-                                    </template>
-                                    <template #loading>
-                                        <div class="p-4">
-                                            <div
-                                                class="mb-2"
-                                                v-for="i in 5"
-                                                :key="i"
-                                            >
-                                                <Skeleton height="3rem" />
-                                            </div>
-                                        </div>
-                                    </template>
-                                    <template #footer>
-                                        <div
-                                            class="flex justify-between items-center"
-                                        >
-                                            <small
-                                                >Total records:
-                                                {{
-                                                    magmaPathwaysTotalRecords
-                                                }}</small
-                                            >
-                                        </div>
-                                    </template>
-                                </DataTable>
-                                <div
-                                    v-else-if="
-                                        !magmaPathwaysLoading &&
-                                        magmaPathwaysResults.length === 0
+                            <div class="mt-4 flex justify-end">
+                                <Button
+                                    label="View MAGMA Log"
+                                    icon="pi pi-file-check"
+                                    @click="
+                                        $router.push(
+                                            `/log/${jobId}?method=magma`,
+                                        )
                                     "
-                                    class="text-center p-4"
-                                >
-                                    <p class="text-gray-500">
-                                        No MAGMA pathway results available for
-                                        this dataset.
-                                    </p>
-                                </div>
+                                    size="small"
+                                    outlined
+                                />
                             </div>
                         </TabPanel>
                     </TabPanels>
