@@ -301,14 +301,28 @@ onMounted(async () => {
                             field="phenotype"
                             header="Phenotype"
                             sortable
-                            :style="{ minWidth: '12rem' }"
+                            :style="{ minWidth: '12rem', maxWidth: '20rem' }"
                         >
                             <template #body="{ data }">
-                                {{
-                                    phenotypeStore.getPhenotypeByName(
-                                        data.phenotype,
-                                    )?.description || data.phenotype
-                                }}
+                                <a
+                                    :href="`https://a2f.hugeamp.org/phenotype.html?phenotype=${data.phenotype}`"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    v-tooltip.top="{
+                                        value:
+                                            phenotypeStore.getPhenotypeByName(
+                                                data.phenotype,
+                                            )?.description || data.phenotype,
+                                        showDelay: 500,
+                                    }"
+                                    class="overflow-hidden text-ellipsis whitespace-nowrap block text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                >
+                                    {{
+                                        phenotypeStore.getPhenotypeByName(
+                                            data.phenotype,
+                                        )?.description || data.phenotype
+                                    }}
+                                </a>
                             </template>
                         </Column>
 
@@ -321,18 +335,6 @@ onMounted(async () => {
                         >
                             <template #body="{ data }">
                                 {{ getAncestryName(data.ancestry) }}
-                            </template>
-                        </Column>
-
-                        <!-- Annotation Column -->
-                        <Column
-                            field="annotation"
-                            header="Annotation"
-                            sortable
-                            :style="{ minWidth: '10rem' }"
-                        >
-                            <template #body="{ data }">
-                                {{ data.annotation }}
                             </template>
                         </Column>
 
