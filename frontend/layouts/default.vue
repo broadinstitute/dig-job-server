@@ -135,6 +135,7 @@ function signOut() {
     console.log("Signing out...");
     localStorage.removeItem("authToken");
     localStorage.removeItem("isDefaultUser");
+    localStorage.setItem("hasSignedOut", "true");
     window.location.href = "/";
 }
 </script>
