@@ -13,7 +13,7 @@ const toast = useToast();
 // Ancestry mapping from codes to descriptive names
 const ancestryMapping = {
     AFR: "African",
-    AMR: "Native American",
+    AMR: "Ad Mixed American",
     EAS: "East Asian",
     EUR: "European",
     SAS: "South Asian",

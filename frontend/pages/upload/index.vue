@@ -423,7 +423,7 @@ const ancestryOptions = [
     { name: "African", value: "AFR" },
     { name: "East Asian", value: "EAS" },
     { name: "South Asian", value: "SAS" },
-    { name: "Native American", value: "AMR" },
+    { name: "Ad Mixed American", value: "AMR" },
 ];
 const colOptions = [
     { name: "chromosome", value: "chromosome" },
