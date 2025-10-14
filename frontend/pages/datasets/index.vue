@@ -782,30 +782,38 @@ function getBedWorkflowOptions(data) {
         });
     } else if (annotSldscStatus === "FAILED") {
         // Failed - show as failed option
+        const workflowData = data.workflows?.["annot-sldsc"]?.["annot-sldsc"];
         options.push({
             label: "Annot-SLDSC (Failed)",
             icon: "pi pi-times-circle",
             method: "annot-sldsc",
             status: "failed",
             severity: "danger",
-            command: () => {
-                // Navigate to log page
-                router.push(`/log/${data.id}?method=annot-sldsc`);
-            },
+            command: () =>
+                showBedWorkflowDialog(
+                    data,
+                    "annot-sldsc",
+                    "failed",
+                    workflowData,
+                ),
             disabled: false,
         });
     } else if (annotSldscStatus === "SUCCEEDED") {
         // Succeeded - show as succeeded option
+        const workflowData = data.workflows?.["annot-sldsc"]?.["annot-sldsc"];
         options.push({
             label: "Annot-SLDSC (Completed)",
             icon: "pi pi-check-circle",
             method: "annot-sldsc",
             status: "succeeded",
             severity: "success",
-            command: () => {
-                // Navigate to results or log page
-                router.push(`/log/${data.id}?method=annot-sldsc`);
-            },
+            command: () =>
+                showBedWorkflowDialog(
+                    data,
+                    "annot-sldsc",
+                    "succeeded",
+                    workflowData,
+                ),
             disabled: false,
         });
     } else if (annotSldscStatus === "RUNNING") {
@@ -886,6 +894,67 @@ async function confirmAndRunBedWorkflow(data, workflow) {
             });
         },
     });
+}
+
+function showBedWorkflowDialog(data, method, status, workflowData) {
+    if (status === "failed") {
+        // Show dialog for failed workflows
+        confirm.require({
+            group: "workflow-status",
+            header: `${method.toUpperCase()} Analysis Failed`,
+            icon: "pi pi-times-circle",
+            acceptClass: "p-button-primary",
+            rejectClass: "p-button-secondary",
+            acceptLabel: "Re-run Analysis",
+            rejectLabel: "View Log",
+            data: {
+                method: method,
+                dataset: data.dataset_name,
+                status: status,
+                workflowData: workflowData,
+                isFailure: true,
+            },
+            accept: () => {
+                // Re-run the analysis
+                runBedAnalysis(data, method);
+            },
+            reject: () => {
+                // Navigate to log page with method context
+                router.push(`/log/${data.id}?method=${method}`);
+            },
+        });
+    } else if (status === "succeeded") {
+        // Show dialog for successful workflows
+        const updatedAt = workflowData?.updated_at
+            ? new Date(workflowData.updated_at).toLocaleString()
+            : "Unknown";
+
+        confirm.require({
+            group: "workflow-status",
+            header: `${method.toUpperCase()} Analysis Completed`,
+            icon: "pi pi-check-circle",
+            acceptClass: "p-button-primary",
+            rejectClass: "p-button-secondary",
+            acceptLabel: "View Results",
+            rejectLabel: "View Log",
+            data: {
+                method: method,
+                dataset: data.dataset_name,
+                status: status,
+                workflowData: workflowData,
+                updatedAt: updatedAt,
+                isFailure: false,
+            },
+            accept: () => {
+                // Navigate to annotation results page
+                router.push(`/annot-results?dataset=${data.dataset_name}`);
+            },
+            reject: () => {
+                // Navigate to log page with method context
+                router.push(`/log/${data.id}?method=${method}`);
+            },
+        });
+    }
 }
 
 // Helper function to get result button configuration for BED files

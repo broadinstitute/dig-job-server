@@ -112,10 +112,19 @@
                     class="flex flex-col sm:flex-row gap-4 justify-center mb-8"
                 >
                     <Button
+                        v-if="!isLoggedIn"
                         label="Create Account"
                         @click="$router.push('/signup')"
                         icon="pi pi-user-plus"
                         size="large"
+                    />
+                    <Button
+                        v-else
+                        label="Get Started"
+                        @click="handleGetStarted"
+                        icon="pi pi-arrow-right"
+                        size="large"
+                        :disabled="isCheckingUser"
                     />
                 </div>
                 <h2
@@ -135,6 +144,7 @@
 const router = useRouter();
 const userStore = useUserStore();
 const isCheckingUser = ref(false);
+const isLoggedIn = ref(false);
 
 useHead({
     title: "GWAS-CE - Genomic Analysis Platform",
@@ -147,14 +157,19 @@ useHead({
     ],
 });
 
+onMounted(async () => {
+    // Check login status on mount
+    isLoggedIn.value = await userStore.isUserLoggedIn();
+});
+
 const handleGetStarted = async () => {
     isCheckingUser.value = true;
 
     try {
         // Check if user is logged in
-        const isLoggedIn = await userStore.isUserLoggedIn();
+        const loggedIn = await userStore.isUserLoggedIn();
 
-        if (!isLoggedIn) {
+        if (!loggedIn) {
             // Not logged in - redirect to login page
             router.push("/signup");
             return;

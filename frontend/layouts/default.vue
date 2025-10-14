@@ -23,7 +23,7 @@
                         href="/datasets"
                     />
                     <Button
-                        v-if="userStore.isDefaultUser"
+                        v-if="!isLoggedIn"
                         icon="pi pi-user"
                         label="Login"
                         class="p-button-text"
@@ -32,7 +32,7 @@
                         href="/login"
                     />
                     <Button
-                        v-if="!userStore.isDefaultUser"
+                        v-else
                         icon="pi pi-sign-out"
                         label="Sign out"
                         class="p-button-text"
@@ -122,16 +122,19 @@ import { useUserStore } from "~/stores/UserStore";
 
 const userStore = useUserStore();
 const { isDarkMode, toggleDarkMode } = useTheme();
+const isLoggedIn = ref(false);
 
-onMounted(() => {
+onMounted(async () => {
     // Initialize userStore to check isDefaultUser status
     userStore.init();
+    // Check login status
+    isLoggedIn.value = await userStore.isUserLoggedIn();
 });
 
 function signOut() {
     console.log("Signing out...");
     localStorage.removeItem("authToken");
     localStorage.removeItem("isDefaultUser");
-    window.location.href = "/login";
+    window.location.href = "/";
 }
 </script>
