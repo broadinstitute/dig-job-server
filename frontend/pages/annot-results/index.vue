@@ -142,17 +142,26 @@ onMounted(async () => {
             <Toast position="top-center" />
 
             <!-- Header -->
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-4">
-                    <Button
-                        icon="pi pi-arrow-left"
-                        label="Back to Datasets"
-                        @click="goBack"
-                        outlined
-                        size="small"
-                    />
-                    <h1 class="text-2xl font-bold">Annotation SLDSC Results</h1>
-                </div>
+            <div>
+                <h2 class="text-2xl font-bold mb-4 text-center">
+                    Annotation SLDSC Results
+                </h2>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <Button
+                    label="Back to Datasets"
+                    icon="pi pi-arrow-left"
+                    @click="goBack"
+                    class="mb-4"
+                    outlined
+                    size="small"
+                />
+                <Button
+                    icon="pi pi-download"
+                    label="Download Annotation Results"
+                    size="small"
+                />
             </div>
 
             <!-- Dataset Info Card -->
