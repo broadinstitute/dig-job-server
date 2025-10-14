@@ -25,8 +25,13 @@ export const useUserStore = defineStore("UserStore", {
 
                 const token = localStorage.getItem("authToken");
                 if (!token) {
-                    // If not logged in and we don't have any token, try default login
-                    await this.tryDefaultLogin();
+                    // Only try default login if we haven't explicitly signed out
+                    // (isDefaultUser would be cleared on sign out)
+                    const hasSignedOut =
+                        localStorage.getItem("hasSignedOut") === "true";
+                    if (!hasSignedOut) {
+                        await this.tryDefaultLogin();
+                    }
                     return this.user !== null;
                 }
 
@@ -55,13 +60,19 @@ export const useUserStore = defineStore("UserStore", {
                     this.user = null;
 
                     // For default user, try to login again automatically
-                    if (wasDefaultUser) {
+                    // But only if they haven't explicitly signed out
+                    const hasSignedOut =
+                        localStorage.getItem("hasSignedOut") === "true";
+                    if (wasDefaultUser && !hasSignedOut) {
                         await this.tryDefaultLogin();
                     }
                 }
 
                 // If not logged in and we don't have any token, try default login
-                if (!localStorage.getItem("authToken")) {
+                // But only if they haven't explicitly signed out
+                const hasSignedOut =
+                    localStorage.getItem("hasSignedOut") === "true";
+                if (!localStorage.getItem("authToken") && !hasSignedOut) {
                     await this.tryDefaultLogin();
                 }
 
@@ -71,7 +82,9 @@ export const useUserStore = defineStore("UserStore", {
         async tryDefaultLogin() {
             try {
                 const config = useRuntimeConfig();
+                // Only attempt default login if explicitly enabled via environment variable
                 if (
+                    config.public.enableDefaultLogin &&
                     config.public.defaultUsername &&
                     config.public.defaultPassword
                 ) {
@@ -162,6 +175,9 @@ export const useUserStore = defineStore("UserStore", {
                     } else {
                         localStorage.removeItem("isDefaultUser");
                     }
+
+                    // Clear the hasSignedOut flag when user logs in
+                    localStorage.removeItem("hasSignedOut");
 
                     return true;
                 }
