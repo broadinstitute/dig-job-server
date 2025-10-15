@@ -302,11 +302,15 @@ async def download_bed_file(dataset_name: str, user: User = Depends(get_current_
         if not bed_file:
             raise fastapi.HTTPException(status_code=404, detail="BED file not found")
 
-        # Generate presigned URL for download
+        # Generate presigned URL for download with content-disposition to force download
         try:
             presigned_url = s3.generate_presigned_url(
                 'get_object',
-                params={'Bucket': s3.BUCKET_NAME, 'Key': bed_file['s3_path']},
+                params={
+                    'Bucket': s3.BUCKET_NAME,
+                    'Key': bed_file['s3_path'],
+                    'ResponseContentDisposition': f"attachment; filename=\"{bed_file['filename']}\""
+                },
                 expires_in=3600
             )
         except ClientError as e:

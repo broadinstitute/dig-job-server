@@ -258,19 +258,15 @@ export const useUserStore = defineStore("UserStore", {
                 const downloadUrl = response.data.download_url;
                 const filename = response.data.filename;
 
-                // Fetch the file from the presigned URL
-                const fileResponse = await fetch(downloadUrl);
-                const blob = await fileResponse.blob();
-
-                // Create a download link
-                const url = window.URL.createObjectURL(blob);
+                // Create a download link and trigger it
+                // This avoids CORS issues by letting the browser handle the download directly
                 const link = document.createElement("a");
-                link.href = url;
+                link.href = downloadUrl;
                 link.setAttribute("download", filename);
+                link.target = "_blank"; // Open in new tab as fallback
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
-                window.URL.revokeObjectURL(url);
             } catch (error) {
                 console.error("Error downloading BED file:", error);
                 throw error;

@@ -509,6 +509,16 @@
                                                         forceSelection
                                                     />
                                                 </template>
+                                                <template #body="{ data }">
+                                                    <a
+                                                        :href="`https://a2f.hugeamp.org/gene.html?gene=${data.gene}`"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                    >
+                                                        {{ data.gene }}
+                                                    </a>
+                                                </template>
                                             </Column>
                                             <Column
                                                 field="pValue"
