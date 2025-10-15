@@ -1293,18 +1293,33 @@ function openBedResultsInNewTab(dataset) {
                                 {{ getAncestryName(data.ancestry) }}
                             </template>
                         </Column>
-                        <Column field="phenotype" header="Phenotype">
+                        <Column
+                            field="phenotype"
+                            header="Phenotype"
+                            :style="{ minWidth: '12rem', maxWidth: '20rem' }"
+                        >
                             <template #body="{ data }">
                                 <template v-if="data.phenotype">
-                                    <span
-                                        v-tooltip.top="
+                                    <a
+                                        :href="`https://a2f.hugeamp.org/phenotype.html?phenotype=${data.phenotype}`"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        v-tooltip.top="{
+                                            value:
+                                                phenotypeStore.getPhenotypeByName(
+                                                    data.phenotype,
+                                                )?.description ||
+                                                data.phenotype,
+                                            showDelay: 500,
+                                        }"
+                                        class="overflow-hidden text-ellipsis whitespace-nowrap block text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                    >
+                                        {{
                                             phenotypeStore.getPhenotypeByName(
                                                 data.phenotype,
-                                            )?.description || ''
-                                        "
-                                    >
-                                        {{ data.phenotype }}
-                                    </span>
+                                            )?.description || data.phenotype
+                                        }}
+                                    </a>
                                 </template>
                             </template>
                         </Column>
