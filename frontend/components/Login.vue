@@ -27,8 +27,11 @@ const submitForm = async () => {
         toast.add({
             severity: "error",
             summary: "Error",
-            detail: error.response?.data?.detail || error.message,
-            life: 3000,
+            detail:
+                userStore.loginError ||
+                error.response?.data?.detail ||
+                error.message,
+            life: 5000,
         });
     }
 };
