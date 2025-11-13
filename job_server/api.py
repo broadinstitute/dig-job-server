@@ -711,3 +711,89 @@ async def get_magma_pathways_results(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pigean-gene-results/{dataset}")
+async def get_pigean_gene_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: str = Query('combined', description="Field to sort by"),
+        sort_order: int = Query(-1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'pigean', 'pigean')
+
+    # Get workflow status to extract job ID
+    workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+    # Try to get job ID from MAGMA workflow
+    job_id = None
+    if 'pigean' in workflow_status and 'pigean' in workflow_status['pigean']:
+        job_id = workflow_status['pigean']['pigean'].get('job_id')
+
+    # Fallback to dataset name if no specific job ID found
+    if not job_id:
+        job_id = dataset
+
+    try:
+        df = get_cached_results(s3_path, f'gene_stats.json.gz', 'pigean', True)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        genes = df['gene'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "genes": genes,
+            "jobId": job_id
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pigean-gene-set-results/{dataset}")
+async def get_pigean_gene_set_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: str = Query('beta_uncorrected', description="Field to sort by"),
+        sort_order: int = Query(-1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'pigean', 'pigean')
+
+    # Get workflow status to extract job ID
+    workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+    # Try to get job ID from MAGMA workflow
+    job_id = None
+    if 'pigean' in workflow_status and 'pigean' in workflow_status['pigean']:
+        job_id = workflow_status['pigean']['pigean'].get('job_id')
+
+    # Fallback to dataset name if no specific job ID found
+    if not job_id:
+        job_id = dataset
+
+    try:
+        df = get_cached_results(s3_path, f'gene_set_stats.json.gz', 'pigean', True)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        gene_sets = df['gene_set'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "geneSets": gene_sets,
+            "jobId": job_id
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
