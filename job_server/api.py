@@ -471,7 +471,7 @@ def get_dataframe(data: TextIO, file_type: str) -> pd.DataFrame:
         return pd.read_csv(data, sep='\t', names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
     if file_type == 'annot-sldsc':
         return pd.read_csv(data, sep='\t', names=['phenotype', 'ancestry', 'annotation', 'enrichment', 'pValue'])
-    elif file_type == 'magma':
+    elif file_type in ['magma', 'pigean']:
         return pd.DataFrame.from_records(map(json.loads, data.readlines()))
 
 
@@ -483,7 +483,8 @@ def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: b
                 df = get_dataframe(f, file_type)
         else:
             df = get_dataframe(s3.get_results(s3_path, file)['Body'], file_type)
-        df['pValue'] = pd.to_numeric(df['pValue'])
+        if 'pValue' in df.columns:
+            df['pValue'] = pd.to_numeric(df['pValue'])
         return df
     except ClientError as e:
         raise fastapi.HTTPException(status_code=500, detail="Failed to fetch results") from e
@@ -492,7 +493,7 @@ def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: b
 def filter_results(
         df: pd.DataFrame,
         request: Request,
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
 ):
     filter_params = {}
@@ -525,11 +526,8 @@ def filter_results(
                 else:
                     df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
 
-    if sort_field:
-        ascending = sort_order == 1
-        df = df.sort_values(by=sort_field, ascending=ascending)
-    else:
-        df = df.sort_values(by='pValue')
+    ascending = sort_order == 1
+    df = df.sort_values(by=sort_field, ascending=ascending)
     return df
 
 
@@ -539,7 +537,7 @@ async def get_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -589,7 +587,7 @@ async def get_magma_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -633,7 +631,7 @@ async def get_annot_sldsc_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -676,7 +674,7 @@ async def get_magma_pathways_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
