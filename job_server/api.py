@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import io
 import json
+import numpy as np
 import os
 import re
 from asyncio import Queue
@@ -737,7 +738,7 @@ async def get_pigean_gene_results(
         job_id = dataset
 
     try:
-        df = get_cached_results(s3_path, f'gene_stats.json.gz', 'pigean', True)
+        df = get_cached_results(s3_path, 'gene_stats.json.gz', 'pigean', True)
         df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
@@ -745,9 +746,17 @@ async def get_pigean_gene_results(
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
+        gene_gene_set_records = {}
+        sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace({np.nan: None}) \
+            .groupby('gene')
+        for row in results:
+            gene_gene_set_records[row['gene']] = sub_df.get_group(row['gene']).to_dict('records')
+
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
+            "subRecords": gene_gene_set_records,
             "genes": genes,
             "jobId": job_id
         })
@@ -780,7 +789,7 @@ async def get_pigean_gene_set_results(
         job_id = dataset
 
     try:
-        df = get_cached_results(s3_path, f'gene_set_stats.json.gz', 'pigean', True)
+        df = get_cached_results(s3_path, 'gene_set_stats.json.gz', 'pigean', True)
         df = filter_results(df, request, sort_field, sort_order)
 
         total_records = len(df)
@@ -788,9 +797,17 @@ async def get_pigean_gene_set_results(
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
+        gene_gene_set_records = {}
+        sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace({np.nan: None}) \
+            .groupby('gene_set')
+        for row in results:
+            gene_gene_set_records[row['gene_set']] = sub_df.get_group(row['gene_set']).to_dict('records')
+
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
+            "subRecords": gene_gene_set_records,
             "geneSets": gene_sets,
             "jobId": job_id
         })
