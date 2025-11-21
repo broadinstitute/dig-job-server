@@ -25,6 +25,7 @@ class AnalysisMethod(str, Enum):
     sldsc = "sldsc"
     magma = "magma"
     annot_sldsc = "annot-sldsc"
+    pigean = "pigean"
 
 class AnalysisRequest(BaseModel):
     dataset: str
