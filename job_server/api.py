@@ -751,7 +751,10 @@ async def get_pigean_gene_results(
             .replace({np.nan: None}) \
             .groupby('gene')
         for row in results:
-            gene_gene_set_records[row['gene']] = sub_df.get_group(row['gene']).to_dict('records')
+            if row['gene'] in sub_df.groups:
+                gene_gene_set_records[row['gene']] = sub_df.get_group(row['gene']).to_dict('records')
+            else:
+                gene_gene_set_records[row['gene']] = []
 
         return JSONResponse({
             "items": results,
@@ -802,7 +805,10 @@ async def get_pigean_gene_set_results(
             .replace({np.nan: None}) \
             .groupby('gene_set')
         for row in results:
-            gene_gene_set_records[row['gene_set']] = sub_df.get_group(row['gene_set']).to_dict('records')
+            if row['gene_set'] in sub_df.groups:
+                gene_gene_set_records[row['gene_set']] = sub_df.get_group(row['gene_set']).to_dict('records')
+            else:
+                gene_gene_set_records[row['gene_set']] = []
 
         return JSONResponse({
             "items": results,
