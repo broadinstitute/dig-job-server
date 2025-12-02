@@ -219,6 +219,16 @@ function getAvailableWorkflows(data) {
         });
     }
 
+    // Check PIGEAN
+    if (!getJobStatus(data, "pigean")) {
+        workflows.push({
+            label: "Run PIGEAN",
+            icon: "pi pi-share-alt",
+            method: "pigean",
+            command: () => runPigean(data),
+        });
+    }
+
     return workflows;
 }
 
@@ -231,7 +241,6 @@ function getAllWorkflowOptions(data) {
     const sldscWorkflow = data.workflows?.sldsc?.sldsc;
 
     if (!sldscStatus) {
-        // Not run yet - available to run
         options.push({
             label: "Run SLDSC",
             icon: "pi pi-chart-line",
@@ -242,7 +251,6 @@ function getAllWorkflowOptions(data) {
             disabled: false,
         });
     } else if (sldscStatus === "FAILED") {
-        // Failed - show as failed option
         options.push({
             label: "SLDSC (Failed)",
             icon: "pi pi-times-circle",
@@ -254,7 +262,6 @@ function getAllWorkflowOptions(data) {
             disabled: false,
         });
     } else if (sldscStatus === "SUCCEEDED") {
-        // Succeeded - show as succeeded option
         options.push({
             label: "SLDSC (Completed)",
             icon: "pi pi-check-circle",
@@ -266,7 +273,6 @@ function getAllWorkflowOptions(data) {
             disabled: false,
         });
     } else if (sldscStatus === "RUNNING") {
-        // Running - show as running option
         options.push({
             label: "SLDSC (Running)",
             icon: "pi pi-spin pi-spinner",
@@ -330,6 +336,54 @@ function getAllWorkflowOptions(data) {
         });
     }
 
+    // Check PIGEAN
+    const pigeanStatus = getJobStatus(data, "pigean");
+    const pigeanWorkflow = data.workflows?.pigean?.pigean;
+
+    if (!pigeanStatus) {
+        options.push({
+            label: "Run PIGEAN",
+            icon: "pi pi-share-alt",
+            method: "pigean",
+            status: "available",
+            severity: "secondary",
+            command: () => runPigean(data),
+            disabled: false,
+        });
+    } else if (pigeanStatus === "FAILED") {
+        options.push({
+            label: "PIGEAN (Failed)",
+            icon: "pi pi-times-circle",
+            method: "pigean",
+            status: "failed",
+            severity: "danger",
+            command: () =>
+                showWorkflowDialog(data, "pigean", "failed", pigeanWorkflow),
+            disabled: false,
+        });
+    } else if (pigeanStatus === "SUCCEEDED") {
+        options.push({
+            label: "PIGEAN (Completed)",
+            icon: "pi pi-check-circle",
+            method: "pigean",
+            status: "succeeded",
+            severity: "success",
+            command: () =>
+                showWorkflowDialog(data, "pigean", "succeeded", pigeanWorkflow),
+            disabled: false,
+        });
+    } else if (pigeanStatus === "RUNNING") {
+        options.push({
+            label: "PIGEAN (Running)",
+            icon: "pi pi-spin pi-spinner",
+            method: "pigean",
+            status: "running",
+            severity: "warn",
+            command: () => {},
+            disabled: true,
+        });
+    }
+
     return options;
 }
 
@@ -355,13 +409,20 @@ function getRunningWorkflows(data) {
         });
     }
 
+    if (getJobStatus(data, "pigean") === "RUNNING") {
+        workflows.push({
+            label: "PIGEAN Running",
+            icon: "pi pi-spin pi-spinner",
+            method: "pigean",
+        });
+    }
+
     return workflows;
 }
 
 // Helper function to get successful workflows
 function getSuccessfulWorkflows(data) {
     const workflows = [];
-
     // Check SLDSC
     if (getJobStatus(data, "sldsc") === "SUCCEEDED") {
         workflows.push({
@@ -380,22 +441,30 @@ function getSuccessfulWorkflows(data) {
         });
     }
 
+    if (getJobStatus(data, "pigean") === "SUCCEEDED") {
+        workflows.push({
+            label: "View PIGEAN",
+            icon: "pi pi-eye",
+            method: "pigean",
+        });
+    }
+
     return workflows;
 }
 
-// Helper function to get result button configuration
 function getResultButtonConfig(data) {
-    const successfulWorkflows = getSuccessfulWorkflows(data);
+    const hasSuccessfulWorkflow = ["sldsc", "magma", "pigean"].some(
+        (method) => getJobStatus(data, method) === "SUCCEEDED",
+    );
 
-    if (successfulWorkflows.length === 0) {
+    if (!hasSuccessfulWorkflow) {
         return null;
     }
 
-    // Always show "View Results" for any successful workflows
     return {
         label: "View Results",
         icon: "pi pi-eye",
-        command: () => viewResults(data.dataset), // Results page will handle showing appropriate tabs
+        command: () => viewResults(data.dataset),
         dropdownItems: [
             {
                 label: "Open in new tab",
@@ -430,6 +499,18 @@ async function runMagma(data) {
     });
 }
 
+async function runPigean(data) {
+    const { job_id } = await userStore.startAnalysis(data.dataset, "pigean");
+    data.status = "RUNNING pigean";
+    listenForJobStatus(job_id, data);
+    toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "PIGEAN analysis started successfully",
+        life: 5000,
+    });
+}
+
 // Helper function to get simple job status for sldsc or magma
 function getJobStatus(data, method) {
     if (
@@ -445,7 +526,7 @@ function getJobStatus(data, method) {
 function getOverallWorkflowStatus(data) {
     if (!data.workflows && !data.status) return null;
 
-    const workflowMethods = ["sldsc", "magma"]; // Main analysis workflows
+    const workflowMethods = ["sldsc", "magma", "pigean"]; // Main analysis workflows
     const statuses = [];
 
     // Collect all workflow statuses from workflows structure
@@ -532,6 +613,7 @@ async function confirmAndRunWorkflow(data, workflow) {
     const workflowDescriptions = {
         sldsc: "SLDSC (Stratified LD Score Regression) analysis will calculate heritability and genetic correlations for your dataset.",
         magma: "MAGMA analysis will perform gene-based association testing and pathway analysis on your dataset.",
+        pigean: "PIGEAN analysis will run gene and gene-set enrichment to highlight pathway-level associations for your dataset.",
     };
 
     confirm.require({
@@ -627,7 +709,7 @@ function showWorkflowDialog(data, method, status, workflowData) {
             },
             accept: () => {
                 // Navigate to results page with specific tab selected
-                router.push(`/results?dataset=${data.dataset}&tab=${method}`);
+                goToWorkflowResults(data.dataset, method);
             },
             reject: () => {
                 // Navigate to log page with method context
@@ -652,6 +734,14 @@ function viewResults(dataset) {
 
 function openInNewTab(dataset) {
     window.open(`/results?dataset=${dataset}`, "_blank");
+}
+
+function goToWorkflowResults(dataset, method) {
+    if (method) {
+        router.push(`/results?dataset=${dataset}&tab=${method}`);
+    } else {
+        router.push(`/results?dataset=${dataset}`);
+    }
 }
 
 // BED Files Functions
