@@ -1158,31 +1158,17 @@
                                             sortable
                                             :showFilterMenu="false"
                                         >
-                                        </Column>
-                                        <Column
-                                            field="source"
-                                            header="Source"
-                                            sortable
-                                            :showFilterMenu="false"
-                                        >
-                                            <template #filter>
-                                                <InputText
-                                                    v-model="
-                                                        pigeanGeneSetFilters[
-                                                            'source'
-                                                        ].value
-                                                    "
-                                                    placeholder="Contains"
-                                                    class="p-column-filter w-full"
-                                                    @keydown.enter="
-                                                        onPigeanGeneSetFilter
-                                                    "
-                                                />
-                                            </template>
-                                            <template #body="slotProps">
-                                                {{
-                                                    slotProps.data.source || "—"
-                                                }}
+                                            <template #body="{ data }">
+                                                <a
+                                                    :href="`https://a2f.hugeamp.org:8000/pigean/geneset.html?geneset=${encodeURIComponent(
+                                                        data.gene_set || '',
+                                                    )}&genesetSize=small&traitGroup=all`"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                >
+                                                    {{ data.gene_set }}
+                                                </a>
                                             </template>
                                         </Column>
                                         <Column
@@ -1860,7 +1846,6 @@ const pigeanGeneFilters = ref({
 });
 
 const pigeanGeneSetFilters = ref({
-    source: { value: null, matchMode: "contains" },
     beta_uncorrected: { value: null, matchMode: "gte" },
     beta: { value: null, matchMode: "gte" },
     n: { value: null, matchMode: "gte" },
