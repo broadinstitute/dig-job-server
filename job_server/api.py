@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import io
 import json
+import numpy as np
 import os
 import re
 from asyncio import Queue
@@ -471,7 +472,7 @@ def get_dataframe(data: TextIO, file_type: str) -> pd.DataFrame:
         return pd.read_csv(data, sep='\t', names=['annotation', 'tissue', 'biosample', 'enrichment', 'pValue'])
     if file_type == 'annot-sldsc':
         return pd.read_csv(data, sep='\t', names=['phenotype', 'ancestry', 'annotation', 'enrichment', 'pValue'])
-    elif file_type == 'magma':
+    elif file_type in ['magma', 'pigean']:
         return pd.DataFrame.from_records(map(json.loads, data.readlines()))
 
 
@@ -483,7 +484,8 @@ def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: b
                 df = get_dataframe(f, file_type)
         else:
             df = get_dataframe(s3.get_results(s3_path, file)['Body'], file_type)
-        df['pValue'] = pd.to_numeric(df['pValue'])
+        if 'pValue' in df.columns:
+            df['pValue'] = pd.to_numeric(df['pValue'])
         return df
     except ClientError as e:
         raise fastapi.HTTPException(status_code=500, detail="Failed to fetch results") from e
@@ -492,7 +494,7 @@ def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: b
 def filter_results(
         df: pd.DataFrame,
         request: Request,
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
 ):
     filter_params = {}
@@ -525,11 +527,8 @@ def filter_results(
                 else:
                     df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
 
-    if sort_field:
-        ascending = sort_order == 1
-        df = df.sort_values(by=sort_field, ascending=ascending)
-    else:
-        df = df.sort_values(by='pValue')
+    ascending = sort_order == 1
+    df = df.sort_values(by=sort_field, ascending=ascending)
     return df
 
 
@@ -539,7 +538,7 @@ async def get_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -589,7 +588,7 @@ async def get_magma_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -633,7 +632,7 @@ async def get_annot_sldsc_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -676,7 +675,7 @@ async def get_magma_pathways_results(
         request: Request,
         first: int = Query(0, description="First record index"),
         rows: int = Query(10, description="Number of rows per page"),
-        sort_field: Optional[str] = Query(None, description="Field to sort by"),
+        sort_field: str = Query('pValue', description="Field to sort by"),
         sort_order: int = Query(1, description="Sort order (1 for ascending, -1 for descending)"),
         user: User = Depends(get_current_user)
 ):
@@ -708,6 +707,108 @@ async def get_magma_pathways_results(
             "items": results,
             "totalRecords": total_records,
             "pathways": pathways,
+            "jobId": job_id
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pigean-gene-results/{dataset}")
+async def get_pigean_gene_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: str = Query('combined', description="Field to sort by"),
+        sort_order: int = Query(-1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'pigean', 'pigean')
+
+    # Get workflow status to extract job ID
+    workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+    # Try to get job ID from MAGMA workflow
+    job_id = None
+    if 'pigean' in workflow_status and 'pigean' in workflow_status['pigean']:
+        job_id = workflow_status['pigean']['pigean'].get('job_id')
+
+    # Fallback to dataset name if no specific job ID found
+    if not job_id:
+        job_id = dataset
+
+    try:
+        df = get_cached_results(s3_path, 'gene_stats.json.gz', 'pigean', True)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        genes = df['gene'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        gene_gene_set_records = {}
+        sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace({np.nan: None}) \
+            .groupby('gene')
+        for row in results:
+            gene_gene_set_records[row['gene']] = sub_df.get_group(row['gene']).to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "subRecords": gene_gene_set_records,
+            "genes": genes,
+            "jobId": job_id
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pigean-gene-set-results/{dataset}")
+async def get_pigean_gene_set_results(
+        dataset: str,
+        request: Request,
+        first: int = Query(0, description="First record index"),
+        rows: int = Query(10, description="Number of rows per page"),
+        sort_field: str = Query('beta_uncorrected', description="Field to sort by"),
+        sort_order: int = Query(-1, description="Sort order (1 for ascending, -1 for descending)"),
+        user: User = Depends(get_current_user)
+):
+    s3_path = get_s3_results_path(dataset, user, 'genetic', 'pigean', 'pigean')
+
+    # Get workflow status to extract job ID
+    workflow_status = database_utils.get_workflow_status_summary(get_db(), user.username, dataset)
+
+    # Try to get job ID from MAGMA workflow
+    job_id = None
+    if 'pigean' in workflow_status and 'pigean' in workflow_status['pigean']:
+        job_id = workflow_status['pigean']['pigean'].get('job_id')
+
+    # Fallback to dataset name if no specific job ID found
+    if not job_id:
+        job_id = dataset
+
+    try:
+        df = get_cached_results(s3_path, 'gene_set_stats.json.gz', 'pigean', True)
+        df = filter_results(df, request, sort_field, sort_order)
+
+        total_records = len(df)
+        gene_sets = df['gene_set'].unique().tolist()
+        df = df.iloc[first:first + rows]
+        results = df.to_dict('records')
+
+        gene_gene_set_records = {}
+        sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace({np.nan: None}) \
+            .groupby('gene_set')
+        for row in results:
+            gene_gene_set_records[row['gene_set']] = sub_df.get_group(row['gene_set']).to_dict('records')
+
+        return JSONResponse({
+            "items": results,
+            "totalRecords": total_records,
+            "subRecords": gene_gene_set_records,
+            "geneSets": gene_sets,
             "jobId": job_id
         })
 
