@@ -32,7 +32,7 @@ pytest
 
 6. Start the server (you can set up a IDE runtime config for this too):
 ```bash
-python -m job_server.main
+TEST_MODE=true python -m job_server.server serve
 ```
 
 7. Start using the server:
