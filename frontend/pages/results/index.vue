@@ -815,37 +815,7 @@
                                                 </a>
                                             </template>
                                         </Column>
-                                        <Column
-                                            field="prior"
-                                            header="Prior"
-                                            sortable
-                                            :showFilterMenu="false"
-                                        >
-                                            <template #filter>
-                                                <InputNumber
-                                                    v-model="
-                                                        pigeanGeneFilters[
-                                                            'prior'
-                                                        ].value
-                                                    "
-                                                    placeholder="≥ Value"
-                                                    class="p-column-filter w-full"
-                                                    :minFractionDigits="3"
-                                                    :maxFractionDigits="6"
-                                                    @keydown.enter="
-                                                        onPigeanGeneFilter
-                                                    "
-                                                />
-                                            </template>
-                                            <template #body="slotProps">
-                                                {{
-                                                    formatNumber(
-                                                        slotProps.data.prior ||
-                                                            0,
-                                                    )
-                                                }}
-                                            </template>
-                                        </Column>
+
                                         <Column
                                             field="combined"
                                             header="Combined Score"
@@ -940,6 +910,37 @@
                                             </template>
                                         </Column>
                                         <Column
+                                            field="prior"
+                                            header="Prior"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneFilters[
+                                                            'prior'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="6"
+                                                    @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data.prior ||
+                                                            0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
                                             field="n"
                                             header="# Gene Sets"
                                             sortable
@@ -970,23 +971,44 @@
                                                 }}
                                             </template>
                                         </Column>
+                                        <Column header="Gene Sets">
+                                            <template #body="{ data }">
+                                                <Button
+                                                    size="small"
+                                                    outlined
+                                                    :label="
+                                                        isPigeanGeneRowExpanded(
+                                                            data,
+                                                        )
+                                                            ? 'Hide'
+                                                            : 'Show'
+                                                    "
+                                                    :disabled="
+                                                        !data?.gene_sets?.length
+                                                    "
+                                                    @click="
+                                                        togglePigeanGeneRow(
+                                                            data,
+                                                        )
+                                                    "
+                                                />
+                                            </template>
+                                        </Column>
 
                                         <template #expansion="slotProps">
                                             <div class="p-4 bg-gray-50 rounded">
                                                 <h4 class="font-semibold mb-2">
-                                                    Top Gene Sets for
+                                                    Gene Sets for
                                                     {{ slotProps.data.gene }}
                                                 </h4>
+
                                                 <DataTable
                                                     v-if="
-                                                        pigeanGeneSubRecords?.[
-                                                            slotProps.data.gene
-                                                        ]?.length
+                                                        slotProps.data
+                                                            ?.gene_sets?.length
                                                     "
                                                     :value="
-                                                        pigeanGeneSubRecords[
-                                                            slotProps.data.gene
-                                                        ]
+                                                        slotProps.data.gene_sets
                                                     "
                                                     size="small"
                                                     class="p-datatable-sm"
@@ -994,64 +1016,122 @@
                                                     <Column
                                                         field="gene_set"
                                                         header="Gene Set"
-                                                    />
+                                                    >
+                                                        <template
+                                                            #body="{ data }"
+                                                        >
+                                                            <a
+                                                                v-if="
+                                                                    data?.gene_set
+                                                                "
+                                                                :href="`https://a2f.hugeamp.org:8000/pigean/geneset.html?geneset=${encodeURIComponent(
+                                                                    data.gene_set,
+                                                                )}&genesetSize=small&traitGroup=all`"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                            >
+                                                                {{
+                                                                    data.gene_set
+                                                                }}
+                                                            </a>
+                                                            <span v-else
+                                                                >—</span
+                                                            >
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="combined"
+                                                        header="Combined Score"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .combined ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .combined,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="beta"
+                                                        header="Beta (Joint)"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .beta ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .beta,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
                                                     <Column
                                                         field="beta_uncorrected"
-                                                        header="Effect (Marginal)"
+                                                        header="Beta (Marginal)"
                                                     >
                                                         <template #body="row">
                                                             {{
-                                                                formatNumber(
-                                                                    row.data
-                                                                        .beta_uncorrected ||
-                                                                        0,
-                                                                )
+                                                                typeof row.data
+                                                                    .beta_uncorrected ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .beta_uncorrected,
+                                                                      )
+                                                                    : "—"
                                                             }}
                                                         </template>
                                                     </Column>
                                                     <Column
-                                                        field="beta_corrected"
-                                                        header="Beta (Adj)"
+                                                        field="prior"
+                                                        header="Prior"
                                                     >
                                                         <template #body="row">
                                                             {{
-                                                                formatNumber(
-                                                                    row.data
-                                                                        .beta_corrected ||
-                                                                        0,
-                                                                )
+                                                                typeof row.data
+                                                                    .prior ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .prior,
+                                                                      )
+                                                                    : "—"
                                                             }}
                                                         </template>
                                                     </Column>
                                                     <Column
-                                                        field="pValue_uncorrected"
-                                                        header="P-Value (Raw)"
+                                                        field="log_bf"
+                                                        header="log10 BF"
                                                     >
                                                         <template #body="row">
                                                             {{
-                                                                formatPValue(
-                                                                    row.data
-                                                                        .pValue_uncorrected ||
-                                                                        0,
-                                                                )
-                                                            }}
-                                                        </template>
-                                                    </Column>
-                                                    <Column
-                                                        field="pValue_corrected"
-                                                        header="P-Value (Adj)"
-                                                    >
-                                                        <template #body="row">
-                                                            {{
-                                                                formatPValue(
-                                                                    row.data
-                                                                        .pValue_corrected ||
-                                                                        0,
-                                                                )
+                                                                typeof row.data
+                                                                    .log_bf ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .log_bf,
+                                                                      )
+                                                                    : "—"
                                                             }}
                                                         </template>
                                                     </Column>
                                                 </DataTable>
+
                                                 <div
                                                     v-else
                                                     class="text-sm text-gray-500"
@@ -1407,7 +1487,6 @@ const pigeanGeneFirst = ref(0);
 const pigeanGeneRows = ref(10);
 const pigeanGeneSortField = ref("combined");
 const pigeanGeneSortOrder = ref(-1);
-const pigeanGeneSubRecords = ref({});
 const pigeanGeneExpandedRows = ref({});
 
 const pigeanGeneSetResults = ref([]);
@@ -2059,7 +2138,6 @@ const loadPigeanGeneResults = async () => {
         const { data } = await resultsStore.axios.get(endpoint);
 
         pigeanGeneResults.value = data.items || [];
-        pigeanGeneSubRecords.value = data.subRecords || {};
         hasPigeanGeneResults.value = pigeanGeneResults.value.length > 0;
         if (typeof data.totalRecords === "number") {
             pigeanGeneTotalRecords.value = data.totalRecords;
@@ -2146,6 +2224,30 @@ const onPigeanGeneSetFilter = () => {
 
 const onPigeanGeneExpandedRowsChange = (value) => {
     pigeanGeneExpandedRows.value = value;
+};
+
+const togglePigeanGeneRow = (rowData) => {
+    const current = { ...pigeanGeneExpandedRows.value };
+    const key = rowData?.gene;
+    if (!key) {
+        return;
+    }
+
+    if (current[key]) {
+        delete current[key];
+    } else {
+        current[key] = rowData;
+    }
+
+    pigeanGeneExpandedRows.value = current;
+};
+
+const isPigeanGeneRowExpanded = (rowData) => {
+    const key = rowData?.gene;
+    if (!key) {
+        return false;
+    }
+    return Boolean(pigeanGeneExpandedRows.value?.[key]);
 };
 
 const onPigeanGeneSetExpandedRowsChange = (value) => {
