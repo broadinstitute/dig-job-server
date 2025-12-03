@@ -757,14 +757,13 @@ async def get_pigean_gene_results(
             .groupby('gene')
         for row in results:
             if row['gene'] in sub_df.groups:
-                gene_gene_set_records[row['gene']] = sub_df.get_group(row['gene']).to_dict('records')
+                row['gene_sets'] = sub_df.get_group(row['gene']).to_dict('records')
             else:
-                gene_gene_set_records[row['gene']] = []
+                row['gene_sets'] = []
 
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
-            "subRecords": gene_gene_set_records,
             "genes": genes,
             "jobId": job_id
         })
@@ -805,20 +804,18 @@ async def get_pigean_gene_set_results(
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
-        gene_gene_set_records = {}
         sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
             .replace({np.nan: None}) \
             .groupby('gene_set')
         for row in results:
             if row['gene_set'] in sub_df.groups:
-                gene_gene_set_records[row['gene_set']] = sub_df.get_group(row['gene_set']).to_dict('records')
+                row['genes'] = sub_df.get_group(row['gene_set']).to_dict('records')
             else:
-                gene_gene_set_records[row['gene_set']] = []
+                row['genes'] = []
 
         return JSONResponse({
             "items": results,
             "totalRecords": total_records,
-            "subRecords": gene_gene_set_records,
             "geneSets": gene_sets,
             "jobId": job_id
         })
