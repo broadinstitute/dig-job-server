@@ -973,25 +973,35 @@
                                         </Column>
                                         <Column header="Gene Sets">
                                             <template #body="{ data }">
-                                                <Button
-                                                    size="small"
-                                                    outlined
-                                                    :label="
-                                                        isPigeanGeneRowExpanded(
-                                                            data,
-                                                        )
-                                                            ? 'Hide'
-                                                            : 'Show'
-                                                    "
-                                                    :disabled="
+                                                <span
+                                                    class="inline-flex"
+                                                    v-tooltip.left="
                                                         !data?.gene_sets?.length
+                                                            ? 'No data available'
+                                                            : null
                                                     "
-                                                    @click="
-                                                        togglePigeanGeneRow(
-                                                            data,
-                                                        )
-                                                    "
-                                                />
+                                                >
+                                                    <Button
+                                                        size="small"
+                                                        outlined
+                                                        :label="
+                                                            isPigeanGeneRowExpanded(
+                                                                data,
+                                                            )
+                                                                ? 'Hide'
+                                                                : 'Show'
+                                                        "
+                                                        :disabled="
+                                                            !data?.gene_sets
+                                                                ?.length
+                                                        "
+                                                        @click="
+                                                            togglePigeanGeneRow(
+                                                                data,
+                                                            )
+                                                        "
+                                                    />
+                                                </span>
                                             </template>
                                         </Column>
 
