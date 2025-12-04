@@ -451,10 +451,15 @@ def get_s3_results_path(dataset: str, user: User, dataset_type: str, method_grou
 
 @router.get("/download/{dataset}")
 async def download_hermes_file(dataset: str, result_type: str = Query('sldsc', description="Type of results to download"), user: User = Depends(get_current_user)):
-    if result_type.lower() == 'magma':
+    result_type_lower = result_type.lower()
+    if result_type_lower == 'magma':
         s3_path = get_s3_results_path(dataset, user, 'genetic', 'magma', 'genes')
         df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
         filename = f"{dataset}_magma_results.tsv"
+    elif result_type_lower == 'pigean':
+        s3_path = get_s3_results_path(dataset, user, 'genetic', 'pigean', 'pigean')
+        df = get_cached_results(s3_path, 'gene_stats.json.gz', 'pigean', True)
+        filename = f"{dataset}_pigean_gene_results.tsv"
     else:
         s3_path = get_s3_results_path(dataset, user, 'genetic', 'sldsc', 'sldsc')
         df = get_cached_results(s3_path, 'tissue.output.tsv', 'sldsc', False)
@@ -741,6 +746,9 @@ async def get_pigean_gene_results(
         df = get_cached_results(s3_path, 'gene_stats.json.gz', 'pigean', True)
         df = filter_results(df, request, sort_field, sort_order)
 
+        # Replace inf/-inf/nan with None for JSON serialization
+        df = df.replace([np.inf, -np.inf], np.nan).replace({np.nan: None})
+
         total_records = len(df)
         genes = df['gene'].unique().tolist()
         df = df.iloc[first:first + rows]
@@ -748,6 +756,7 @@ async def get_pigean_gene_results(
 
         gene_gene_set_records = {}
         sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace([np.inf, -np.inf], np.nan) \
             .replace({np.nan: None}) \
             .groupby('gene')
         for row in results:
@@ -794,12 +803,16 @@ async def get_pigean_gene_set_results(
         df = get_cached_results(s3_path, 'gene_set_stats.json.gz', 'pigean', True)
         df = filter_results(df, request, sort_field, sort_order)
 
+        # Replace inf/-inf/nan with None for JSON serialization
+        df = df.replace([np.inf, -np.inf], np.nan).replace({np.nan: None})
+
         total_records = len(df)
         gene_sets = df['gene_set'].unique().tolist()
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace([np.inf, -np.inf], np.nan) \
             .replace({np.nan: None}) \
             .groupby('gene_set')
         for row in results:

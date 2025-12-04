@@ -4,32 +4,7 @@
             v-if="error"
             class="error-message p-6 bg-red-100 text-red-700 rounded"
         >
-            <InputNumber
-                v-model="filters['pValue'].value"
-                placeholder="≤ Value"
-                class="p-column-filter w-full"
-                :minFractionDigits="10"
-                :maxFractionDigits="10"
-                @keydown.enter="onSldscFilter"
-            />
-            {{ error }}
-            <Button
-                label="Retry"
-                @click="checkResultsAvailability"
-                class="ml-2"
-            />
-        </div>
-
-        <div
-            v-if="
-                !hasSldscResults &&
-                !hasMagmaResults &&
-                !sldscLoading &&
-                !magmaLoading &&
-                !error
-            "
-            class="error-message p-6 bg-yellow-100 text-yellow-700 rounded"
-        >
+            class="error-message p-6 bg-yellow-100 text-yellow-700 rounded" >
             <div v-if="hasWorkflowData">
                 <h3 class="font-semibold mb-2">
                     Workflow Status for Dataset: {{ dataset }}
@@ -106,13 +81,7 @@
 
         <Card>
             <template #content>
-                <Tabs
-                    :value="activeTab"
-                    @tab-change="onTabChange"
-                    @update:value="onTabChange"
-                    @change="onTabChange"
-                    @tab-click="onTabChange"
-                >
+                <Tabs :value="activeTab" @update:value="onTabChange">
                     <TabList>
                         <Tab
                             v-if="shouldShowSldscTab"
@@ -127,6 +96,13 @@
                             :disabled="!hasMagmaResults"
                             @click="() => onTabChange({ value: 'magma' })"
                             >{{ magmaTabHeader }}</Tab
+                        >
+                        <Tab
+                            v-if="shouldShowPigeanTab"
+                            value="pigean"
+                            :disabled="!hasPigeanResults"
+                            @click="() => onTabChange({ value: 'pigean' })"
+                            >{{ pigeanTabHeader }}</Tab
                         >
                     </TabList>
                     <TabPanels>
@@ -429,315 +405,277 @@
                                 </div>
                             </div>
 
-                            <!-- MAGMA Accordion with both tables -->
-                            <Accordion
+                            <div
                                 v-else-if="
                                     magmaResults.length > 0 ||
                                     magmaPathwaysResults.length > 0
                                 "
-                                :value="['0']"
-                                multiple
                             >
-                                <!-- MAGMA Gene Results -->
-                                <AccordionPanel value="0">
-                                    <AccordionHeader>
-                                        <div
-                                            class="flex items-center justify-between w-full pr-4 py-1 px-2 bg-gray-50 dark:bg-gray-800 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                        >
-                                            <span class="font-semibold text-lg"
-                                                >Genes</span
-                                            >
-                                            <Tag
-                                                :value="`${magmaTotalRecords} genes`"
-                                                severity="info"
-                                            />
-                                        </div>
-                                    </AccordionHeader>
-                                    <AccordionContent>
-                                        <!-- MAGMA Gene Results Table -->
-                                        <DataTable
-                                            :first="magmaFirst"
-                                            :rows="magmaRows"
-                                            :sortField="magmaSortField"
-                                            :sortOrder="magmaSortOrder"
-                                            :value="magmaResults"
-                                            ref="magmaDt"
-                                            :lazy="true"
-                                            :totalRecords="magmaTotalRecords"
-                                            :loading="magmaLoading"
-                                            paginator
-                                            :rows-per-page-options="[
-                                                10, 20, 50,
-                                            ]"
-                                            @page="onMagmaPage"
-                                            @sort="onMagmaSort"
-                                            :filters="magmaFilters"
-                                            @filter="onMagmaFilter"
-                                            stripedRows
-                                            class="p-datatable-sm"
-                                            filterDisplay="row"
-                                            :showFilterOperator="false"
-                                            :showFilterMatchModes="false"
+                                <div class="mb-8" v-if="magmaResults.length">
+                                    <div
+                                        class="flex items-center justify-between mb-3"
+                                    >
+                                        <h3 class="font-semibold text-lg">
+                                            Gene Results
+                                        </h3>
+                                        <Tag
+                                            :value="`${magmaTotalRecords} genes`"
+                                            severity="info"
+                                        />
+                                    </div>
+                                    <DataTable
+                                        :first="magmaFirst"
+                                        :rows="magmaRows"
+                                        :sortField="magmaSortField"
+                                        :sortOrder="magmaSortOrder"
+                                        :value="magmaResults"
+                                        ref="magmaDt"
+                                        :lazy="true"
+                                        :totalRecords="magmaTotalRecords"
+                                        :loading="magmaLoading"
+                                        paginator
+                                        :rows-per-page-options="[10, 20, 50]"
+                                        @page="onMagmaPage"
+                                        @sort="onMagmaSort"
+                                        :filters="magmaFilters"
+                                        @filter="onMagmaFilter"
+                                        stripedRows
+                                        class="p-datatable-sm"
+                                        filterDisplay="row"
+                                        :showFilterOperator="false"
+                                        :showFilterMatchModes="false"
+                                        :showFilterMenu="false"
+                                        :showClearButton="false"
+                                    >
+                                        <Column
+                                            field="gene"
+                                            header="Gene"
+                                            sortable
+                                            filterMatchMode="equals"
                                             :showFilterMenu="false"
-                                            :showClearButton="false"
                                         >
-                                            <Column
-                                                field="gene"
-                                                header="Gene"
-                                                sortable
-                                                filterMatchMode="equals"
-                                                :showFilterMenu="false"
-                                            >
-                                                <template #filter>
-                                                    <AutoComplete
-                                                        v-model="
-                                                            magmaFilters['gene']
-                                                                .value
-                                                        "
-                                                        :suggestions="
-                                                            filteredGenes
-                                                        "
-                                                        @complete="searchGenes"
-                                                        placeholder="Search gene"
-                                                        class="p-column-filter w-full"
-                                                        @item-select="
-                                                            onGeneSelect
-                                                        "
-                                                        @clear="onGeneClear"
-                                                        :delay="300"
-                                                        dropdown
-                                                        forceSelection
-                                                    />
-                                                </template>
-                                                <template #body="{ data }">
-                                                    <a
-                                                        :href="`https://a2f.hugeamp.org/gene.html?gene=${data.gene}`"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
-                                                    >
-                                                        {{ data.gene }}
-                                                    </a>
-                                                </template>
-                                            </Column>
-                                            <Column
-                                                field="pValue"
-                                                header="P-Value"
-                                                sortable
-                                                filterMatchMode="lte"
-                                                :showFilterMenu="false"
-                                            >
-                                                <template #filter>
-                                                    <InputNumber
-                                                        v-model="
-                                                            magmaFilters[
-                                                                'pValue'
-                                                            ].value
-                                                        "
-                                                        placeholder="≤ Value"
-                                                        class="p-column-filter w-full"
-                                                        mode="decimal"
-                                                        :minFractionDigits="3"
-                                                        :maxFractionDigits="9"
-                                                        @keydown.enter="
-                                                            onMagmaFilter
-                                                        "
-                                                    />
-                                                </template>
-                                                <template #body="slotProps">
-                                                    {{
-                                                        formatPValue(
-                                                            slotProps.data
-                                                                .pValue,
-                                                        )
-                                                    }}
-                                                </template>
-                                            </Column>
-
-                                            <template #empty>
-                                                <div class="text-center p-4">
-                                                    No MAGMA results found.
-                                                </div>
+                                            <template #filter>
+                                                <AutoComplete
+                                                    v-model="
+                                                        magmaFilters['gene']
+                                                            .value
+                                                    "
+                                                    :suggestions="filteredGenes"
+                                                    @complete="searchGenes"
+                                                    placeholder="Search gene"
+                                                    class="p-column-filter w-full"
+                                                    @item-select="onGeneSelect"
+                                                    @clear="onGeneClear"
+                                                    :delay="300"
+                                                    dropdown
+                                                    forceSelection
+                                                />
                                             </template>
-                                            <template #loading>
-                                                <div class="p-4">
-                                                    <div
-                                                        class="mb-2"
-                                                        v-for="i in 5"
-                                                        :key="i"
-                                                    >
-                                                        <Skeleton
-                                                            height="3rem"
-                                                        />
-                                                    </div>
-                                                </div>
+                                            <template #body="{ data }">
+                                                <a
+                                                    :href="`https://a2f.hugeamp.org/gene.html?gene=${data.gene}`"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                >
+                                                    {{ data.gene }}
+                                                </a>
                                             </template>
-                                        </DataTable>
-                                    </AccordionContent>
-                                </AccordionPanel>
-
-                                <!-- MAGMA Pathways Results -->
-                                <AccordionPanel
-                                    value="1"
-                                    v-if="
-                                        hasMagmaPathwaysResults ||
-                                        magmaPathwaysLoading
-                                    "
-                                >
-                                    <AccordionHeader>
-                                        <div
-                                            class="flex items-center justify-between w-full pr-4 py-1 px-2 bg-gray-50 dark:bg-gray-800 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                        >
-                                            <span class="font-semibold text-lg"
-                                                >Pathways</span
-                                            >
-                                            <Tag
-                                                :value="`${magmaPathwaysTotalRecords} pathways`"
-                                                severity="info"
-                                            />
-                                        </div>
-                                    </AccordionHeader>
-                                    <AccordionContent>
-                                        <!-- MAGMA Pathways Results Table -->
-                                        <DataTable
-                                            :first="magmaPathwaysFirst"
-                                            :rows="magmaPathwaysRows"
-                                            :sortField="magmaPathwaysSortField"
-                                            :sortOrder="magmaPathwaysSortOrder"
-                                            :value="magmaPathwaysResults"
-                                            ref="magmaPathwaysDt"
-                                            :lazy="true"
-                                            :totalRecords="
-                                                magmaPathwaysTotalRecords
-                                            "
-                                            :loading="magmaPathwaysLoading"
-                                            paginator
-                                            :rows-per-page-options="[
-                                                10, 20, 50,
-                                            ]"
-                                            @page="onMagmaPathwaysPage"
-                                            @sort="onMagmaPathwaysSort"
-                                            :filters="magmaPathwaysFilters"
-                                            @filter="onMagmaPathwaysFilter"
-                                            stripedRows
-                                            class="p-datatable-sm"
-                                            filterDisplay="row"
-                                            :showFilterOperator="false"
-                                            :showFilterMatchModes="false"
+                                        </Column>
+                                        <Column
+                                            field="pValue"
+                                            header="P-Value"
+                                            sortable
+                                            filterMatchMode="lte"
                                             :showFilterMenu="false"
-                                            :showClearButton="false"
                                         >
-                                            <Column
-                                                field="pathwayName"
-                                                header="Pathway"
-                                                sortable
-                                                filterMatchMode="contains"
-                                                :showFilterMenu="false"
-                                            >
-                                                <template #filter>
-                                                    <InputText
-                                                        v-model="
-                                                            magmaPathwaysFilters[
-                                                                'pathwayName'
-                                                            ].value
-                                                        "
-                                                        placeholder="Search pathway"
-                                                        class="p-column-filter w-full"
-                                                        @keydown.enter="
-                                                            onMagmaPathwaysFilter
-                                                        "
-                                                    />
-                                                </template>
-                                            </Column>
-                                            <Column
-                                                field="pValue"
-                                                header="P-Value"
-                                                sortable
-                                                filterMatchMode="lte"
-                                                :showFilterMenu="false"
-                                            >
-                                                <template #filter>
-                                                    <InputNumber
-                                                        v-model="
-                                                            magmaPathwaysFilters[
-                                                                'pValue'
-                                                            ].value
-                                                        "
-                                                        placeholder="≤ Value"
-                                                        class="p-column-filter w-full"
-                                                        mode="decimal"
-                                                        :minFractionDigits="3"
-                                                        :maxFractionDigits="9"
-                                                        @keydown.enter="
-                                                            onMagmaPathwaysFilter
-                                                        "
-                                                    />
-                                                </template>
-                                                <template #body="slotProps">
-                                                    {{
-                                                        formatPValue(
-                                                            slotProps.data
-                                                                .pValue,
-                                                        )
-                                                    }}
-                                                </template>
-                                            </Column>
-                                            <Column
-                                                field="numGenes"
-                                                header="# Genes"
-                                                sortable
-                                            ></Column>
-                                            <Column
-                                                field="beta"
-                                                header="Beta"
-                                                sortable
-                                            >
-                                                <template #body="slotProps">
-                                                    {{
-                                                        formatNumber(
-                                                            slotProps.data.beta,
-                                                        )
-                                                    }}
-                                                </template>
-                                            </Column>
-                                            <Column
-                                                field="stdErr"
-                                                header="SE"
-                                                sortable
-                                            >
-                                                <template #body="slotProps">
-                                                    {{
-                                                        formatNumber(
-                                                            slotProps.data
-                                                                .stdErr,
-                                                        )
-                                                    }}
-                                                </template>
-                                            </Column>
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        magmaFilters['pValue']
+                                                            .value
+                                                    "
+                                                    placeholder="≤ Value"
+                                                    class="p-column-filter w-full"
+                                                    mode="decimal"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="9"
+                                                    @keydown.enter="
+                                                        onMagmaFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatPValue(
+                                                        slotProps.data.pValue,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
 
-                                            <template #empty>
-                                                <div class="text-center p-4">
-                                                    No MAGMA pathway results
-                                                    found.
+                                        <template #empty>
+                                            <div class="text-center p-4">
+                                                No MAGMA results found.
+                                            </div>
+                                        </template>
+                                        <template #loading>
+                                            <div class="p-4">
+                                                <div
+                                                    class="mb-2"
+                                                    v-for="i in 5"
+                                                    :key="i"
+                                                >
+                                                    <Skeleton height="3rem" />
                                                 </div>
+                                            </div>
+                                        </template>
+                                    </DataTable>
+                                </div>
+
+                                <div v-if="magmaPathwaysResults.length">
+                                    <div
+                                        class="flex items-center justify-between mb-3"
+                                    >
+                                        <h3 class="font-semibold text-lg">
+                                            Pathway Results
+                                        </h3>
+                                        <Tag
+                                            :value="`${magmaPathwaysTotalRecords} pathways`"
+                                            severity="info"
+                                        />
+                                    </div>
+                                    <DataTable
+                                        :first="magmaPathwaysFirst"
+                                        :rows="magmaPathwaysRows"
+                                        :sortField="magmaPathwaysSortField"
+                                        :sortOrder="magmaPathwaysSortOrder"
+                                        :value="magmaPathwaysResults"
+                                        ref="magmaPathwaysDt"
+                                        :lazy="true"
+                                        :totalRecords="
+                                            magmaPathwaysTotalRecords
+                                        "
+                                        :loading="magmaPathwaysLoading"
+                                        paginator
+                                        :rows-per-page-options="[10, 20, 50]"
+                                        @page="onMagmaPathwaysPage"
+                                        @sort="onMagmaPathwaysSort"
+                                        :filters="magmaPathwaysFilters"
+                                        @filter="onMagmaPathwaysFilter"
+                                        stripedRows
+                                        class="p-datatable-sm"
+                                        filterDisplay="row"
+                                        :showFilterOperator="false"
+                                        :showFilterMatchModes="false"
+                                        :showFilterMenu="false"
+                                        :showClearButton="false"
+                                    >
+                                        <Column
+                                            field="pathwayName"
+                                            header="Pathway"
+                                            sortable
+                                            filterMatchMode="contains"
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputText
+                                                    v-model="
+                                                        magmaPathwaysFilters[
+                                                            'pathwayName'
+                                                        ].value
+                                                    "
+                                                    placeholder="Search pathway"
+                                                    class="p-column-filter w-full"
+                                                    @keydown.enter="
+                                                        onMagmaPathwaysFilter
+                                                    "
+                                                />
                                             </template>
-                                            <template #loading>
-                                                <div class="p-4">
-                                                    <div
-                                                        class="mb-2"
-                                                        v-for="i in 5"
-                                                        :key="i"
-                                                    >
-                                                        <Skeleton
-                                                            height="3rem"
-                                                        />
-                                                    </div>
+                                        </Column>
+                                        <Column
+                                            field="pValue"
+                                            header="P-Value"
+                                            sortable
+                                            filterMatchMode="lte"
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        magmaPathwaysFilters[
+                                                            'pValue'
+                                                        ].value
+                                                    "
+                                                    placeholder="≤ Value"
+                                                    class="p-column-filter w-full"
+                                                    mode="decimal"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="9"
+                                                    @keydown.enter="
+                                                        onMagmaPathwaysFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatPValue(
+                                                        slotProps.data.pValue,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="numGenes"
+                                            header="# Genes"
+                                            sortable
+                                        ></Column>
+                                        <Column
+                                            field="beta"
+                                            header="Beta"
+                                            sortable
+                                        >
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data.beta,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="stdErr"
+                                            header="SE"
+                                            sortable
+                                        >
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data.stdErr,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+
+                                        <template #empty>
+                                            <div class="text-center p-4">
+                                                No MAGMA pathway results found.
+                                            </div>
+                                        </template>
+                                        <template #loading>
+                                            <div class="p-4">
+                                                <div
+                                                    class="mb-2"
+                                                    v-for="i in 5"
+                                                    :key="i"
+                                                >
+                                                    <Skeleton height="3rem" />
                                                 </div>
-                                            </template>
-                                        </DataTable>
-                                    </AccordionContent>
-                                </AccordionPanel>
-                            </Accordion>
+                                            </div>
+                                        </template>
+                                    </DataTable>
+                                </div>
+                            </div>
 
                             <!-- No results message -->
                             <div
@@ -767,6 +705,729 @@
                                 />
                             </div>
                         </TabPanel>
+
+                        <TabPanel v-if="shouldShowPigeanTab" value="pigean">
+                            <div v-if="pigeanWorkflowRunning" class="p-4">
+                                <div
+                                    class="mb-4 p-4 bg-blue-100 text-blue-700 rounded"
+                                >
+                                    <div
+                                        class="flex items-center justify-between"
+                                    >
+                                        <div>
+                                            <h3 class="font-semibold mb-1">
+                                                PIGEAN Analysis Running
+                                            </h3>
+                                            <p class="text-sm">
+                                                The PIGEAN workflow is currently
+                                                processing. Results will be
+                                                available once complete.
+                                            </p>
+                                            <p class="text-sm mt-1">
+                                                Status:
+                                                {{ pigeanWorkflowStatus }}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            label="Refresh"
+                                            @click="checkResultsAvailability"
+                                            class="ml-2"
+                                            size="small"
+                                        />
+                                    </div>
+                                </div>
+                                <div class="mb-2" v-for="i in 5" :key="i">
+                                    <Skeleton height="3rem" />
+                                </div>
+                            </div>
+
+                            <div
+                                v-else-if="
+                                    pigeanGeneLoading || pigeanGeneSetLoading
+                                "
+                                class="p-4"
+                            >
+                                <div class="mb-2" v-for="i in 5" :key="i">
+                                    <Skeleton height="3rem" />
+                                </div>
+                            </div>
+
+                            <div
+                                v-else-if="
+                                    pigeanGeneResults.length > 0 ||
+                                    pigeanGeneSetResults.length > 0
+                                "
+                            >
+                                <div class="mb-8">
+                                    <div
+                                        class="flex items-center justify-between mb-3"
+                                    >
+                                        <h3 class="font-semibold text-lg">
+                                            Gene Results
+                                        </h3>
+                                        <Tag
+                                            :value="`${pigeanGeneTotalRecords} genes`"
+                                            severity="info"
+                                        />
+                                    </div>
+                                    <DataTable
+                                        :value="pigeanGeneResults"
+                                        dataKey="gene"
+                                        :first="pigeanGeneFirst"
+                                        :rows="pigeanGeneRows"
+                                        :sortField="pigeanGeneSortField"
+                                        :sortOrder="pigeanGeneSortOrder"
+                                        :totalRecords="pigeanGeneTotalRecords"
+                                        :lazy="true"
+                                        paginator
+                                        :rows-per-page-options="[10, 20, 50]"
+                                        :loading="pigeanGeneLoading"
+                                        :filters="pigeanGeneFilters"
+                                        @page="onPigeanGenePage"
+                                        @sort="onPigeanGeneSort"
+                                        @filter="onPigeanGeneFilter"
+                                        :expandedRows="pigeanGeneExpandedRows"
+                                        @update:expandedRows="
+                                            onPigeanGeneExpandedRowsChange
+                                        "
+                                        stripedRows
+                                        class="p-datatable-sm"
+                                        filterDisplay="row"
+                                        :showFilterOperator="false"
+                                        :showFilterMatchModes="false"
+                                        :showFilterMenu="false"
+                                        :showClearButton="false"
+                                    >
+                                        <Column
+                                            field="gene"
+                                            header="Gene"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #body="{ data }">
+                                                <a
+                                                    :href="`https://a2f.hugeamp.org/gene.html?gene=${data.gene}`"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                >
+                                                    {{ data.gene }}
+                                                </a>
+                                            </template>
+                                        </Column>
+
+                                        <Column
+                                            field="combined"
+                                            header="Combined Score"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneFilters[
+                                                            'combined'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="3"
+                                                    @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data
+                                                            .combined || 0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="huge_score"
+                                            header="HuGE Score"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneFilters[
+                                                            'huge_score'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="3"
+                                                    @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data
+                                                            .huge_score || 0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="log_bf"
+                                            header="log10 BF"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneFilters[
+                                                            'log_bf'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="3"
+                                                    @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data.log_bf ||
+                                                            0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="prior"
+                                            header="Prior"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneFilters[
+                                                            'prior'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="6"
+                                                    @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data.prior ||
+                                                            0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="n"
+                                            header="# Gene Sets"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneFilters['n']
+                                                            .value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="0"
+                                                    :maxFractionDigits="0"
+                                                    @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    slotProps.data.n !== null &&
+                                                    slotProps.data.n !==
+                                                        undefined
+                                                        ? slotProps.data.n.toLocaleString()
+                                                        : "—"
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column header="Gene Sets">
+                                            <template #body="{ data }">
+                                                <span
+                                                    class="inline-flex"
+                                                    v-tooltip.left="
+                                                        !data?.gene_sets?.length
+                                                            ? 'No data available'
+                                                            : null
+                                                    "
+                                                >
+                                                    <Button
+                                                        size="small"
+                                                        outlined
+                                                        :label="
+                                                            isPigeanGeneRowExpanded(
+                                                                data,
+                                                            )
+                                                                ? 'Hide'
+                                                                : 'Show'
+                                                        "
+                                                        :disabled="
+                                                            !data?.gene_sets
+                                                                ?.length
+                                                        "
+                                                        @click="
+                                                            togglePigeanGeneRow(
+                                                                data,
+                                                            )
+                                                        "
+                                                    />
+                                                </span>
+                                            </template>
+                                        </Column>
+
+                                        <template #expansion="slotProps">
+                                            <div class="p-4 bg-gray-50 rounded">
+                                                <h4 class="font-semibold mb-2">
+                                                    Gene Sets for
+                                                    {{ slotProps.data.gene }}
+                                                </h4>
+
+                                                <DataTable
+                                                    v-if="
+                                                        slotProps.data
+                                                            ?.gene_sets?.length
+                                                    "
+                                                    :value="
+                                                        slotProps.data.gene_sets
+                                                    "
+                                                    size="small"
+                                                    class="p-datatable-sm"
+                                                >
+                                                    <Column
+                                                        field="gene_set"
+                                                        header="Gene Set"
+                                                    >
+                                                        <template
+                                                            #body="{ data }"
+                                                        >
+                                                            <a
+                                                                v-if="
+                                                                    data?.gene_set
+                                                                "
+                                                                :href="`https://a2f.hugeamp.org:8000/pigean/geneset.html?geneset=${encodeURIComponent(
+                                                                    data.gene_set,
+                                                                )}&genesetSize=small&traitGroup=all`"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                            >
+                                                                {{
+                                                                    data.gene_set
+                                                                }}
+                                                            </a>
+                                                            <span v-else
+                                                                >—</span
+                                                            >
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="combined"
+                                                        header="Combined Score"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .combined ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .combined,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="beta"
+                                                        header="Beta (Joint)"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .beta ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .beta,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="beta_uncorrected"
+                                                        header="Beta (Marginal)"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .beta_uncorrected ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .beta_uncorrected,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="prior"
+                                                        header="Prior"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .prior ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .prior,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="log_bf"
+                                                        header="log10 BF"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .log_bf ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .log_bf,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                </DataTable>
+
+                                                <div
+                                                    v-else
+                                                    class="text-sm text-gray-500"
+                                                >
+                                                    No gene-set details
+                                                    available for this gene.
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template #empty>
+                                            <div class="text-center p-4">
+                                                No PIGEAN gene results found.
+                                            </div>
+                                        </template>
+                                    </DataTable>
+                                </div>
+
+                                <div>
+                                    <div
+                                        class="flex items-center justify-between mb-3"
+                                    >
+                                        <h3 class="font-semibold text-lg">
+                                            Gene Set Results
+                                        </h3>
+                                        <Tag
+                                            :value="`${pigeanGeneSetTotalRecords} gene sets`"
+                                            severity="info"
+                                        />
+                                    </div>
+                                    <DataTable
+                                        :value="pigeanGeneSetResults"
+                                        dataKey="gene_set"
+                                        :first="pigeanGeneSetFirst"
+                                        :rows="pigeanGeneSetRows"
+                                        :sortField="pigeanGeneSetSortField"
+                                        :sortOrder="pigeanGeneSetSortOrder"
+                                        :totalRecords="
+                                            pigeanGeneSetTotalRecords
+                                        "
+                                        :lazy="true"
+                                        paginator
+                                        :rows-per-page-options="[10, 20, 50]"
+                                        :loading="pigeanGeneSetLoading"
+                                        :filters="pigeanGeneSetFilters"
+                                        @page="onPigeanGeneSetPage"
+                                        @sort="onPigeanGeneSetSort"
+                                        @filter="onPigeanGeneSetFilter"
+                                        :expandedRows="
+                                            pigeanGeneSetExpandedRows
+                                        "
+                                        @update:expandedRows="
+                                            onPigeanGeneSetExpandedRowsChange
+                                        "
+                                        stripedRows
+                                        class="p-datatable-sm"
+                                        filterDisplay="row"
+                                        :showFilterOperator="false"
+                                        :showFilterMatchModes="false"
+                                        :showFilterMenu="false"
+                                        :showClearButton="false"
+                                    >
+                                        <Column
+                                            field="gene_set"
+                                            header="Gene Set"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #body="{ data }">
+                                                <a
+                                                    :href="`https://a2f.hugeamp.org:8000/pigean/geneset.html?geneset=${encodeURIComponent(
+                                                        data.gene_set || '',
+                                                    )}&genesetSize=small&traitGroup=all`"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                >
+                                                    {{ data.gene_set }}
+                                                </a>
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="beta_uncorrected"
+                                            header="Beta (Marginal)"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneSetFilters[
+                                                            'beta_uncorrected'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="3"
+                                                    @keydown.enter="
+                                                        onPigeanGeneSetFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data
+                                                            .beta_uncorrected ||
+                                                            0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="beta"
+                                            header="Beta (Joint)"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneSetFilters[
+                                                            'beta'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="3"
+                                                    :maxFractionDigits="3"
+                                                    @keydown.enter="
+                                                        onPigeanGeneSetFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data.beta ||
+                                                            0,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="n"
+                                            header="# Genes"
+                                            sortable
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <InputNumber
+                                                    v-model="
+                                                        pigeanGeneSetFilters[
+                                                            'n'
+                                                        ].value
+                                                    "
+                                                    placeholder="≥ Value"
+                                                    class="p-column-filter w-full"
+                                                    :minFractionDigits="0"
+                                                    :maxFractionDigits="0"
+                                                    @keydown.enter="
+                                                        onPigeanGeneSetFilter
+                                                    "
+                                                />
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    slotProps.data.n !== null &&
+                                                    slotProps.data.n !==
+                                                        undefined
+                                                        ? slotProps.data.n.toLocaleString()
+                                                        : "—"
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <template #expansion="slotProps">
+                                            <div class="p-4 bg-gray-50 rounded">
+                                                <h4 class="font-semibold mb-2">
+                                                    Genes contributing to
+                                                    {{
+                                                        slotProps.data.gene_set
+                                                    }}
+                                                </h4>
+                                                <DataTable
+                                                    v-if="
+                                                        pigeanGeneSetSubRecords?.[
+                                                            slotProps.data
+                                                                .gene_set
+                                                        ]?.length
+                                                    "
+                                                    :value="
+                                                        pigeanGeneSetSubRecords[
+                                                            slotProps.data
+                                                                .gene_set
+                                                        ]
+                                                    "
+                                                    size="small"
+                                                    class="p-datatable-sm"
+                                                >
+                                                    <Column
+                                                        field="gene"
+                                                        header="Gene"
+                                                    />
+
+                                                    <Column
+                                                        field="beta_corrected"
+                                                        header="Beta (Adj)"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                formatNumber(
+                                                                    row.data
+                                                                        .beta_corrected ||
+                                                                        0,
+                                                                )
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="pValue_uncorrected"
+                                                        header="P-Value (Raw)"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                formatPValue(
+                                                                    row.data
+                                                                        .pValue_uncorrected ||
+                                                                        0,
+                                                                )
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="pValue_corrected"
+                                                        header="P-Value (Adj)"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                formatPValue(
+                                                                    row.data
+                                                                        .pValue_corrected ||
+                                                                        0,
+                                                                )
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                </DataTable>
+                                                <div
+                                                    v-else
+                                                    class="text-sm text-gray-500"
+                                                >
+                                                    No gene-level details
+                                                    available for this gene set.
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template #empty>
+                                            <div class="text-center p-4">
+                                                No PIGEAN gene set results
+                                                found.
+                                            </div>
+                                        </template>
+                                    </DataTable>
+                                </div>
+                            </div>
+
+                            <div v-else class="text-center p-4 text-gray-500">
+                                No PIGEAN results available for this dataset.
+                            </div>
+
+                            <div class="mt-4 flex justify-end">
+                                <Button
+                                    label="View PIGEAN Log"
+                                    icon="pi pi-file-check"
+                                    @click="
+                                        $router.push(
+                                            `/log/${jobId}?method=pigean`,
+                                        )
+                                    "
+                                    size="small"
+                                    outlined
+                                />
+                            </div>
+                        </TabPanel>
                     </TabPanels>
                 </Tabs>
             </template>
@@ -784,7 +1445,7 @@ import { storeToRefs } from "pinia";
 const resultsStore = useResultsStore();
 
 const dataset = ref(route.query.dataset);
-const tab = ref(route.query.tab || "sldsc"); // 'sldsc' or 'magma'
+const tab = ref(route.query.tab || "sldsc");
 const filteredBiosamples = ref([]);
 const filteredGenes = ref([]);
 
@@ -828,10 +1489,34 @@ const magmaPathwaysSortOrder = ref(1);
 const magmaPathwaysDt = ref();
 const hasMagmaPathwaysResults = ref(false);
 
+// PIGEAN specific data
+const pigeanGeneResults = ref([]);
+const pigeanGeneTotalRecords = ref(0);
+const pigeanGeneLoading = ref(false);
+const pigeanGeneFirst = ref(0);
+const pigeanGeneRows = ref(10);
+const pigeanGeneSortField = ref("combined");
+const pigeanGeneSortOrder = ref(-1);
+const pigeanGeneExpandedRows = ref({});
+
+const pigeanGeneSetResults = ref([]);
+const pigeanGeneSetTotalRecords = ref(0);
+const pigeanGeneSetLoading = ref(false);
+const pigeanGeneSetFirst = ref(0);
+const pigeanGeneSetRows = ref(10);
+const pigeanGeneSetSortField = ref("beta");
+const pigeanGeneSetSortOrder = ref(-1);
+const pigeanGeneSetSubRecords = ref({});
+const pigeanGeneSetExpandedRows = ref({});
+
+const hasPigeanGeneResults = ref(false);
+const hasPigeanGeneSetResults = ref(false);
+
 // Job IDs for linking to logs
 const sldscJobId = ref(null);
 const magmaJobId = ref(null);
 const magmaPathwaysJobId = ref(null);
+const pigeanJobId = ref(null);
 
 // Shared data from store
 const {
@@ -849,6 +1534,10 @@ const sldscTabHeader = computed(() => {
 
 const magmaTabHeader = computed(() => {
     return "MAGMA";
+});
+
+const pigeanTabHeader = computed(() => {
+    return "PIGEAN";
 });
 
 // Computed properties for tab visibility and workflow status
@@ -880,6 +1569,20 @@ const shouldShowMagmaTab = computed(() => {
     }
 });
 
+const hasPigeanResults = computed(() => {
+    return hasPigeanGeneResults.value || hasPigeanGeneSetResults.value;
+});
+
+const shouldShowPigeanTab = computed(() => {
+    const pigeanStatus = workflowStatus.value.pigean?.pigean?.status;
+
+    if (hasWorkflowData.value) {
+        return pigeanStatus === "SUCCEEDED" || hasPigeanResults.value;
+    }
+
+    return hasPigeanResults.value;
+});
+
 const sldscWorkflowStatus = computed(() => {
     return (
         workflowStatus.value.ldsc?.ldsc?.status ||
@@ -890,6 +1593,10 @@ const sldscWorkflowStatus = computed(() => {
 
 const magmaWorkflowStatus = computed(() => {
     return workflowStatus.value.magma?.magma?.status || null;
+});
+
+const pigeanWorkflowStatus = computed(() => {
+    return workflowStatus.value.pigean?.pigean?.status || null;
 });
 
 const sldscWorkflowRunning = computed(() => {
@@ -911,12 +1618,24 @@ const magmaWorkflowRunning = computed(() => {
         )
     );
 });
+
+const pigeanWorkflowRunning = computed(() => {
+    const status = pigeanWorkflowStatus.value;
+    return (
+        status &&
+        ["RUNNING", "RUNNABLE", "PENDING", "SUBMITTED"].includes(
+            status.toUpperCase(),
+        )
+    );
+});
 const canDownloadCurrentTab = computed(() => {
     if (activeTab.value === "magma") {
         return hasMagmaResults.value;
-    } else {
-        return hasSldscResults.value;
     }
+    if (activeTab.value === "pigean") {
+        return hasPigeanResults.value;
+    }
+    return hasSldscResults.value;
 });
 
 // Computed property to find a job ID for viewing logs
@@ -926,6 +1645,8 @@ const jobId = computed(() => {
         return magmaJobId.value;
     } else if (activeTab.value === "sldsc" && sldscJobId.value) {
         return sldscJobId.value;
+    } else if (activeTab.value === "pigean" && pigeanJobId.value) {
+        return pigeanJobId.value;
     }
 
     // Fallback to workflow status job ID
@@ -941,6 +1662,11 @@ const jobId = computed(() => {
             } else if (workflows.ldsc?.ldsc?.job_id) {
                 return workflows.ldsc.ldsc.job_id;
             }
+        } else if (
+            activeTab.value === "pigean" &&
+            workflows.pigean?.pigean?.job_id
+        ) {
+            return workflows.pigean.pigean.job_id;
         }
     }
 
@@ -960,8 +1686,12 @@ const formatNumber = (value) => {
 
 const config = useRuntimeConfig();
 const downloadUrl = computed(() => {
-    // Backend expects "magma" or "ldsc" (not "sldsc")
-    const resultTypeParam = activeTab.value === "magma" ? "magma" : "ldsc";
+    let resultTypeParam = "ldsc";
+    if (activeTab.value === "magma") {
+        resultTypeParam = "magma";
+    } else if (activeTab.value === "pigean") {
+        resultTypeParam = "pigean";
+    }
     return `${config.public.apiBaseUrl}/api/download/${dataset.value}?result_type=${resultTypeParam}`;
 });
 
@@ -1158,30 +1888,52 @@ const magmaPathwaysFilters = ref({
     pValue: { value: null, matchMode: "lte" },
 });
 
+const pigeanGeneFilters = ref({
+    prior: { value: null, matchMode: "gte" },
+    combined: { value: null, matchMode: "gte" },
+    huge_score: { value: null, matchMode: "gte" },
+    log_bf: { value: null, matchMode: "gte" },
+    n: { value: null, matchMode: "gte" },
+});
+
+const pigeanGeneSetFilters = ref({
+    beta_uncorrected: { value: null, matchMode: "gte" },
+    beta: { value: null, matchMode: "gte" },
+    n: { value: null, matchMode: "gte" },
+});
+
 const transformFilters = (filters) => {
     const transformedFilters = {};
     Object.entries(filters).forEach(([key, filter]) => {
-        if (filter.value !== null && filter.value !== "") {
-            if (key === "pValue") {
-                transformedFilters[`filter_${key}`] = `<=${filter.value}`;
-            } else if (key === "enrichment") {
-                transformedFilters[`filter_${key}`] = `>=${filter.value}`;
-            } else if (key === "start") {
-                transformedFilters[`filter_${key}`] = `>=${filter.value}`;
-            } else if (key === "end") {
-                transformedFilters[`filter_${key}`] = `<=${filter.value}`;
-            } else if (
-                key === "biosample" ||
-                key === "annotation" ||
-                key === "tissue" ||
-                key === "gene" ||
-                key === "chr"
-            ) {
-                transformedFilters[`filter_${key}`] = `eq:${filter.value}`;
-            } else {
-                transformedFilters[`filter_${key}`] =
-                    `contains:${filter.value}`;
-            }
+        if (
+            !filter ||
+            filter.value === null ||
+            filter.value === "" ||
+            typeof filter.value === "undefined"
+        ) {
+            return;
+        }
+
+        const filterName = filter.paramKey || key;
+        const filterKey = `filter_${filterName}`;
+        const matchMode = filter.matchMode || "equals";
+        const value = filter.value;
+
+        switch (matchMode) {
+            case "lte":
+                transformedFilters[filterKey] = `<=${value}`;
+                break;
+            case "gte":
+                transformedFilters[filterKey] = `>=${value}`;
+                break;
+            case "equals":
+                transformedFilters[filterKey] = `eq:${value}`;
+                break;
+            case "contains":
+                transformedFilters[filterKey] = `contains:${value}`;
+                break;
+            default:
+                transformedFilters[filterKey] = value;
         }
     });
     return transformedFilters;
@@ -1189,65 +1941,27 @@ const transformFilters = (filters) => {
 
 // Tab change handler
 const onTabChange = (event) => {
-    // Handle different event formats from PrimeVue
-    let newValue;
+    let newValue = null;
     if (typeof event === "string") {
         newValue = event;
-    } else if (event && typeof event.index !== "undefined") {
-        // Map index to value
-        newValue = event.index === 0 ? "sldsc" : "magma";
     } else if (event && event.value) {
         newValue = event.value;
-    } else {
-        console.error("Unexpected event format:", event);
+    }
+
+    if (!newValue || newValue === activeTab.value) {
         return;
     }
 
-    // Only allow switching to tabs that should be shown and have results
     if (
-        newValue === "sldsc" &&
-        (!shouldShowSldscTab.value || !hasSldscResults.value)
-    ) {
-        return;
-    }
-    if (
-        newValue === "magma" &&
-        (!shouldShowMagmaTab.value || !hasMagmaResults.value)
+        (newValue === "sldsc" && !shouldShowSldscTab.value) ||
+        (newValue === "magma" && !shouldShowMagmaTab.value) ||
+        (newValue === "pigean" && !shouldShowPigeanTab.value)
     ) {
         return;
     }
 
     activeTab.value = newValue;
     tab.value = newValue;
-
-    // Update URL parameter to reflect the current tab
-    router.replace({
-        query: { ...route.query, tab: newValue },
-    });
-
-    // Load data for the active tab if not already loaded and workflow succeeded
-    if (
-        newValue === "sldsc" &&
-        sldscResults.value.length === 0 &&
-        hasSldscResults.value
-    ) {
-        loadSldscResults();
-    } else if (
-        newValue === "magma" &&
-        magmaResults.value.length === 0 &&
-        hasMagmaResults.value
-    ) {
-        loadMagmaResults();
-    }
-
-    // Also load pathways if on magma tab
-    if (
-        newValue === "magma" &&
-        magmaPathwaysResults.value.length === 0 &&
-        hasMagmaPathwaysResults.value
-    ) {
-        loadMagmaPathwaysResults();
-    }
 };
 
 // SLDSC Results functions
@@ -1412,6 +2126,144 @@ const onMagmaPathwaysFilter = () => {
     loadMagmaPathwaysResults();
 };
 
+// PIGEAN Results functions
+const loadPigeanGeneResults = async () => {
+    try {
+        pigeanGeneLoading.value = true;
+        resultsStore.init();
+
+        const queryParams = new URLSearchParams({
+            first: pigeanGeneFirst.value,
+            rows: pigeanGeneRows.value,
+            sort_field: pigeanGeneSortField.value,
+            sort_order: pigeanGeneSortOrder.value,
+        });
+
+        const transformedFilters = transformFilters(pigeanGeneFilters.value);
+        Object.entries(transformedFilters).forEach(([key, value]) => {
+            queryParams.append(key, value);
+        });
+
+        const endpoint = `/api/pigean-gene-results/${dataset.value}?${queryParams.toString()}`;
+        const { data } = await resultsStore.axios.get(endpoint);
+
+        pigeanGeneResults.value = data.items || [];
+        hasPigeanGeneResults.value = pigeanGeneResults.value.length > 0;
+        if (typeof data.totalRecords === "number") {
+            pigeanGeneTotalRecords.value = data.totalRecords;
+        }
+        if (data.jobId) {
+            pigeanJobId.value = data.jobId;
+        }
+    } catch (err) {
+        console.error("Failed to load PIGEAN gene results:", err);
+    } finally {
+        pigeanGeneLoading.value = false;
+    }
+};
+
+const onPigeanGenePage = (event) => {
+    pigeanGeneFirst.value = event.first;
+    pigeanGeneRows.value = event.rows;
+    loadPigeanGeneResults();
+};
+
+const onPigeanGeneSort = (event) => {
+    pigeanGeneSortField.value = event.sortField;
+    pigeanGeneSortOrder.value = event.sortOrder;
+    loadPigeanGeneResults();
+};
+
+const onPigeanGeneFilter = () => {
+    pigeanGeneFirst.value = 0;
+    loadPigeanGeneResults();
+};
+
+const loadPigeanGeneSetResults = async () => {
+    try {
+        pigeanGeneSetLoading.value = true;
+        resultsStore.init();
+
+        const queryParams = new URLSearchParams({
+            first: pigeanGeneSetFirst.value,
+            rows: pigeanGeneSetRows.value,
+            sort_field: pigeanGeneSetSortField.value,
+            sort_order: pigeanGeneSetSortOrder.value,
+        });
+
+        const transformedFilters = transformFilters(pigeanGeneSetFilters.value);
+        Object.entries(transformedFilters).forEach(([key, value]) => {
+            queryParams.append(key, value);
+        });
+
+        const endpoint = `/api/pigean-gene-set-results/${dataset.value}?${queryParams.toString()}`;
+        const { data } = await resultsStore.axios.get(endpoint);
+
+        pigeanGeneSetResults.value = data.items || [];
+        pigeanGeneSetSubRecords.value = data.subRecords || {};
+        hasPigeanGeneSetResults.value = pigeanGeneSetResults.value.length > 0;
+        if (typeof data.totalRecords === "number") {
+            pigeanGeneSetTotalRecords.value = data.totalRecords;
+        }
+        if (data.jobId) {
+            pigeanJobId.value = data.jobId;
+        }
+    } catch (err) {
+        console.error("Failed to load PIGEAN gene set results:", err);
+    } finally {
+        pigeanGeneSetLoading.value = false;
+    }
+};
+
+const onPigeanGeneSetPage = (event) => {
+    pigeanGeneSetFirst.value = event.first;
+    pigeanGeneSetRows.value = event.rows;
+    loadPigeanGeneSetResults();
+};
+
+const onPigeanGeneSetSort = (event) => {
+    pigeanGeneSetSortField.value = event.sortField;
+    pigeanGeneSetSortOrder.value = event.sortOrder;
+    loadPigeanGeneSetResults();
+};
+
+const onPigeanGeneSetFilter = () => {
+    pigeanGeneSetFirst.value = 0;
+    loadPigeanGeneSetResults();
+};
+
+const onPigeanGeneExpandedRowsChange = (value) => {
+    pigeanGeneExpandedRows.value = value;
+};
+
+const togglePigeanGeneRow = (rowData) => {
+    const current = { ...pigeanGeneExpandedRows.value };
+    const key = rowData?.gene;
+    if (!key) {
+        return;
+    }
+
+    if (current[key]) {
+        delete current[key];
+    } else {
+        current[key] = rowData;
+    }
+
+    pigeanGeneExpandedRows.value = current;
+};
+
+const isPigeanGeneRowExpanded = (rowData) => {
+    const key = rowData?.gene;
+    if (!key) {
+        return false;
+    }
+    return Boolean(pigeanGeneExpandedRows.value?.[key]);
+};
+
+const onPigeanGeneSetExpandedRowsChange = (value) => {
+    pigeanGeneSetExpandedRows.value = value;
+};
+
 // Check both result types availability and set initial tab
 const checkResultsAvailability = async () => {
     try {
@@ -1439,6 +2291,10 @@ const checkResultsAvailability = async () => {
         const magmaStatus = workflows.magma?.magma?.status;
         const hasMagmaWorkflow = !!magmaStatus;
         const magmaSucceeded = magmaStatus === "SUCCEEDED";
+
+        const pigeanStatus = workflows.pigean?.pigean?.status;
+        const hasPigeanWorkflow = !!pigeanStatus;
+        const pigeanSucceeded = pigeanStatus === "SUCCEEDED";
 
         // Set results availability based on workflow status
         if (sldscSucceeded) {
@@ -1505,19 +2361,54 @@ const checkResultsAvailability = async () => {
             }
         }
 
+        if (pigeanSucceeded) {
+            hasPigeanGeneResults.value = true;
+            hasPigeanGeneSetResults.value = true;
+        } else if (hasPigeanWorkflow) {
+            hasPigeanGeneResults.value = false;
+            hasPigeanGeneSetResults.value = false;
+        } else {
+            try {
+                const pigeanGeneResponse = await resultsStore.axios.get(
+                    `/api/pigean-gene-results/${dataset.value}?first=0&rows=1`,
+                );
+                hasPigeanGeneResults.value =
+                    pigeanGeneResponse.data.items &&
+                    pigeanGeneResponse.data.items.length > 0;
+            } catch (geneErr) {
+                console.log("PIGEAN gene API check failed:", geneErr);
+                hasPigeanGeneResults.value = false;
+            }
+
+            try {
+                const pigeanGeneSetResponse = await resultsStore.axios.get(
+                    `/api/pigean-gene-set-results/${dataset.value}?first=0&rows=1`,
+                );
+                hasPigeanGeneSetResults.value =
+                    pigeanGeneSetResponse.data.items &&
+                    pigeanGeneSetResponse.data.items.length > 0;
+            } catch (geneSetErr) {
+                console.log("PIGEAN gene-set API check failed:", geneSetErr);
+                hasPigeanGeneSetResults.value = false;
+            }
+        }
+
         // Ensure we have a valid active tab
         // If current active tab shouldn't be shown, switch to the first available tab
         await nextTick(); // Wait for computed properties to update
 
         const currentTabValid =
             (activeTab.value === "sldsc" && shouldShowSldscTab.value) ||
-            (activeTab.value === "magma" && shouldShowMagmaTab.value);
+            (activeTab.value === "magma" && shouldShowMagmaTab.value) ||
+            (activeTab.value === "pigean" && shouldShowPigeanTab.value);
 
         if (!currentTabValid) {
             if (shouldShowSldscTab.value) {
                 activeTab.value = "sldsc";
             } else if (shouldShowMagmaTab.value) {
                 activeTab.value = "magma";
+            } else if (shouldShowPigeanTab.value) {
+                activeTab.value = "pigean";
             }
         }
 
@@ -1536,6 +2427,14 @@ const checkResultsAvailability = async () => {
                 "MAGMA pathways results detected as available, loading data...",
             );
             loadMagmaPathwaysResults();
+        }
+
+        if (pigeanSucceeded && pigeanGeneResults.value.length === 0) {
+            loadPigeanGeneResults();
+        }
+
+        if (pigeanSucceeded && pigeanGeneSetResults.value.length === 0) {
+            loadPigeanGeneSetResults();
         }
     } catch (err) {
         console.error("Failed to check results availability:", err);
@@ -1570,11 +2469,39 @@ const checkResultsAvailability = async () => {
         } catch (e) {
             hasMagmaPathwaysResults.value = false;
         }
+
+        try {
+            const pigeanGeneResponse = await resultsStore.axios.get(
+                `/api/pigean-gene-results/${dataset.value}?first=0&rows=1`,
+            );
+            hasPigeanGeneResults.value =
+                pigeanGeneResponse.data.items &&
+                pigeanGeneResponse.data.items.length > 0;
+        } catch (e) {
+            hasPigeanGeneResults.value = false;
+        }
+
+        try {
+            const pigeanGeneSetResponse = await resultsStore.axios.get(
+                `/api/pigean-gene-set-results/${dataset.value}?first=0&rows=1`,
+            );
+            hasPigeanGeneSetResults.value =
+                pigeanGeneSetResponse.data.items &&
+                pigeanGeneSetResponse.data.items.length > 0;
+        } catch (e) {
+            hasPigeanGeneSetResults.value = false;
+        }
     }
 };
 
 // Watch for activeTab changes to ensure content is displayed
 watch(activeTab, (newTab) => {
+    if (newTab && route.query.tab !== newTab) {
+        router.replace({
+            query: { ...route.query, tab: newTab },
+        });
+    }
+
     if (
         newTab === "sldsc" &&
         hasSldscResults.value &&
@@ -1597,13 +2524,29 @@ watch(activeTab, (newTab) => {
     ) {
         loadMagmaPathwaysResults();
     }
+
+    if (
+        newTab === "pigean" &&
+        hasPigeanGeneResults.value &&
+        pigeanGeneResults.value.length === 0
+    ) {
+        loadPigeanGeneResults();
+    }
+
+    if (
+        newTab === "pigean" &&
+        hasPigeanGeneSetResults.value &&
+        pigeanGeneSetResults.value.length === 0
+    ) {
+        loadPigeanGeneSetResults();
+    }
 });
 
 // Watch for route query parameter changes
 watch(
     () => route.query.tab,
     (newTab) => {
-        if (newTab && (newTab === "sldsc" || newTab === "magma")) {
+        if (newTab && ["sldsc", "magma", "pigean"].includes(newTab)) {
             activeTab.value = newTab;
             tab.value = newTab;
         }
@@ -1637,6 +2580,22 @@ onMounted(async () => {
         magmaPathwaysResults.value.length === 0
     ) {
         loadMagmaPathwaysResults();
+    }
+
+    if (
+        activeTab.value === "pigean" &&
+        hasPigeanGeneResults.value &&
+        pigeanGeneResults.value.length === 0
+    ) {
+        loadPigeanGeneResults();
+    }
+
+    if (
+        activeTab.value === "pigean" &&
+        hasPigeanGeneSetResults.value &&
+        pigeanGeneSetResults.value.length === 0
+    ) {
+        loadPigeanGeneSetResults();
     }
 });
 </script>

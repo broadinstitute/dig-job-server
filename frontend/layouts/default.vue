@@ -46,7 +46,7 @@
         <slot />
 
         <div class="layout-footer">
-            <span> Powered by KPN Data Registry </span>
+            <span>Powered by KPN Data Registry </span>
             <Button
                 :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
                 :aria-label="
@@ -110,6 +110,7 @@
     padding: 1rem 0 1rem 0;
     gap: 0.5rem;
     border-top: 1px solid var(--surface-border);
+    font-size: small;
 }
 
 .theme-toggle-btn.sun-icon :deep(.pi-sun) {
