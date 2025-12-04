@@ -142,15 +142,36 @@
                                 </div>
                             </div>
 
-                            <!-- Show loading skeleton while data is loading -->
-                            <div v-else-if="sldscLoading" class="p-4">
-                                <div class="mb-2" v-for="i in 5" :key="i">
-                                    <Skeleton height="3rem" />
-                                </div>
-                            </div>
-                            <!-- SLDSC Results Table -->
-                            <DataTable
-                                v-else-if="sldscResults.length > 0"
+                            <div v-else>
+                                <!-- SLDSC Results Section -->
+                                <div class="mb-8">
+                                    <div
+                                        class="flex items-center justify-between mb-3"
+                                    >
+                                        <h3 class="font-semibold text-lg">
+                                            SLDSC Results
+                                        </h3>
+                                        <Tag
+                                            v-if="sldscTotalRecords > 0"
+                                            :value="`${sldscTotalRecords} results`"
+                                            severity="info"
+                                        />
+                                    </div>
+
+                                    <!-- Loading skeleton -->
+                                    <div v-if="sldscLoading && sldscResults.length === 0" class="p-4">
+                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                                            <i class="pi pi-spinner pi-spin text-primary"></i>
+                                            <span>Loading SLDSC results...</span>
+                                        </div>
+                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                            <Skeleton height="3rem" />
+                                        </div>
+                                    </div>
+
+                                    <!-- SLDSC Results Table -->
+                                    <DataTable
+                                        v-else-if="sldscResults.length > 0"
                                 :first="sldscFirst"
                                 :rows="sldscRows"
                                 :sortField="sldscSortField"
@@ -334,16 +355,19 @@
                                     </div>
                                 </template>
                             </DataTable>
-                            <div
-                                v-else-if="
-                                    !sldscLoading && sldscResults.length === 0
-                                "
-                                class="text-center p-4"
-                            >
-                                <p class="text-gray-500">
-                                    No SLDSC results available for this dataset.
-                                </p>
+
+                                    <!-- No results message -->
+                                    <div
+                                        v-else-if="!sldscLoading"
+                                        class="text-center p-4"
+                                    >
+                                        <p class="text-gray-500">
+                                            No SLDSC results available for this dataset.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
+
                             <div class="mt-4 flex justify-end">
                                 <Button
                                     label="View SLDSC Log"
@@ -395,23 +419,9 @@
                                 </div>
                             </div>
 
-                            <!-- Show loading skeleton while data is loading -->
-                            <div
-                                v-else-if="magmaLoading || magmaPathwaysLoading"
-                                class="p-4"
-                            >
-                                <div class="mb-2" v-for="i in 5" :key="i">
-                                    <Skeleton height="3rem" />
-                                </div>
-                            </div>
-
-                            <div
-                                v-else-if="
-                                    magmaResults.length > 0 ||
-                                    magmaPathwaysResults.length > 0
-                                "
-                            >
-                                <div class="mb-8" v-if="magmaResults.length">
+                            <div v-else>
+                                <!-- MAGMA Gene Results Section -->
+                                <div class="mb-8">
                                     <div
                                         class="flex items-center justify-between mb-3"
                                     >
@@ -419,11 +429,26 @@
                                             Gene Results
                                         </h3>
                                         <Tag
+                                            v-if="magmaTotalRecords > 0"
                                             :value="`${magmaTotalRecords} genes`"
                                             severity="info"
                                         />
                                     </div>
+
+                                    <!-- Gene table loading skeleton -->
+                                    <div v-if="magmaLoading && magmaResults.length === 0" class="p-4">
+                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                                            <i class="pi pi-spinner pi-spin text-primary"></i>
+                                            <span>Loading MAGMA gene results...</span>
+                                        </div>
+                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                            <Skeleton height="3rem" />
+                                        </div>
+                                    </div>
+
+                                    <!-- Gene table -->
                                     <DataTable
+                                        v-else-if="magmaResults.length > 0"
                                         :first="magmaFirst"
                                         :rows="magmaRows"
                                         :sortField="magmaSortField"
@@ -531,9 +556,18 @@
                                             </div>
                                         </template>
                                     </DataTable>
+
+                                    <!-- No gene results message -->
+                                    <div
+                                        v-else-if="!magmaLoading"
+                                        class="text-center p-4 text-gray-500"
+                                    >
+                                        No MAGMA gene results available.
+                                    </div>
                                 </div>
 
-                                <div v-if="magmaPathwaysResults.length">
+                                <!-- MAGMA Pathway Results Section -->
+                                <div class="mt-8">
                                     <div
                                         class="flex items-center justify-between mb-3"
                                     >
@@ -541,11 +575,26 @@
                                             Pathway Results
                                         </h3>
                                         <Tag
+                                            v-if="magmaPathwaysTotalRecords > 0"
                                             :value="`${magmaPathwaysTotalRecords} pathways`"
                                             severity="info"
                                         />
                                     </div>
+
+                                    <!-- Pathway table loading skeleton -->
+                                    <div v-if="magmaPathwaysLoading && magmaPathwaysResults.length === 0" class="p-4">
+                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                                            <i class="pi pi-spinner pi-spin text-primary"></i>
+                                            <span>Loading MAGMA pathway results...</span>
+                                        </div>
+                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                            <Skeleton height="3rem" />
+                                        </div>
+                                    </div>
+
+                                    <!-- Pathway table -->
                                     <DataTable
+                                        v-else-if="magmaPathwaysResults.length > 0"
                                         :first="magmaPathwaysFirst"
                                         :rows="magmaPathwaysRows"
                                         :sortField="magmaPathwaysSortField"
@@ -674,23 +723,17 @@
                                             </div>
                                         </template>
                                     </DataTable>
+
+                                    <!-- No pathway results message -->
+                                    <div
+                                        v-else-if="!magmaPathwaysLoading"
+                                        class="text-center p-4 text-gray-500"
+                                    >
+                                        No MAGMA pathway results available.
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- No results message -->
-                            <div
-                                v-else-if="
-                                    !magmaLoading &&
-                                    !magmaPathwaysLoading &&
-                                    magmaResults.length === 0 &&
-                                    magmaPathwaysResults.length === 0
-                                "
-                                class="text-center p-4"
-                            >
-                                <p class="text-gray-500">
-                                    No MAGMA results available for this dataset.
-                                </p>
-                            </div>
                             <div class="mt-4 flex justify-end">
                                 <Button
                                     label="View MAGMA Log"
@@ -741,23 +784,8 @@
                                 </div>
                             </div>
 
-                            <div
-                                v-else-if="
-                                    pigeanGeneLoading || pigeanGeneSetLoading
-                                "
-                                class="p-4"
-                            >
-                                <div class="mb-2" v-for="i in 5" :key="i">
-                                    <Skeleton height="3rem" />
-                                </div>
-                            </div>
-
-                            <div
-                                v-else-if="
-                                    pigeanGeneResults.length > 0 ||
-                                    pigeanGeneSetResults.length > 0
-                                "
-                            >
+                            <div v-else>
+                                <!-- Gene Results Section -->
                                 <div class="mb-8">
                                     <div
                                         class="flex items-center justify-between mb-3"
@@ -766,11 +794,26 @@
                                             Gene Results
                                         </h3>
                                         <Tag
+                                            v-if="pigeanGeneTotalRecords > 0"
                                             :value="`${pigeanGeneTotalRecords} genes`"
                                             severity="info"
                                         />
                                     </div>
+
+                                    <!-- Gene table loading skeleton -->
+                                    <div v-if="pigeanGeneLoading && pigeanGeneResults.length === 0" class="p-4">
+                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                                            <i class="pi pi-spinner pi-spin text-primary"></i>
+                                            <span>Loading PIGEAN gene results...</span>
+                                        </div>
+                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                            <Skeleton height="3rem" />
+                                        </div>
+                                    </div>
+
+                                    <!-- Gene table -->
                                     <DataTable
+                                        v-else
                                         :value="pigeanGeneResults"
                                         dataKey="gene"
                                         lazy
@@ -1158,18 +1201,36 @@
                                         </template>
                                     </DataTable>
 
-                                    <!-- Gene Scatter Plot -->
-                                    <div class="mt-6">
+                                    <!-- Gene Scatter Plot - only render once chart data is loaded -->
+                                    <div
+                                        v-if="pigeanGeneChartDataLoaded"
+                                        class="mt-6"
+                                    >
                                         <h4 class="font-semibold text-lg mb-3">
                                             Gene Support Scatter Plot
                                         </h4>
                                         <PigeanGeneScatterPlot
                                             :geneResults="pigeanGeneAllData"
+                                            :key="'pigean-chart-' + dataset"
                                         />
+                                    </div>
+                                    <div
+                                        v-else-if="pigeanGeneChartLoading"
+                                        class="mt-6"
+                                    >
+                                        <h4 class="font-semibold text-lg mb-3">
+                                            Gene Support Scatter Plot
+                                        </h4>
+                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                                            <i class="pi pi-spinner pi-spin text-primary"></i>
+                                            <span>Loading scatter plot data...</span>
+                                        </div>
+                                        <Skeleton height="400px" />
                                     </div>
                                 </div>
 
-                                <div>
+                                <!-- Gene Set Results Section -->
+                                <div class="mt-8">
                                     <div
                                         class="flex items-center justify-between mb-3"
                                     >
@@ -1177,11 +1238,26 @@
                                             Gene Set Results
                                         </h3>
                                         <Tag
+                                            v-if="pigeanGeneSetTotalRecords > 0"
                                             :value="`${pigeanGeneSetTotalRecords} gene sets`"
                                             severity="info"
                                         />
                                     </div>
+
+                                    <!-- Gene set table loading skeleton -->
+                                    <div v-if="pigeanGeneSetLoading && pigeanGeneSetResults.length === 0" class="p-4">
+                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                                            <i class="pi pi-spinner pi-spin text-primary"></i>
+                                            <span>Loading PIGEAN gene set results...</span>
+                                        </div>
+                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                            <Skeleton height="3rem" />
+                                        </div>
+                                    </div>
+
+                                    <!-- Gene set table -->
                                     <DataTable
+                                        v-else
                                         :value="pigeanGeneSetResults"
                                         dataKey="gene_set"
                                         :first="pigeanGeneSetFirst"
@@ -1417,10 +1493,6 @@
                                         </template>
                                     </DataTable>
                                 </div>
-                            </div>
-
-                            <div v-else class="text-center p-4 text-gray-500">
-                                No PIGEAN results available for this dataset.
                             </div>
 
                             <div class="mt-4 flex justify-end">
