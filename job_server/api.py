@@ -746,6 +746,9 @@ async def get_pigean_gene_results(
         df = get_cached_results(s3_path, 'gene_stats.json.gz', 'pigean', True)
         df = filter_results(df, request, sort_field, sort_order)
 
+        # Replace inf/-inf/nan with None for JSON serialization
+        df = df.replace([np.inf, -np.inf], np.nan).replace({np.nan: None})
+
         total_records = len(df)
         genes = df['gene'].unique().tolist()
         df = df.iloc[first:first + rows]
@@ -753,6 +756,7 @@ async def get_pigean_gene_results(
 
         gene_gene_set_records = {}
         sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace([np.inf, -np.inf], np.nan) \
             .replace({np.nan: None}) \
             .groupby('gene')
         for row in results:
@@ -799,12 +803,16 @@ async def get_pigean_gene_set_results(
         df = get_cached_results(s3_path, 'gene_set_stats.json.gz', 'pigean', True)
         df = filter_results(df, request, sort_field, sort_order)
 
+        # Replace inf/-inf/nan with None for JSON serialization
+        df = df.replace([np.inf, -np.inf], np.nan).replace({np.nan: None})
+
         total_records = len(df)
         gene_sets = df['gene_set'].unique().tolist()
         df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
+            .replace([np.inf, -np.inf], np.nan) \
             .replace({np.nan: None}) \
             .groupby('gene_set')
         for row in results:
