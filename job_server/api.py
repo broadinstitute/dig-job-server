@@ -751,7 +751,10 @@ async def get_pigean_gene_results(
 
         total_records = len(df)
         genes = df['gene'].unique().tolist()
-        df = df.iloc[first:first + rows]
+
+        # Apply pagination (skip if rows=-1 to return all)
+        if rows != -1:
+            df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         gene_gene_set_records = {}
@@ -808,7 +811,10 @@ async def get_pigean_gene_set_results(
 
         total_records = len(df)
         gene_sets = df['gene_set'].unique().tolist()
-        df = df.iloc[first:first + rows]
+
+        # Apply pagination (skip if rows=-1 to return all)
+        if rows != -1:
+            df = df.iloc[first:first + rows]
         results = df.to_dict('records')
 
         sub_df = get_cached_results(s3_path, 'gene_gene_set_stats.json.gz', 'pigean', True) \
