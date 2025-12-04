@@ -773,19 +773,18 @@
                                     <DataTable
                                         :value="pigeanGeneResults"
                                         dataKey="gene"
+                                        lazy
                                         :first="pigeanGeneFirst"
                                         :rows="pigeanGeneRows"
                                         :sortField="pigeanGeneSortField"
                                         :sortOrder="pigeanGeneSortOrder"
                                         :totalRecords="pigeanGeneTotalRecords"
-                                        :lazy="true"
                                         paginator
                                         :rows-per-page-options="[10, 20, 50]"
                                         :loading="pigeanGeneLoading"
                                         :filters="pigeanGeneFilters"
                                         @page="onPigeanGenePage"
                                         @sort="onPigeanGeneSort"
-                                        @filter="onPigeanGeneFilter"
                                         :expandedRows="pigeanGeneExpandedRows"
                                         @update:expandedRows="
                                             onPigeanGeneExpandedRowsChange
@@ -1158,6 +1157,16 @@
                                             </div>
                                         </template>
                                     </DataTable>
+
+                                    <!-- Gene Scatter Plot -->
+                                    <div class="mt-6">
+                                        <h4 class="font-semibold text-lg mb-3">
+                                            Gene Support Scatter Plot
+                                        </h4>
+                                        <PigeanGeneScatterPlot
+                                            :geneResults="pigeanGeneAllData"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -1490,7 +1499,8 @@ const magmaPathwaysDt = ref();
 const hasMagmaPathwaysResults = ref(false);
 
 // PIGEAN specific data
-const pigeanGeneResults = ref([]);
+const pigeanGeneResults = ref([]); // Paginated data for table
+const pigeanGeneAllData = ref([]); // All data for chart
 const pigeanGeneTotalRecords = ref(0);
 const pigeanGeneLoading = ref(false);
 const pigeanGeneFirst = ref(0);
@@ -1511,6 +1521,11 @@ const pigeanGeneSetExpandedRows = ref({});
 
 const hasPigeanGeneResults = ref(false);
 const hasPigeanGeneSetResults = ref(false);
+
+// Flags to track if data has been loaded (prevent repeated fetches)
+const pigeanGeneChartDataLoaded = ref(false);
+const pigeanGeneChartLoading = ref(false);
+const pigeanGeneSetDataLoaded = ref(false);
 
 // Job IDs for linking to logs
 const sldscJobId = ref(null);
@@ -2127,6 +2142,8 @@ const onMagmaPathwaysFilter = () => {
 };
 
 // PIGEAN Results functions
+
+// Load table data with server-side pagination
 const loadPigeanGeneResults = async () => {
     try {
         pigeanGeneLoading.value = true;
@@ -2148,10 +2165,9 @@ const loadPigeanGeneResults = async () => {
         const { data } = await resultsStore.axios.get(endpoint);
 
         pigeanGeneResults.value = data.items || [];
+        pigeanGeneTotalRecords.value = data.totalRecords || 0;
         hasPigeanGeneResults.value = pigeanGeneResults.value.length > 0;
-        if (typeof data.totalRecords === "number") {
-            pigeanGeneTotalRecords.value = data.totalRecords;
-        }
+
         if (data.jobId) {
             pigeanJobId.value = data.jobId;
         }
@@ -2159,6 +2175,39 @@ const loadPigeanGeneResults = async () => {
         console.error("Failed to load PIGEAN gene results:", err);
     } finally {
         pigeanGeneLoading.value = false;
+    }
+};
+
+// Load all data for chart (separate from table)
+// Use rows=-1 to fetch all, or a specific number like 1000 to limit for performance
+const loadPigeanGeneChartData = async (maxRows = 1000) => {
+    // Prevent multiple fetches
+    if (pigeanGeneChartDataLoaded.value || pigeanGeneChartLoading.value) {
+        return;
+    }
+
+    try {
+        pigeanGeneChartLoading.value = true;
+        resultsStore.init();
+
+        const queryParams = new URLSearchParams({
+            sort_field: pigeanGeneSortField.value,
+            sort_order: pigeanGeneSortOrder.value,
+            rows: maxRows, // -1 for all, or specific number for performance
+            first: 0,
+        });
+
+        // Note: Chart data ignores filters to show full dataset
+        const endpoint = `/api/pigean-gene-results/${dataset.value}?${queryParams.toString()}`;
+        const { data } = await resultsStore.axios.get(endpoint);
+
+        pigeanGeneAllData.value = data.items || [];
+        pigeanGeneChartDataLoaded.value = true;
+    } catch (err) {
+        console.error("Failed to load PIGEAN gene chart data:", err);
+        pigeanGeneChartDataLoaded.value = false;
+    } finally {
+        pigeanGeneChartLoading.value = false;
     }
 };
 
@@ -2171,6 +2220,7 @@ const onPigeanGenePage = (event) => {
 const onPigeanGeneSort = (event) => {
     pigeanGeneSortField.value = event.sortField;
     pigeanGeneSortOrder.value = event.sortOrder;
+    pigeanGeneFirst.value = 0;
     loadPigeanGeneResults();
 };
 
@@ -2179,7 +2229,15 @@ const onPigeanGeneFilter = () => {
     loadPigeanGeneResults();
 };
 
-const loadPigeanGeneSetResults = async () => {
+const loadPigeanGeneSetResults = async (forceReload = false) => {
+    // Prevent multiple fetches unless forced
+    if (
+        (pigeanGeneSetDataLoaded.value || pigeanGeneSetLoading.value) &&
+        !forceReload
+    ) {
+        return;
+    }
+
     try {
         pigeanGeneSetLoading.value = true;
         resultsStore.init();
@@ -2202,6 +2260,7 @@ const loadPigeanGeneSetResults = async () => {
         pigeanGeneSetResults.value = data.items || [];
         pigeanGeneSetSubRecords.value = data.subRecords || {};
         hasPigeanGeneSetResults.value = pigeanGeneSetResults.value.length > 0;
+        pigeanGeneSetDataLoaded.value = true;
         if (typeof data.totalRecords === "number") {
             pigeanGeneSetTotalRecords.value = data.totalRecords;
         }
@@ -2210,6 +2269,7 @@ const loadPigeanGeneSetResults = async () => {
         }
     } catch (err) {
         console.error("Failed to load PIGEAN gene set results:", err);
+        pigeanGeneSetDataLoaded.value = false;
     } finally {
         pigeanGeneSetLoading.value = false;
     }
@@ -2218,18 +2278,18 @@ const loadPigeanGeneSetResults = async () => {
 const onPigeanGeneSetPage = (event) => {
     pigeanGeneSetFirst.value = event.first;
     pigeanGeneSetRows.value = event.rows;
-    loadPigeanGeneSetResults();
+    loadPigeanGeneSetResults(true); // Force reload for pagination
 };
 
 const onPigeanGeneSetSort = (event) => {
     pigeanGeneSetSortField.value = event.sortField;
     pigeanGeneSetSortOrder.value = event.sortOrder;
-    loadPigeanGeneSetResults();
+    loadPigeanGeneSetResults(true); // Force reload for sorting
 };
 
 const onPigeanGeneSetFilter = () => {
     pigeanGeneSetFirst.value = 0;
-    loadPigeanGeneSetResults();
+    loadPigeanGeneSetResults(true); // Force reload for filtering
 };
 
 const onPigeanGeneExpandedRowsChange = (value) => {
@@ -2431,9 +2491,10 @@ const checkResultsAvailability = async () => {
 
         if (pigeanSucceeded && pigeanGeneResults.value.length === 0) {
             loadPigeanGeneResults();
+            loadPigeanGeneChartData(); // Load chart data separately
         }
 
-        if (pigeanSucceeded && pigeanGeneSetResults.value.length === 0) {
+        if (pigeanSucceeded && !pigeanGeneSetDataLoaded.value) {
             loadPigeanGeneSetResults();
         }
     } catch (err) {
@@ -2531,12 +2592,13 @@ watch(activeTab, (newTab) => {
         pigeanGeneResults.value.length === 0
     ) {
         loadPigeanGeneResults();
+        loadPigeanGeneChartData(); // Load chart data separately
     }
 
     if (
         newTab === "pigean" &&
         hasPigeanGeneSetResults.value &&
-        pigeanGeneSetResults.value.length === 0
+        !pigeanGeneSetDataLoaded.value
     ) {
         loadPigeanGeneSetResults();
     }
@@ -2552,6 +2614,26 @@ watch(
         }
     },
     { immediate: true },
+);
+
+// Watch for dataset changes to reset loaded flags
+watch(
+    () => route.query.dataset,
+    (newDataset) => {
+        if (newDataset && newDataset !== dataset.value) {
+            dataset.value = newDataset;
+            // Reset loaded flags so data will be fetched again
+            pigeanGeneChartDataLoaded.value = false;
+            pigeanGeneSetDataLoaded.value = false;
+            // Clear existing data
+            pigeanGeneAllData.value = [];
+            pigeanGeneResults.value = [];
+            pigeanGeneSetResults.value = [];
+            // Reset pagination
+            pigeanGeneFirst.value = 0;
+            pigeanGeneSetFirst.value = 0;
+        }
+    },
 );
 
 onMounted(async () => {
@@ -2588,12 +2670,13 @@ onMounted(async () => {
         pigeanGeneResults.value.length === 0
     ) {
         loadPigeanGeneResults();
+        loadPigeanGeneChartData(); // Load chart data separately
     }
 
     if (
         activeTab.value === "pigean" &&
         hasPigeanGeneSetResults.value &&
-        pigeanGeneSetResults.value.length === 0
+        !pigeanGeneSetDataLoaded.value
     ) {
         loadPigeanGeneSetResults();
     }
