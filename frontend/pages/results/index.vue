@@ -144,11 +144,15 @@
 
                             <div v-else>
                                 <!-- SLDSC Results Section -->
-                                <div class="mb-8">
+                                <div
+                                    class="mb-8 p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
+                                >
                                     <div
-                                        class="flex items-center justify-between mb-3"
+                                        class="flex items-center justify-between mb-4"
                                     >
-                                        <h3 class="font-semibold text-lg">
+                                        <h3
+                                            class="font-semibold text-xl text-gray-800 dark:text-gray-100"
+                                        >
                                             SLDSC Results
                                         </h3>
                                         <Tag
@@ -451,11 +455,15 @@
 
                             <div v-else>
                                 <!-- MAGMA Gene Results Section -->
-                                <div class="mb-8">
+                                <div
+                                    class="mb-8 p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
+                                >
                                     <div
-                                        class="flex items-center justify-between mb-3"
+                                        class="flex items-center justify-between mb-4"
                                     >
-                                        <h3 class="font-semibold text-lg">
+                                        <h3
+                                            class="font-semibold text-xl text-gray-800 dark:text-gray-100"
+                                        >
                                             Gene Results
                                         </h3>
                                         <Tag
@@ -613,11 +621,15 @@
                                 </div>
 
                                 <!-- MAGMA Pathway Results Section -->
-                                <div class="mt-8">
+                                <div
+                                    class="mt-8 p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
+                                >
                                     <div
-                                        class="flex items-center justify-between mb-3"
+                                        class="flex items-center justify-between mb-4"
                                     >
-                                        <h3 class="font-semibold text-lg">
+                                        <h3
+                                            class="font-semibold text-xl text-gray-800 dark:text-gray-100"
+                                        >
                                             Pathway Results
                                         </h3>
                                         <Tag
@@ -851,11 +863,15 @@
 
                             <div v-else>
                                 <!-- Gene Results Section -->
-                                <div class="mb-8">
+                                <div
+                                    class="mb-8 p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
+                                >
                                     <div
-                                        class="flex items-center justify-between mb-3"
+                                        class="flex items-center justify-between mb-4"
                                     >
-                                        <h3 class="font-semibold text-lg">
+                                        <h3
+                                            class="font-semibold text-xl text-gray-800 dark:text-gray-100"
+                                        >
                                             Gene Results
                                         </h3>
                                         <Tag
@@ -1364,11 +1380,15 @@
                                 </div>
 
                                 <!-- Gene Set Results Section -->
-                                <div class="mt-8">
+                                <div
+                                    class="mt-8 p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
+                                >
                                     <div
-                                        class="flex items-center justify-between mb-3"
+                                        class="flex items-center justify-between mb-4"
                                     >
-                                        <h3 class="font-semibold text-lg">
+                                        <h3
+                                            class="font-semibold text-xl text-gray-800 dark:text-gray-100"
+                                        >
                                             Gene Set Results
                                         </h3>
                                         <Tag
@@ -1376,6 +1396,39 @@
                                             :value="`${pigeanGeneSetTotalRecords} gene sets`"
                                             severity="info"
                                         />
+                                    </div>
+
+                                    <!-- Gene Set Scatter Plot -->
+                                    <div
+                                        v-if="pigeanGeneSetDataLoaded"
+                                        class="mb-6"
+                                    >
+                                        <PigeanGeneSetScatterPlot
+                                            :geneSetResults="
+                                                pigeanGeneSetResults
+                                            "
+                                            :key="pigeanGeneSetChartKey"
+                                        />
+                                    </div>
+                                    <div
+                                        v-else-if="pigeanGeneSetLoading"
+                                        class="mb-6"
+                                    >
+                                        <h4 class="font-semibold text-lg mb-3">
+                                            Gene Set Plot
+                                        </h4>
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading scatter plot
+                                                data...</span
+                                            >
+                                        </div>
+                                        <Skeleton height="400px" />
                                     </div>
 
                                     <!-- Gene set table loading skeleton -->
@@ -1446,6 +1499,29 @@
                                             sortable
                                             :showFilterMenu="false"
                                         >
+                                            <template #filter>
+                                                <AutoComplete
+                                                    v-model="
+                                                        pigeanGeneSetFilterInput
+                                                    "
+                                                    :suggestions="
+                                                        pigeanGeneSetSuggestions
+                                                    "
+                                                    @complete="
+                                                        onPigeanGeneSetComplete
+                                                    "
+                                                    @item-select="
+                                                        onPigeanGeneSetSelect
+                                                    "
+                                                    @clear="
+                                                        onPigeanGeneSetClear
+                                                    "
+                                                    placeholder="Search gene set"
+                                                    class="p-column-filter"
+                                                    fluid
+                                                    showClear
+                                                />
+                                            </template>
                                             <template #body="{ data }">
                                                 <a
                                                     :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(
@@ -1977,6 +2053,11 @@ const pigeanChartKey = computed(() => {
     return `pigean-chart-${dataset.value}-${pigeanGeneTotalRecords.value}`;
 });
 
+// Key for forcing gene set chart re-render when data changes
+const pigeanGeneSetChartKey = computed(() => {
+    return `pigean-geneset-chart-${dataset.value}-${pigeanGeneSetTotalRecords.value}`;
+});
+
 // Client-side pagination for PIGEAN gene table
 const paginatedPigeanGeneData = computed(() => {
     const start = pigeanGeneFirst.value;
@@ -2309,10 +2390,13 @@ const pigeanGeneFilters = ref({
 const pigeanGeneFilterInput = ref(null);
 
 const pigeanGeneSetFilters = ref({
+    gene_set: { value: null, matchMode: "contains" },
     beta_uncorrected: { value: null, matchMode: "gte" },
     beta: { value: null, matchMode: "gte" },
     n: { value: null, matchMode: "gte" },
 });
+
+const pigeanGeneSetFilterInput = ref(null);
 
 const transformFilters = (filters) => {
     const transformedFilters = {};
@@ -2599,6 +2683,31 @@ const onPigeanGeneClear = () => {
     pigeanGeneFilterInput.value = null;
     pigeanGeneFilters.value.gene.value = null;
     onPigeanGeneFilter();
+};
+
+// Autocomplete suggestions for gene set filter
+const pigeanGeneSetSuggestions = ref([]);
+
+const onPigeanGeneSetComplete = (event) => {
+    const query = event.query.toLowerCase();
+    // Get unique gene set names from results that match the query
+    const allGeneSets = pigeanGeneSetResults.value
+        .map((item) => item.gene_set)
+        .filter((geneSet) => geneSet?.toLowerCase().includes(query));
+    // Return unique values, limited to first 20
+    pigeanGeneSetSuggestions.value = [...new Set(allGeneSets)].slice(0, 20);
+};
+
+const onPigeanGeneSetSelect = (event) => {
+    pigeanGeneSetFilters.value.gene_set.value = event.value;
+    pigeanGeneSetFilterInput.value = event.value;
+    onPigeanGeneSetFilter();
+};
+
+const onPigeanGeneSetClear = () => {
+    pigeanGeneSetFilterInput.value = null;
+    pigeanGeneSetFilters.value.gene_set.value = null;
+    onPigeanGeneSetFilter();
 };
 
 // Client-side pagination handler
