@@ -867,6 +867,37 @@
                                         />
                                     </div>
 
+                                    <!-- Gene Scatter Plot - only render once chart data is loaded -->
+                                    <div
+                                        v-if="pigeanGeneChartDataLoaded"
+                                        class="mb-6"
+                                    >
+                                        <PigeanGeneScatterPlot
+                                            :geneResults="pigeanGeneAllData"
+                                            :key="'pigean-chart-' + dataset"
+                                        />
+                                    </div>
+                                    <div
+                                        v-else-if="pigeanGeneChartLoading"
+                                        class="mb-6"
+                                    >
+                                        <h4 class="font-semibold text-lg mb-3">
+                                            Gene Support Plot
+                                        </h4>
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading scatter plot
+                                                data...</span
+                                            >
+                                        </div>
+                                        <Skeleton height="400px" />
+                                    </div>
+
                                     <!-- Gene table loading skeleton -->
                                     <div
                                         v-if="
@@ -1132,7 +1163,9 @@
                                         </Column>
 
                                         <template #expansion="slotProps">
-                                            <div class="p-4 bg-gray-50 rounded">
+                                            <div
+                                                class="p-4 bg-gray-50 dark:bg-gray-800 rounded"
+                                            >
                                                 <h4 class="font-semibold mb-2">
                                                     Gene Sets for
                                                     {{ slotProps.data.gene }}
@@ -1284,40 +1317,6 @@
                                             </div>
                                         </template>
                                     </DataTable>
-
-                                    <!-- Gene Scatter Plot - only render once chart data is loaded -->
-                                    <div
-                                        v-if="pigeanGeneChartDataLoaded"
-                                        class="mt-6"
-                                    >
-                                        <h4 class="font-semibold text-lg mb-3">
-                                            Gene Support Scatter Plot
-                                        </h4>
-                                        <PigeanGeneScatterPlot
-                                            :geneResults="pigeanGeneAllData"
-                                            :key="'pigean-chart-' + dataset"
-                                        />
-                                    </div>
-                                    <div
-                                        v-else-if="pigeanGeneChartLoading"
-                                        class="mt-6"
-                                    >
-                                        <h4 class="font-semibold text-lg mb-3">
-                                            Gene Support Scatter Plot
-                                        </h4>
-                                        <div
-                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
-                                        >
-                                            <i
-                                                class="pi pi-spinner pi-spin text-primary"
-                                            ></i>
-                                            <span
-                                                >Loading scatter plot
-                                                data...</span
-                                            >
-                                        </div>
-                                        <Skeleton height="400px" />
-                                    </div>
                                 </div>
 
                                 <!-- Gene Set Results Section -->
@@ -1512,7 +1511,9 @@
                                             </template>
                                         </Column>
                                         <template #expansion="slotProps">
-                                            <div class="p-4 bg-gray-50 rounded">
+                                            <div
+                                                class="p-4 bg-gray-50 dark:bg-gray-800 rounded"
+                                            >
                                                 <h4 class="font-semibold mb-2">
                                                     Genes contributing to
                                                     {{
