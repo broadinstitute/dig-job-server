@@ -277,8 +277,7 @@
                                             <template #filter>
                                                 <AutoComplete
                                                     v-model="
-                                                        filters['biosample']
-                                                            .value
+                                                        biosampleFilterInput
                                                     "
                                                     :suggestions="
                                                         filteredBiosamples
@@ -530,8 +529,7 @@
                                             <template #filter>
                                                 <AutoComplete
                                                     v-model="
-                                                        magmaFilters['gene']
-                                                            .value
+                                                        magmaGeneFilterInput
                                                     "
                                                     :suggestions="filteredGenes"
                                                     @complete="searchGenes"
@@ -867,18 +865,20 @@
                                         />
                                     </div>
 
-                                    <!-- Gene Scatter Plot - only render once chart data is loaded -->
+                                    <!-- Gene Scatter Plot - uses filtered data -->
                                     <div
-                                        v-if="pigeanGeneChartDataLoaded"
+                                        v-if="pigeanGeneDataLoaded"
                                         class="mb-6"
                                     >
                                         <PigeanGeneScatterPlot
-                                            :geneResults="pigeanGeneAllData"
-                                            :key="'pigean-chart-' + dataset"
+                                            :geneResults="
+                                                filteredPigeanGeneData
+                                            "
+                                            :key="pigeanChartKey"
                                         />
                                     </div>
                                     <div
-                                        v-else-if="pigeanGeneChartLoading"
+                                        v-else-if="pigeanGeneLoading"
                                         class="mb-6"
                                     >
                                         <h4 class="font-semibold text-lg mb-3">
@@ -902,7 +902,7 @@
                                     <div
                                         v-if="
                                             pigeanGeneLoading &&
-                                            pigeanGeneResults.length === 0
+                                            pigeanGeneAllData.length === 0
                                         "
                                         class="p-4"
                                     >
@@ -926,12 +926,11 @@
                                         </div>
                                     </div>
 
-                                    <!-- Gene table -->
+                                    <!-- Gene table (client-side pagination) -->
                                     <DataTable
                                         v-else
-                                        :value="pigeanGeneResults"
+                                        :value="paginatedPigeanGeneData"
                                         dataKey="gene"
-                                        lazy
                                         :first="pigeanGeneFirst"
                                         :rows="pigeanGeneRows"
                                         :sortField="pigeanGeneSortField"
@@ -939,7 +938,6 @@
                                         :totalRecords="pigeanGeneTotalRecords"
                                         paginator
                                         :rows-per-page-options="[10, 20, 50]"
-                                        :loading="pigeanGeneLoading"
                                         :filters="pigeanGeneFilters"
                                         @page="onPigeanGenePage"
                                         @sort="onPigeanGeneSort"
@@ -961,6 +959,29 @@
                                             sortable
                                             :showFilterMenu="false"
                                         >
+                                            <template #filter>
+                                                <AutoComplete
+                                                    v-model="
+                                                        pigeanGeneFilterInput
+                                                    "
+                                                    :suggestions="
+                                                        pigeanGeneSuggestions
+                                                    "
+                                                    @complete="
+                                                        onPigeanGeneComplete
+                                                    "
+                                                    @item-select="
+                                                        onPigeanGeneSelect
+                                                    "
+                                                    @clear="
+                                                        onPigeanGeneClear
+                                                    "
+                                                    placeholder="Search gene"
+                                                    class="p-column-filter"
+                                                    fluid
+                                                    showClear
+                                                />
+                                            </template>
                                             <template #body="{ data }">
                                                 <a
                                                     :href="`https://a2f.hugeamp.org/gene.html?gene=${data.gene}`"
@@ -990,7 +1011,11 @@
                                                     class="p-column-filter w-full"
                                                     :minFractionDigits="3"
                                                     :maxFractionDigits="3"
+                                                    showClear
                                                     @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                    @update:modelValue="
                                                         onPigeanGeneFilter
                                                     "
                                                 />
@@ -1021,7 +1046,11 @@
                                                     class="p-column-filter w-full"
                                                     :minFractionDigits="3"
                                                     :maxFractionDigits="3"
+                                                    showClear
                                                     @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                    @update:modelValue="
                                                         onPigeanGeneFilter
                                                     "
                                                 />
@@ -1052,7 +1081,11 @@
                                                     class="p-column-filter w-full"
                                                     :minFractionDigits="3"
                                                     :maxFractionDigits="3"
+                                                    showClear
                                                     @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                    @update:modelValue="
                                                         onPigeanGeneFilter
                                                     "
                                                 />
@@ -1083,7 +1116,11 @@
                                                     class="p-column-filter w-full"
                                                     :minFractionDigits="3"
                                                     :maxFractionDigits="6"
+                                                    showClear
                                                     @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                    @update:modelValue="
                                                         onPigeanGeneFilter
                                                     "
                                                 />
@@ -1113,7 +1150,11 @@
                                                     class="p-column-filter w-full"
                                                     :minFractionDigits="0"
                                                     :maxFractionDigits="0"
+                                                    showClear
                                                     @keydown.enter="
+                                                        onPigeanGeneFilter
+                                                    "
+                                                    @update:modelValue="
                                                         onPigeanGeneFilter
                                                     "
                                                 />
@@ -1680,9 +1721,7 @@ const magmaPathwaysDt = ref();
 const hasMagmaPathwaysResults = ref(false);
 
 // PIGEAN specific data
-const pigeanGeneResults = ref([]); // Paginated data for table
-const pigeanGeneAllData = ref([]); // All data for chart
-const pigeanGeneTotalRecords = ref(0);
+const pigeanGeneAllData = ref([]); // All fetched data (top 1000)
 const pigeanGeneLoading = ref(false);
 const pigeanGeneFirst = ref(0);
 const pigeanGeneRows = ref(10);
@@ -1704,8 +1743,7 @@ const hasPigeanGeneResults = ref(false);
 const hasPigeanGeneSetResults = ref(false);
 
 // Flags to track if data has been loaded (prevent repeated fetches)
-const pigeanGeneChartDataLoaded = ref(false);
-const pigeanGeneChartLoading = ref(false);
+const pigeanGeneDataLoaded = ref(false);
 const pigeanGeneSetDataLoaded = ref(false);
 
 // Job IDs for linking to logs
@@ -1777,6 +1815,71 @@ const shouldShowPigeanTab = computed(() => {
     }
 
     return hasPigeanResults.value;
+});
+
+// Client-side filtering for PIGEAN gene data
+const filteredPigeanGeneData = computed(() => {
+    let data = [...pigeanGeneAllData.value];
+
+    // Apply filters
+    const filters = pigeanGeneFilters.value;
+
+    // Gene name filter (case-insensitive contains)
+    if (filters.gene?.value) {
+        const searchTerm = filters.gene.value.toLowerCase();
+        data = data.filter((item) =>
+            item.gene?.toLowerCase().includes(searchTerm),
+        );
+    }
+    if (filters.combined?.value != null) {
+        data = data.filter((item) => item.combined >= filters.combined.value);
+    }
+    if (filters.huge_score?.value != null) {
+        data = data.filter(
+            (item) => item.huge_score >= filters.huge_score.value,
+        );
+    }
+    if (filters.log_bf?.value != null) {
+        data = data.filter((item) => item.log_bf >= filters.log_bf.value);
+    }
+    if (filters.prior?.value != null) {
+        data = data.filter((item) => item.prior >= filters.prior.value);
+    }
+    if (filters.n?.value != null) {
+        data = data.filter((item) => item.n >= filters.n.value);
+    }
+
+    // Apply sorting
+    if (pigeanGeneSortField.value) {
+        const field = pigeanGeneSortField.value;
+        const order = pigeanGeneSortOrder.value || 1;
+        data.sort((a, b) => {
+            const aVal = a[field] ?? 0;
+            const bVal = b[field] ?? 0;
+            if (aVal < bVal) return -1 * order;
+            if (aVal > bVal) return 1 * order;
+            return 0;
+        });
+    }
+
+    return data;
+});
+
+// Total records after filtering (for pagination)
+const pigeanGeneTotalRecords = computed(() => {
+    return filteredPigeanGeneData.value.length;
+});
+
+// Key for forcing chart re-render when filters change
+const pigeanChartKey = computed(() => {
+    return `pigean-chart-${dataset.value}-${pigeanGeneTotalRecords.value}`;
+});
+
+// Client-side pagination for PIGEAN gene table
+const paginatedPigeanGeneData = computed(() => {
+    const start = pigeanGeneFirst.value;
+    const end = start + pigeanGeneRows.value;
+    return filteredPigeanGeneData.value.slice(start, end);
 });
 
 const sldscWorkflowStatus = computed(() => {
@@ -2011,12 +2114,14 @@ const searchBiosamples = (event) => {
 
 // biosample selection
 const onBiosampleSelect = (event) => {
+    biosampleFilterInput.value = event.value;
     filters.value.biosample.value = event.value;
     onSldscFilter();
 };
 
 // clearing the autocomplete
 const onBiosampleClear = () => {
+    biosampleFilterInput.value = null;
     filters.value.biosample.value = null;
     onSldscFilter();
 };
@@ -2056,12 +2161,14 @@ const searchGenes = (event) => {
 
 // Gene selection (MAGMA)
 const onGeneSelect = (event) => {
+    magmaGeneFilterInput.value = event.value;
     magmaFilters.value.gene.value = event.value;
     onMagmaFilter();
 };
 
 // Clearing the gene autocomplete
 const onGeneClear = () => {
+    magmaGeneFilterInput.value = null;
     magmaFilters.value.gene.value = null;
     onMagmaFilter();
 };
@@ -2074,10 +2181,14 @@ const filters = ref({
     pValue: { value: null, matchMode: "lte" },
 });
 
+const biosampleFilterInput = ref(null);
+
 const magmaFilters = ref({
     gene: { value: null, matchMode: "equals" },
     pValue: { value: null, matchMode: "lte" },
 });
+
+const magmaGeneFilterInput = ref(null);
 
 const magmaPathwaysFilters = ref({
     pathwayName: { value: null, matchMode: "contains" },
@@ -2085,12 +2196,15 @@ const magmaPathwaysFilters = ref({
 });
 
 const pigeanGeneFilters = ref({
+    gene: { value: null, matchMode: "contains" },
     prior: { value: null, matchMode: "gte" },
     combined: { value: null, matchMode: "gte" },
     huge_score: { value: null, matchMode: "gte" },
     log_bf: { value: null, matchMode: "gte" },
     n: { value: null, matchMode: "gte" },
 });
+
+const pigeanGeneFilterInput = ref(null);
 
 const pigeanGeneSetFilters = ref({
     beta_uncorrected: { value: null, matchMode: "gte" },
@@ -2324,90 +2438,86 @@ const onMagmaPathwaysFilter = () => {
 
 // PIGEAN Results functions
 
-// Load table data with server-side pagination
-const loadPigeanGeneResults = async () => {
+// Load top 1000 genes (used for both table and chart)
+const loadPigeanGeneData = async () => {
+    // Prevent multiple fetches
+    if (pigeanGeneDataLoaded.value || pigeanGeneLoading.value) {
+        return;
+    }
+
     try {
         pigeanGeneLoading.value = true;
         resultsStore.init();
 
         const queryParams = new URLSearchParams({
-            first: pigeanGeneFirst.value,
-            rows: pigeanGeneRows.value,
-            sort_field: pigeanGeneSortField.value,
-            sort_order: pigeanGeneSortOrder.value,
-        });
-
-        const transformedFilters = transformFilters(pigeanGeneFilters.value);
-        Object.entries(transformedFilters).forEach(([key, value]) => {
-            queryParams.append(key, value);
+            first: 0,
+            rows: 1000, // Fetch top 1000 genes
+            sort_field: "combined", // Default sort by combined score
+            sort_order: -1, // Descending
         });
 
         const endpoint = `/api/pigean-gene-results/${dataset.value}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
-        pigeanGeneResults.value = data.items || [];
-        pigeanGeneTotalRecords.value = data.totalRecords || 0;
-        hasPigeanGeneResults.value = pigeanGeneResults.value.length > 0;
+        pigeanGeneAllData.value = data.items || [];
+        hasPigeanGeneResults.value = pigeanGeneAllData.value.length > 0;
+        pigeanGeneDataLoaded.value = true;
 
         if (data.jobId) {
             pigeanJobId.value = data.jobId;
         }
     } catch (err) {
         console.error("Failed to load PIGEAN gene results:", err);
+        pigeanGeneDataLoaded.value = false;
     } finally {
         pigeanGeneLoading.value = false;
     }
 };
 
-// Load all data for chart (separate from table)
-// Use rows=-1 to fetch all, or a specific number like 1000 to limit for performance
-const loadPigeanGeneChartData = async (maxRows = 1000) => {
-    // Prevent multiple fetches
-    if (pigeanGeneChartDataLoaded.value || pigeanGeneChartLoading.value) {
-        return;
-    }
+// Autocomplete suggestions for gene filter
+const pigeanGeneSuggestions = ref([]);
 
-    try {
-        pigeanGeneChartLoading.value = true;
-        resultsStore.init();
-
-        const queryParams = new URLSearchParams({
-            sort_field: pigeanGeneSortField.value,
-            sort_order: pigeanGeneSortOrder.value,
-            rows: maxRows, // -1 for all, or specific number for performance
-            first: 0,
-        });
-
-        // Note: Chart data ignores filters to show full dataset
-        const endpoint = `/api/pigean-gene-results/${dataset.value}?${queryParams.toString()}`;
-        const { data } = await resultsStore.axios.get(endpoint);
-
-        pigeanGeneAllData.value = data.items || [];
-        pigeanGeneChartDataLoaded.value = true;
-    } catch (err) {
-        console.error("Failed to load PIGEAN gene chart data:", err);
-        pigeanGeneChartDataLoaded.value = false;
-    } finally {
-        pigeanGeneChartLoading.value = false;
-    }
+const onPigeanGeneComplete = (event) => {
+    const query = event.query.toLowerCase();
+    // Get unique gene names from all data that match the query
+    const allGenes = pigeanGeneAllData.value
+        .map((item) => item.gene)
+        .filter((gene) => gene?.toLowerCase().includes(query));
+    // Return unique values, limited to first 20
+    pigeanGeneSuggestions.value = [...new Set(allGenes)].slice(0, 20);
 };
 
+const onPigeanGeneSelect = (event) => {
+    pigeanGeneFilters.value.gene.value = event.value;
+    pigeanGeneFilterInput.value = event.value;
+    onPigeanGeneFilter();
+};
+
+const onPigeanGeneClear = () => {
+    pigeanGeneFilterInput.value = null;
+    pigeanGeneFilters.value.gene.value = null;
+    onPigeanGeneFilter();
+};
+
+// Client-side pagination handler
 const onPigeanGenePage = (event) => {
     pigeanGeneFirst.value = event.first;
     pigeanGeneRows.value = event.rows;
-    loadPigeanGeneResults();
+    // No API call needed - pagination is handled by computed property
 };
 
+// Client-side sorting handler
 const onPigeanGeneSort = (event) => {
     pigeanGeneSortField.value = event.sortField;
     pigeanGeneSortOrder.value = event.sortOrder;
-    pigeanGeneFirst.value = 0;
-    loadPigeanGeneResults();
+    pigeanGeneFirst.value = 0; // Reset to first page on sort
+    // No API call needed - sorting is handled by computed property
 };
 
+// Client-side filtering handler
 const onPigeanGeneFilter = () => {
-    pigeanGeneFirst.value = 0;
-    loadPigeanGeneResults();
+    pigeanGeneFirst.value = 0; // Reset to first page on filter
+    // No API call needed - filtering is handled by computed property
 };
 
 const loadPigeanGeneSetResults = async (forceReload = false) => {
@@ -2670,9 +2780,8 @@ const checkResultsAvailability = async () => {
             loadMagmaPathwaysResults();
         }
 
-        if (pigeanSucceeded && pigeanGeneResults.value.length === 0) {
-            loadPigeanGeneResults();
-            loadPigeanGeneChartData(); // Load chart data separately
+        if (pigeanSucceeded && !pigeanGeneDataLoaded.value) {
+            loadPigeanGeneData();
         }
 
         if (pigeanSucceeded && !pigeanGeneSetDataLoaded.value) {
@@ -2770,10 +2879,9 @@ watch(activeTab, (newTab) => {
     if (
         newTab === "pigean" &&
         hasPigeanGeneResults.value &&
-        pigeanGeneResults.value.length === 0
+        !pigeanGeneDataLoaded.value
     ) {
-        loadPigeanGeneResults();
-        loadPigeanGeneChartData(); // Load chart data separately
+        loadPigeanGeneData();
     }
 
     if (
@@ -2804,15 +2912,17 @@ watch(
         if (newDataset && newDataset !== dataset.value) {
             dataset.value = newDataset;
             // Reset loaded flags so data will be fetched again
-            pigeanGeneChartDataLoaded.value = false;
+            pigeanGeneDataLoaded.value = false;
             pigeanGeneSetDataLoaded.value = false;
             // Clear existing data
             pigeanGeneAllData.value = [];
-            pigeanGeneResults.value = [];
             pigeanGeneSetResults.value = [];
             // Reset pagination
             pigeanGeneFirst.value = 0;
             pigeanGeneSetFirst.value = 0;
+            biosampleFilterInput.value = null;
+            magmaGeneFilterInput.value = null;
+            pigeanGeneFilterInput.value = null;
         }
     },
 );
@@ -2848,10 +2958,9 @@ onMounted(async () => {
     if (
         activeTab.value === "pigean" &&
         hasPigeanGeneResults.value &&
-        pigeanGeneResults.value.length === 0
+        !pigeanGeneDataLoaded.value
     ) {
-        loadPigeanGeneResults();
-        loadPigeanGeneChartData(); // Load chart data separately
+        loadPigeanGeneData();
     }
 
     if (
@@ -2939,5 +3048,15 @@ onMounted(async () => {
 
 :deep(.p-datatable-filter-row) {
     background-color: #f8f9fa;
+}
+
+:deep(.dark .p-autocomplete .p-autocomplete-clear-icon),
+:deep(.dark .p-inputnumber .p-inputnumber-clear-icon) {
+    color: #cbd5f5;
+}
+
+:deep(.p-autocomplete .p-autocomplete-clear-icon:hover),
+:deep(.p-inputnumber .p-inputnumber-clear-icon:hover) {
+    color: #111827;
 }
 </style>
