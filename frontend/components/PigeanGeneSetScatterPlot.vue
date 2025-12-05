@@ -18,12 +18,12 @@
                 <div class="text-sm">
                     <div class="flex items-start justify-between gap-2">
                         <a
-                            :href="`https://a2f.hugeamp.org/gene.html?gene=${tooltip.gene}`"
+                            :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(tooltip.gene_set)}&genesetSize=small&traitGroup=all`"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold hover:underline"
                         >
-                            {{ tooltip.gene }}
+                            {{ tooltip.gene_set }}
                         </a>
                         <button
                             v-if="tooltip.pinned"
@@ -38,16 +38,14 @@
                         class="mt-1 space-y-0.5 text-gray-600 dark:text-gray-300"
                     >
                         <div>
-                            Combined Score: {{ formatNumber(tooltip.combined) }}
+                            Beta (Joint): {{ formatNumber(tooltip.beta) }}
                         </div>
                         <div>
-                            HuGE Score: {{ formatNumber(tooltip.huge_score) }}
+                            Beta (Marginal):
+                            {{ formatNumber(tooltip.beta_uncorrected) }}
                         </div>
                         <div>
-                            Direct Support: {{ formatNumber(tooltip.log_bf) }}
-                        </div>
-                        <div>
-                            Indirect Support: {{ formatNumber(tooltip.prior) }}
+                            # Genes: {{ tooltip.n?.toLocaleString() ?? "—" }}
                         </div>
                     </div>
                 </div>
@@ -69,7 +67,7 @@ import {
 Chart.register(ScatterController, LinearScale, PointElement, ChartTooltip);
 
 const props = defineProps({
-    geneResults: {
+    geneSetResults: {
         type: Array,
         default: () => [],
     },
@@ -86,11 +84,10 @@ const tooltip = ref({
     canvasX: 0,
     canvasY: 0,
     showOnLeft: false,
-    gene: "",
-    combined: 0,
-    huge_score: 0,
-    log_bf: 0,
-    prior: 0,
+    gene_set: "",
+    beta: 0,
+    beta_uncorrected: 0,
+    n: 0,
 });
 
 const tooltipStyle = computed(() => {
@@ -132,27 +129,26 @@ const formatNumber = (value) => {
 };
 
 const chartData = computed(() => {
-    const dataPoints = props.geneResults
+    const dataPoints = props.geneSetResults
         .filter(
             (item) =>
-                typeof item.prior === "number" &&
-                typeof item.log_bf === "number",
+                typeof item.beta_uncorrected === "number" &&
+                typeof item.beta === "number",
         )
         .map((item) => ({
-            x: item.prior,
-            y: item.log_bf,
-            gene: item.gene,
-            combined: item.combined,
-            huge_score: item.huge_score,
+            x: item.beta_uncorrected,
+            y: item.beta,
+            gene_set: item.gene_set,
+            n: item.n,
         }));
 
     return {
         datasets: [
             {
-                label: "Genes",
+                label: "Gene Sets",
                 data: dataPoints,
-                backgroundColor: "rgba(59, 130, 246, 0.6)",
-                borderColor: "rgba(59, 130, 246, 1)",
+                backgroundColor: "rgba(34, 197, 94, 0.6)",
+                borderColor: "rgba(34, 197, 94, 1)",
                 borderWidth: 1,
                 pointRadius: 5,
                 pointHoverRadius: 8,
@@ -185,11 +181,10 @@ const chartOptions = {
                 canvasX: canvasX,
                 canvasY: canvasY,
                 showOnLeft: showOnLeft,
-                gene: rawData.gene,
-                combined: rawData.combined,
-                huge_score: rawData.huge_score,
-                log_bf: rawData.y,
-                prior: rawData.x,
+                gene_set: rawData.gene_set,
+                beta: rawData.y,
+                beta_uncorrected: rawData.x,
+                n: rawData.n,
             };
         }
     },
@@ -228,11 +223,10 @@ const chartOptions = {
                         canvasX: tooltipModel.caretX,
                         canvasY: tooltipModel.caretY,
                         showOnLeft: showOnLeft,
-                        gene: rawData.gene,
-                        combined: rawData.combined,
-                        huge_score: rawData.huge_score,
-                        log_bf: rawData.y,
-                        prior: rawData.x,
+                        gene_set: rawData.gene_set,
+                        beta: rawData.y,
+                        beta_uncorrected: rawData.x,
+                        n: rawData.n,
                     };
                 }
             },
@@ -244,7 +238,7 @@ const chartOptions = {
             position: "bottom",
             title: {
                 display: true,
-                text: "Indirect Support (Prior)",
+                text: "Beta (Marginal)",
                 font: {
                     size: 14,
                     weight: "bold",
@@ -258,7 +252,7 @@ const chartOptions = {
             type: "linear",
             title: {
                 display: true,
-                text: "Direct Support (log10 BF)",
+                text: "Beta (Joint)",
                 font: {
                     size: 14,
                     weight: "bold",
@@ -299,7 +293,7 @@ const updateChart = () => {
 };
 
 watch(
-    () => props.geneResults,
+    () => props.geneSetResults,
     () => {
         nextTick(() => {
             updateChart();
