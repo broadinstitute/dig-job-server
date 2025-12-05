@@ -945,7 +945,7 @@
                                     <!-- Gene table (client-side pagination) -->
                                     <DataTable
                                         v-else
-                                        :value="paginatedPigeanGeneData"
+                                        :value="filteredPigeanGeneData"
                                         dataKey="gene"
                                         :first="pigeanGeneFirst"
                                         :rows="pigeanGeneRows"
@@ -1405,7 +1405,7 @@
                                     >
                                         <PigeanGeneSetScatterPlot
                                             :geneSetResults="
-                                                pigeanGeneSetResults
+                                                filteredPigeanGeneSetData
                                             "
                                             :key="pigeanGeneSetChartKey"
                                         />
@@ -1435,7 +1435,7 @@
                                     <div
                                         v-if="
                                             pigeanGeneSetLoading &&
-                                            pigeanGeneSetResults.length === 0
+                                            pigeanGeneSetAllData.length === 0
                                         "
                                         class="p-4"
                                     >
@@ -1459,10 +1459,10 @@
                                         </div>
                                     </div>
 
-                                    <!-- Gene set table -->
+                                    <!-- Gene set table (client-side pagination) -->
                                     <DataTable
                                         v-else
-                                        :value="pigeanGeneSetResults"
+                                        :value="filteredPigeanGeneSetData"
                                         dataKey="gene_set"
                                         :first="pigeanGeneSetFirst"
                                         :rows="pigeanGeneSetRows"
@@ -1471,14 +1471,11 @@
                                         :totalRecords="
                                             pigeanGeneSetTotalRecords
                                         "
-                                        :lazy="true"
                                         paginator
                                         :rows-per-page-options="[10, 20, 50]"
-                                        :loading="pigeanGeneSetLoading"
                                         :filters="pigeanGeneSetFilters"
                                         @page="onPigeanGeneSetPage"
                                         @sort="onPigeanGeneSetSort"
-                                        @filter="onPigeanGeneSetFilter"
                                         :expandedRows="
                                             pigeanGeneSetExpandedRows
                                         "
@@ -1908,7 +1905,7 @@ const pigeanGeneSortOrder = ref(-1);
 const pigeanGeneExpandedRows = ref({});
 
 const pigeanGeneSetResults = ref([]);
-const pigeanGeneSetTotalRecords = ref(0);
+const pigeanGeneSetAllData = ref([]); // All fetched data (top 1000)
 const pigeanGeneSetLoading = ref(false);
 const pigeanGeneSetFirst = ref(0);
 const pigeanGeneSetRows = ref(10);
@@ -2053,9 +2050,63 @@ const pigeanChartKey = computed(() => {
     return `pigean-chart-${dataset.value}-${pigeanGeneTotalRecords.value}`;
 });
 
+// Client-side filtering for PIGEAN gene set data
+const filteredPigeanGeneSetData = computed(() => {
+    let data = [...pigeanGeneSetAllData.value];
+
+    // Apply filters
+    const filters = pigeanGeneSetFilters.value;
+
+    // Gene set name filter (case-insensitive contains)
+    if (filters.gene_set?.value) {
+        const searchTerm = filters.gene_set.value.toLowerCase();
+        data = data.filter((item) =>
+            item.gene_set?.toLowerCase().includes(searchTerm),
+        );
+    }
+    if (filters.beta_uncorrected?.value != null) {
+        data = data.filter(
+            (item) => item.beta_uncorrected >= filters.beta_uncorrected.value,
+        );
+    }
+    if (filters.beta?.value != null) {
+        data = data.filter((item) => item.beta >= filters.beta.value);
+    }
+    if (filters.n?.value != null) {
+        data = data.filter((item) => item.n >= filters.n.value);
+    }
+
+    // Apply sorting
+    if (pigeanGeneSetSortField.value) {
+        const field = pigeanGeneSetSortField.value;
+        const order = pigeanGeneSetSortOrder.value || 1;
+        data.sort((a, b) => {
+            const aVal = a[field] ?? 0;
+            const bVal = b[field] ?? 0;
+            if (aVal < bVal) return -1 * order;
+            if (aVal > bVal) return 1 * order;
+            return 0;
+        });
+    }
+
+    return data;
+});
+
+// Total records after filtering (for gene set pagination)
+const pigeanGeneSetTotalRecords = computed(() => {
+    return filteredPigeanGeneSetData.value.length;
+});
+
 // Key for forcing gene set chart re-render when data changes
 const pigeanGeneSetChartKey = computed(() => {
     return `pigean-geneset-chart-${dataset.value}-${pigeanGeneSetTotalRecords.value}`;
+});
+
+// Client-side pagination for PIGEAN gene set table
+const paginatedPigeanGeneSetData = computed(() => {
+    const start = pigeanGeneSetFirst.value;
+    const end = start + pigeanGeneSetRows.value;
+    return filteredPigeanGeneSetData.value.slice(start, end);
 });
 
 // Client-side pagination for PIGEAN gene table
@@ -2690,8 +2741,8 @@ const pigeanGeneSetSuggestions = ref([]);
 
 const onPigeanGeneSetComplete = (event) => {
     const query = event.query.toLowerCase();
-    // Get unique gene set names from results that match the query
-    const allGeneSets = pigeanGeneSetResults.value
+    // Get unique gene set names from all data that match the query
+    const allGeneSets = pigeanGeneSetAllData.value
         .map((item) => item.gene_set)
         .filter((geneSet) => geneSet?.toLowerCase().includes(query));
     // Return unique values, limited to first 20
@@ -2731,12 +2782,9 @@ const onPigeanGeneFilter = () => {
     // No API call needed - filtering is handled by computed property
 };
 
-const loadPigeanGeneSetResults = async (forceReload = false) => {
-    // Prevent multiple fetches unless forced
-    if (
-        (pigeanGeneSetDataLoaded.value || pigeanGeneSetLoading.value) &&
-        !forceReload
-    ) {
+const loadPigeanGeneSetResults = async () => {
+    // Prevent multiple fetches
+    if (pigeanGeneSetDataLoaded.value || pigeanGeneSetLoading.value) {
         return;
     }
 
@@ -2745,27 +2793,20 @@ const loadPigeanGeneSetResults = async (forceReload = false) => {
         resultsStore.init();
 
         const queryParams = new URLSearchParams({
-            first: pigeanGeneSetFirst.value,
-            rows: pigeanGeneSetRows.value,
-            sort_field: pigeanGeneSetSortField.value,
-            sort_order: pigeanGeneSetSortOrder.value,
-        });
-
-        const transformedFilters = transformFilters(pigeanGeneSetFilters.value);
-        Object.entries(transformedFilters).forEach(([key, value]) => {
-            queryParams.append(key, value);
+            first: 0,
+            rows: 1000, // Fetch top 1000 gene sets
+            sort_field: "beta", // Default sort by beta
+            sort_order: -1, // Descending
         });
 
         const endpoint = `/api/pigean-gene-set-results/${dataset.value}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
-        pigeanGeneSetResults.value = data.items || [];
+        pigeanGeneSetAllData.value = data.items || [];
         pigeanGeneSetSubRecords.value = data.subRecords || {};
-        hasPigeanGeneSetResults.value = pigeanGeneSetResults.value.length > 0;
+        hasPigeanGeneSetResults.value = pigeanGeneSetAllData.value.length > 0;
         pigeanGeneSetDataLoaded.value = true;
-        if (typeof data.totalRecords === "number") {
-            pigeanGeneSetTotalRecords.value = data.totalRecords;
-        }
+
         if (data.jobId) {
             pigeanJobId.value = data.jobId;
         }
@@ -2777,21 +2818,25 @@ const loadPigeanGeneSetResults = async (forceReload = false) => {
     }
 };
 
+// Client-side pagination handler for gene sets
 const onPigeanGeneSetPage = (event) => {
     pigeanGeneSetFirst.value = event.first;
     pigeanGeneSetRows.value = event.rows;
-    loadPigeanGeneSetResults(true); // Force reload for pagination
+    // No API call needed - pagination is handled by computed property
 };
 
+// Client-side sorting handler for gene sets
 const onPigeanGeneSetSort = (event) => {
     pigeanGeneSetSortField.value = event.sortField;
     pigeanGeneSetSortOrder.value = event.sortOrder;
-    loadPigeanGeneSetResults(true); // Force reload for sorting
+    pigeanGeneSetFirst.value = 0; // Reset to first page on sort
+    // No API call needed - sorting is handled by computed property
 };
 
+// Client-side filtering handler for gene sets
 const onPigeanGeneSetFilter = () => {
-    pigeanGeneSetFirst.value = 0;
-    loadPigeanGeneSetResults(true); // Force reload for filtering
+    pigeanGeneSetFirst.value = 0; // Reset to first page on filter
+    // No API call needed - filtering is handled by computed property
 };
 
 const onPigeanGeneExpandedRowsChange = (value) => {
@@ -3150,13 +3195,14 @@ watch(
             pigeanGeneSetDataLoaded.value = false;
             // Clear existing data
             pigeanGeneAllData.value = [];
-            pigeanGeneSetResults.value = [];
+            pigeanGeneSetAllData.value = [];
             // Reset pagination
             pigeanGeneFirst.value = 0;
             pigeanGeneSetFirst.value = 0;
             biosampleFilterInput.value = null;
             magmaGeneFilterInput.value = null;
             pigeanGeneFilterInput.value = null;
+            pigeanGeneSetFilterInput.value = null;
         }
     },
 );
