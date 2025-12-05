@@ -973,9 +973,7 @@
                                                     @item-select="
                                                         onPigeanGeneSelect
                                                     "
-                                                    @clear="
-                                                        onPigeanGeneClear
-                                                    "
+                                                    @clear="onPigeanGeneClear"
                                                     placeholder="Search gene"
                                                     class="p-column-filter"
                                                     fluid
@@ -984,7 +982,7 @@
                                             </template>
                                             <template #body="{ data }">
                                                 <a
-                                                    :href="`https://a2f.hugeamp.org/gene.html?gene=${data.gene}`"
+                                                    :href="`https://a2f.hugeamp.org/pigean/gene.html?gene=${data.gene}`"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
@@ -1222,6 +1220,11 @@
                                                     "
                                                     size="small"
                                                     class="p-datatable-sm"
+                                                    paginator
+                                                    :rows="5"
+                                                    :rowsPerPageOptions="[
+                                                        5, 10, 20,
+                                                    ]"
                                                 >
                                                     <Column
                                                         field="gene_set"
@@ -1234,7 +1237,7 @@
                                                                 v-if="
                                                                     data?.gene_set
                                                                 "
-                                                                :href="`https://a2f.hugeamp.org:8000/pigean/geneset.html?geneset=${encodeURIComponent(
+                                                                :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(
                                                                     data.gene_set,
                                                                 )}&genesetSize=small&traitGroup=all`"
                                                                 target="_blank"
@@ -1445,7 +1448,7 @@
                                         >
                                             <template #body="{ data }">
                                                 <a
-                                                    :href="`https://a2f.hugeamp.org:8000/pigean/geneset.html?geneset=${encodeURIComponent(
+                                                    :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(
                                                         data.gene_set || '',
                                                     )}&genesetSize=small&traitGroup=all`"
                                                     target="_blank"
@@ -1551,76 +1554,175 @@
                                                 }}
                                             </template>
                                         </Column>
+                                        <Column header="Genes">
+                                            <template #body="{ data }">
+                                                <span
+                                                    class="inline-flex"
+                                                    v-tooltip.left="
+                                                        !data?.genes?.length
+                                                            ? 'No data available'
+                                                            : null
+                                                    "
+                                                >
+                                                    <Button
+                                                        size="small"
+                                                        outlined
+                                                        :label="
+                                                            isPigeanGeneSetRowExpanded(
+                                                                data.gene_set,
+                                                            )
+                                                                ? 'Hide'
+                                                                : 'Show'
+                                                        "
+                                                        :disabled="
+                                                            !data?.genes?.length
+                                                        "
+                                                        @click="
+                                                            togglePigeanGeneSetRow(
+                                                                data,
+                                                            )
+                                                        "
+                                                    />
+                                                </span>
+                                            </template>
+                                        </Column>
+
                                         <template #expansion="slotProps">
                                             <div
                                                 class="p-4 bg-gray-50 dark:bg-gray-800 rounded"
                                             >
                                                 <h4 class="font-semibold mb-2">
-                                                    Genes contributing to
+                                                    Genes in
                                                     {{
                                                         slotProps.data.gene_set
                                                     }}
                                                 </h4>
                                                 <DataTable
                                                     v-if="
-                                                        pigeanGeneSetSubRecords?.[
-                                                            slotProps.data
-                                                                .gene_set
-                                                        ]?.length
+                                                        slotProps.data?.genes
+                                                            ?.length
                                                     "
                                                     :value="
-                                                        pigeanGeneSetSubRecords[
-                                                            slotProps.data
-                                                                .gene_set
-                                                        ]
+                                                        slotProps.data.genes
                                                     "
                                                     size="small"
                                                     class="p-datatable-sm"
+                                                    paginator
+                                                    :rows="5"
+                                                    :rowsPerPageOptions="[
+                                                        5, 10, 20,
+                                                    ]"
                                                 >
                                                     <Column
                                                         field="gene"
                                                         header="Gene"
-                                                    />
-
+                                                    >
+                                                        <template
+                                                            #body="{ data }"
+                                                        >
+                                                            <a
+                                                                v-if="
+                                                                    data?.gene
+                                                                "
+                                                                :href="`https://a2f.hugeamp.org/pigean/gene.html?gene=${data.gene}`"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                            >
+                                                                {{ data.gene }}
+                                                            </a>
+                                                            <span v-else
+                                                                >—</span
+                                                            >
+                                                        </template>
+                                                    </Column>
                                                     <Column
-                                                        field="beta_corrected"
-                                                        header="Beta (Adj)"
+                                                        field="combined"
+                                                        header="Combined Score"
                                                     >
                                                         <template #body="row">
                                                             {{
-                                                                formatNumber(
-                                                                    row.data
-                                                                        .beta_corrected ||
-                                                                        0,
-                                                                )
+                                                                typeof row.data
+                                                                    .combined ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .combined,
+                                                                      )
+                                                                    : "—"
                                                             }}
                                                         </template>
                                                     </Column>
                                                     <Column
-                                                        field="pValue_uncorrected"
-                                                        header="P-Value (Raw)"
+                                                        field="beta_uncorrected"
+                                                        header="Beta (Marginal)"
                                                     >
                                                         <template #body="row">
                                                             {{
-                                                                formatPValue(
-                                                                    row.data
-                                                                        .pValue_uncorrected ||
-                                                                        0,
-                                                                )
+                                                                typeof row.data
+                                                                    .beta_uncorrected ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .beta_uncorrected,
+                                                                      )
+                                                                    : "—"
                                                             }}
                                                         </template>
                                                     </Column>
                                                     <Column
-                                                        field="pValue_corrected"
-                                                        header="P-Value (Adj)"
+                                                        field="beta"
+                                                        header="Beta (Joint)"
                                                     >
                                                         <template #body="row">
                                                             {{
-                                                                formatPValue(
-                                                                    row.data
-                                                                        .pValue_corrected ||
-                                                                        0,
-                                                                )
+                                                                typeof row.data
+                                                                    .beta ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .beta,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="prior"
+                                                        header="Prior"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .prior ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .prior,
+                                                                      )
+                                                                    : "—"
+                                                            }}
+                                                        </template>
+                                                    </Column>
+                                                    <Column
+                                                        field="log_bf"
+                                                        header="log10 BF"
+                                                    >
+                                                        <template #body="row">
+                                                            {{
+                                                                typeof row.data
+                                                                    .log_bf ===
+                                                                "number"
+                                                                    ? formatNumber(
+                                                                          row
+                                                                              .data
+                                                                              .log_bf,
+                                                                      )
+                                                                    : "—"
                                                             }}
                                                         </template>
                                                     </Column>
@@ -2613,6 +2715,29 @@ const isPigeanGeneRowExpanded = (rowData) => {
 
 const onPigeanGeneSetExpandedRowsChange = (value) => {
     pigeanGeneSetExpandedRows.value = value;
+};
+
+const togglePigeanGeneSetRow = (rowData) => {
+    const current = { ...pigeanGeneSetExpandedRows.value };
+    const key = rowData?.gene_set;
+    if (!key) {
+        return;
+    }
+
+    if (current[key]) {
+        delete current[key];
+    } else {
+        current[key] = rowData;
+    }
+
+    pigeanGeneSetExpandedRows.value = current;
+};
+
+const isPigeanGeneSetRowExpanded = (geneSet) => {
+    if (!geneSet) {
+        return false;
+    }
+    return Boolean(pigeanGeneSetExpandedRows.value?.[geneSet]);
 };
 
 // Check both result types availability and set initial tab
