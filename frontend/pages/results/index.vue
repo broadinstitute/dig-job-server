@@ -159,182 +159,23 @@
                                     </div>
 
                                     <!-- Loading skeleton -->
-                                    <div v-if="sldscLoading && sldscResults.length === 0" class="p-4">
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                                            <i class="pi pi-spinner pi-spin text-primary"></i>
-                                            <span>Loading SLDSC results...</span>
+                                    <div
+                                        v-if="
+                                            sldscLoading &&
+                                            sldscResults.length === 0
+                                        "
+                                        class="p-4"
+                                    >
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading SLDSC results...</span
+                                            >
                                         </div>
-                                        <div class="mb-2" v-for="i in 5" :key="i">
-                                            <Skeleton height="3rem" />
-                                        </div>
-                                    </div>
-
-                                    <!-- SLDSC Results Table -->
-                                    <DataTable
-                                        v-else-if="sldscResults.length > 0"
-                                :first="sldscFirst"
-                                :rows="sldscRows"
-                                :sortField="sldscSortField"
-                                :sortOrder="sldscSortOrder"
-                                :value="sldscResults"
-                                ref="sldscDt"
-                                :lazy="true"
-                                :totalRecords="sldscTotalRecords"
-                                :loading="sldscLoading"
-                                paginator
-                                :rows-per-page-options="[10, 20, 50]"
-                                @page="onSldscPage"
-                                @sort="onSldscSort"
-                                :filters="filters"
-                                @filter="onSldscFilter"
-                                stripedRows
-                                class="p-datatable-sm"
-                                filterDisplay="row"
-                                :showFilterOperator="false"
-                                :showFilterMatchModes="false"
-                                :showFilterMenu="false"
-                                :showClearButton="false"
-                            >
-                                <Column
-                                    field="annotation"
-                                    header="Annotation"
-                                    sortable
-                                    filterMatchMode="equals"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <Select
-                                            v-model="
-                                                filters['annotation'].value
-                                            "
-                                            :options="annotationOptions"
-                                            optionLabel="label"
-                                            optionValue="value"
-                                            placeholder="Select annotation"
-                                            class="p-column-filter w-full"
-                                            @change="onSldscFilter"
-                                        />
-                                    </template>
-                                    <template #body="{ data }">
-                                        <div class="flex items-center">
-                                            <div
-                                                :class="
-                                                    'color-dot ' +
-                                                    data.annotation
-                                                "
-                                            ></div>
-                                            <span class="ml-2">{{
-                                                data.annotation
-                                            }}</span>
-                                        </div>
-                                    </template>
-                                </Column>
-                                <Column
-                                    field="tissue"
-                                    header="Tissue"
-                                    sortable
-                                    filterMatchMode="equals"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <Select
-                                            v-model="filters['tissue'].value"
-                                            :options="tissueOptions"
-                                            optionLabel="label"
-                                            optionValue="value"
-                                            placeholder="Select tissue"
-                                            class="p-column-filter w-full"
-                                            @change="onSldscFilter"
-                                        />
-                                    </template>
-                                </Column>
-                                <Column
-                                    field="biosample"
-                                    header="Biosample"
-                                    sortable
-                                    filterMatchMode="equals"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <AutoComplete
-                                            v-model="filters['biosample'].value"
-                                            :suggestions="filteredBiosamples"
-                                            @complete="searchBiosamples"
-                                            placeholder="Search biosample"
-                                            class="p-column-filter w-full"
-                                            @item-select="onBiosampleSelect"
-                                            @clear="onBiosampleClear"
-                                            :delay="300"
-                                            dropdown
-                                            forceSelection
-                                        />
-                                    </template>
-                                </Column>
-                                <Column
-                                    field="enrichment"
-                                    header="Enrichment"
-                                    sortable
-                                    filterMatchMode="gte"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <div class="flex items-center gap-2">
-                                            <InputNumber
-                                                v-model="
-                                                    filters['enrichment'].value
-                                                "
-                                                placeholder="≥ Value"
-                                                class="p-column-filter w-full"
-                                                :minFractionDigits="3"
-                                                :maxFractionDigits="3"
-                                                @keydown.enter="onSldscFilter"
-                                            />
-                                        </div>
-                                    </template>
-                                    <template #body="slotProps">
-                                        {{
-                                            formatNumber(
-                                                slotProps.data.enrichment,
-                                            )
-                                        }}
-                                    </template>
-                                </Column>
-                                <Column
-                                    field="pValue"
-                                    header="P-Value"
-                                    sortable
-                                    filterMatchMode="lte"
-                                    :showFilterMenu="false"
-                                >
-                                    <template #filter>
-                                        <div class="flex items-center gap-2">
-                                            <InputNumber
-                                                v-model="
-                                                    filters['pValue'].value
-                                                "
-                                                placeholder="≤ Value"
-                                                class="p-column-filter w-full"
-                                                mode="decimal"
-                                                :minFractionDigits="3"
-                                                :maxFractionDigits="3"
-                                                @keydown.enter="onSldscFilter"
-                                            />
-                                        </div>
-                                    </template>
-                                    <template #body="slotProps">
-                                        {{
-                                            formatPValue(slotProps.data.pValue)
-                                        }}
-                                    </template>
-                                </Column>
-
-                                <template #empty>
-                                    <div class="text-center p-4">
-                                        No SLDSC results found.
-                                    </div>
-                                </template>
-                                <template #loading>
-                                    <div class="p-4">
                                         <div
                                             class="mb-2"
                                             v-for="i in 5"
@@ -343,18 +184,207 @@
                                             <Skeleton height="3rem" />
                                         </div>
                                     </div>
-                                </template>
-                                <template #footer>
-                                    <div
-                                        class="flex justify-between items-center"
+
+                                    <!-- SLDSC Results Table -->
+                                    <DataTable
+                                        v-else-if="sldscResults.length > 0"
+                                        :first="sldscFirst"
+                                        :rows="sldscRows"
+                                        :sortField="sldscSortField"
+                                        :sortOrder="sldscSortOrder"
+                                        :value="sldscResults"
+                                        ref="sldscDt"
+                                        :lazy="true"
+                                        :totalRecords="sldscTotalRecords"
+                                        :loading="sldscLoading"
+                                        paginator
+                                        :rows-per-page-options="[10, 20, 50]"
+                                        @page="onSldscPage"
+                                        @sort="onSldscSort"
+                                        :filters="filters"
+                                        @filter="onSldscFilter"
+                                        stripedRows
+                                        class="p-datatable-sm"
+                                        filterDisplay="row"
+                                        :showFilterOperator="false"
+                                        :showFilterMatchModes="false"
+                                        :showFilterMenu="false"
+                                        :showClearButton="false"
                                     >
-                                        <small
-                                            >Total records:
-                                            {{ sldscTotalRecords }}</small
+                                        <Column
+                                            field="annotation"
+                                            header="Annotation"
+                                            sortable
+                                            filterMatchMode="equals"
+                                            :showFilterMenu="false"
                                         >
-                                    </div>
-                                </template>
-                            </DataTable>
+                                            <template #filter>
+                                                <Select
+                                                    v-model="
+                                                        filters['annotation']
+                                                            .value
+                                                    "
+                                                    :options="annotationOptions"
+                                                    optionLabel="label"
+                                                    optionValue="value"
+                                                    placeholder="Select annotation"
+                                                    class="p-column-filter w-full"
+                                                    @change="onSldscFilter"
+                                                />
+                                            </template>
+                                            <template #body="{ data }">
+                                                <div class="flex items-center">
+                                                    <div
+                                                        :class="
+                                                            'color-dot ' +
+                                                            data.annotation
+                                                        "
+                                                    ></div>
+                                                    <span class="ml-2">{{
+                                                        data.annotation
+                                                    }}</span>
+                                                </div>
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="tissue"
+                                            header="Tissue"
+                                            sortable
+                                            filterMatchMode="equals"
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <Select
+                                                    v-model="
+                                                        filters['tissue'].value
+                                                    "
+                                                    :options="tissueOptions"
+                                                    optionLabel="label"
+                                                    optionValue="value"
+                                                    placeholder="Select tissue"
+                                                    class="p-column-filter w-full"
+                                                    @change="onSldscFilter"
+                                                />
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="biosample"
+                                            header="Biosample"
+                                            sortable
+                                            filterMatchMode="equals"
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <AutoComplete
+                                                    v-model="
+                                                        filters['biosample']
+                                                            .value
+                                                    "
+                                                    :suggestions="
+                                                        filteredBiosamples
+                                                    "
+                                                    @complete="searchBiosamples"
+                                                    placeholder="Search biosample"
+                                                    class="p-column-filter w-full"
+                                                    @item-select="
+                                                        onBiosampleSelect
+                                                    "
+                                                    @clear="onBiosampleClear"
+                                                    :delay="300"
+                                                    dropdown
+                                                    forceSelection
+                                                />
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="enrichment"
+                                            header="Enrichment"
+                                            sortable
+                                            filterMatchMode="gte"
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <InputNumber
+                                                        v-model="
+                                                            filters[
+                                                                'enrichment'
+                                                            ].value
+                                                        "
+                                                        placeholder="≥ Value"
+                                                        class="p-column-filter w-full"
+                                                        :minFractionDigits="3"
+                                                        :maxFractionDigits="3"
+                                                        @keydown.enter="
+                                                            onSldscFilter
+                                                        "
+                                                    />
+                                                </div>
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatNumber(
+                                                        slotProps.data
+                                                            .enrichment,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+                                        <Column
+                                            field="pValue"
+                                            header="P-Value"
+                                            sortable
+                                            filterMatchMode="lte"
+                                            :showFilterMenu="false"
+                                        >
+                                            <template #filter>
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <InputNumber
+                                                        v-model="
+                                                            filters['pValue']
+                                                                .value
+                                                        "
+                                                        placeholder="≤ Value"
+                                                        class="p-column-filter w-full"
+                                                        mode="decimal"
+                                                        :minFractionDigits="3"
+                                                        :maxFractionDigits="3"
+                                                        @keydown.enter="
+                                                            onSldscFilter
+                                                        "
+                                                    />
+                                                </div>
+                                            </template>
+                                            <template #body="slotProps">
+                                                {{
+                                                    formatPValue(
+                                                        slotProps.data.pValue,
+                                                    )
+                                                }}
+                                            </template>
+                                        </Column>
+
+                                        <template #empty>
+                                            <div class="text-center p-4">
+                                                No SLDSC results found.
+                                            </div>
+                                        </template>
+                                        <template #loading>
+                                            <div class="p-4">
+                                                <div
+                                                    class="mb-2"
+                                                    v-for="i in 5"
+                                                    :key="i"
+                                                >
+                                                    <Skeleton height="3rem" />
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </DataTable>
 
                                     <!-- No results message -->
                                     <div
@@ -362,7 +392,8 @@
                                         class="text-center p-4"
                                     >
                                         <p class="text-gray-500">
-                                            No SLDSC results available for this dataset.
+                                            No SLDSC results available for this
+                                            dataset.
                                         </p>
                                     </div>
                                 </div>
@@ -436,12 +467,29 @@
                                     </div>
 
                                     <!-- Gene table loading skeleton -->
-                                    <div v-if="magmaLoading && magmaResults.length === 0" class="p-4">
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                                            <i class="pi pi-spinner pi-spin text-primary"></i>
-                                            <span>Loading MAGMA gene results...</span>
+                                    <div
+                                        v-if="
+                                            magmaLoading &&
+                                            magmaResults.length === 0
+                                        "
+                                        class="p-4"
+                                    >
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading MAGMA gene
+                                                results...</span
+                                            >
                                         </div>
-                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                        <div
+                                            class="mb-2"
+                                            v-for="i in 5"
+                                            :key="i"
+                                        >
                                             <Skeleton height="3rem" />
                                         </div>
                                     </div>
@@ -582,19 +630,38 @@
                                     </div>
 
                                     <!-- Pathway table loading skeleton -->
-                                    <div v-if="magmaPathwaysLoading && magmaPathwaysResults.length === 0" class="p-4">
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                                            <i class="pi pi-spinner pi-spin text-primary"></i>
-                                            <span>Loading MAGMA pathway results...</span>
+                                    <div
+                                        v-if="
+                                            magmaPathwaysLoading &&
+                                            magmaPathwaysResults.length === 0
+                                        "
+                                        class="p-4"
+                                    >
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading MAGMA pathway
+                                                results...</span
+                                            >
                                         </div>
-                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                        <div
+                                            class="mb-2"
+                                            v-for="i in 5"
+                                            :key="i"
+                                        >
                                             <Skeleton height="3rem" />
                                         </div>
                                     </div>
 
                                     <!-- Pathway table -->
                                     <DataTable
-                                        v-else-if="magmaPathwaysResults.length > 0"
+                                        v-else-if="
+                                            magmaPathwaysResults.length > 0
+                                        "
                                         :first="magmaPathwaysFirst"
                                         :rows="magmaPathwaysRows"
                                         :sortField="magmaPathwaysSortField"
@@ -801,12 +868,29 @@
                                     </div>
 
                                     <!-- Gene table loading skeleton -->
-                                    <div v-if="pigeanGeneLoading && pigeanGeneResults.length === 0" class="p-4">
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                                            <i class="pi pi-spinner pi-spin text-primary"></i>
-                                            <span>Loading PIGEAN gene results...</span>
+                                    <div
+                                        v-if="
+                                            pigeanGeneLoading &&
+                                            pigeanGeneResults.length === 0
+                                        "
+                                        class="p-4"
+                                    >
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading PIGEAN gene
+                                                results...</span
+                                            >
                                         </div>
-                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                        <div
+                                            class="mb-2"
+                                            v-for="i in 5"
+                                            :key="i"
+                                        >
                                             <Skeleton height="3rem" />
                                         </div>
                                     </div>
@@ -1221,9 +1305,16 @@
                                         <h4 class="font-semibold text-lg mb-3">
                                             Gene Support Scatter Plot
                                         </h4>
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                                            <i class="pi pi-spinner pi-spin text-primary"></i>
-                                            <span>Loading scatter plot data...</span>
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading scatter plot
+                                                data...</span
+                                            >
                                         </div>
                                         <Skeleton height="400px" />
                                     </div>
@@ -1245,12 +1336,29 @@
                                     </div>
 
                                     <!-- Gene set table loading skeleton -->
-                                    <div v-if="pigeanGeneSetLoading && pigeanGeneSetResults.length === 0" class="p-4">
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                                            <i class="pi pi-spinner pi-spin text-primary"></i>
-                                            <span>Loading PIGEAN gene set results...</span>
+                                    <div
+                                        v-if="
+                                            pigeanGeneSetLoading &&
+                                            pigeanGeneSetResults.length === 0
+                                        "
+                                        class="p-4"
+                                    >
+                                        <div
+                                            class="flex items-center gap-2 text-sm text-gray-500 mb-3"
+                                        >
+                                            <i
+                                                class="pi pi-spinner pi-spin text-primary"
+                                            ></i>
+                                            <span
+                                                >Loading PIGEAN gene set
+                                                results...</span
+                                            >
                                         </div>
-                                        <div class="mb-2" v-for="i in 5" :key="i">
+                                        <div
+                                            class="mb-2"
+                                            v-for="i in 5"
+                                            :key="i"
+                                        >
                                             <Skeleton height="3rem" />
                                         </div>
                                     </div>
