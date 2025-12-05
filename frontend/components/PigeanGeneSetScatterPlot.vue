@@ -7,6 +7,21 @@
             No data available for scatter plot.
         </div>
         <div v-else class="chart-wrapper">
+            <!-- Download button -->
+            <div class="absolute top-3 right-3 z-10">
+                <Menu ref="downloadMenu" :model="downloadMenuItems" popup />
+                <Button
+                    icon="pi pi-download"
+                    severity="secondary"
+                    size="small"
+                    rounded
+                    text
+                    aria-label="Download chart"
+                    @click="toggleDownloadMenu"
+                    class="!bg-white/80 dark:!bg-gray-800/80 hover:!bg-white dark:hover:!bg-gray-700"
+                    v-tooltip.left="'Download Chart'"
+                />
+            </div>
             <canvas ref="chartCanvas"></canvas>
             <div
                 v-if="tooltip.visible"
@@ -77,6 +92,85 @@ const chartCanvas = ref(null);
 let chartInstance = null;
 
 const tooltipEl = ref(null);
+const downloadMenu = ref(null);
+
+const downloadMenuItems = [
+    {
+        label: "Download as PNG",
+        icon: "pi pi-image",
+        command: () => downloadChart("png"),
+    },
+    {
+        label: "Download as SVG",
+        icon: "pi pi-file",
+        command: () => downloadChart("svg"),
+    },
+];
+
+const toggleDownloadMenu = (event) => {
+    downloadMenu.value.toggle(event);
+};
+
+const downloadChart = (format) => {
+    if (!chartCanvas.value || !chartInstance) return;
+
+    const canvas = chartCanvas.value;
+    const filename = `pigean-geneset-scatter.${format}`;
+
+    if (format === "png") {
+        // Create a new canvas with white background for PNG
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const ctx = tempCanvas.getContext("2d");
+
+        // Fill with white background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // Draw the chart on top
+        ctx.drawImage(canvas, 0, 0);
+
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = tempCanvas.toDataURL("image/png");
+        link.click();
+    } else if (format === "svg") {
+        // Create SVG from canvas
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", canvas.width);
+        svg.setAttribute("height", canvas.height);
+        svg.setAttribute("xmlns", svgNS);
+
+        // Add white background
+        const rect = document.createElementNS(svgNS, "rect");
+        rect.setAttribute("width", "100%");
+        rect.setAttribute("height", "100%");
+        rect.setAttribute("fill", "#ffffff");
+        svg.appendChild(rect);
+
+        // Embed the canvas as an image in SVG
+        const image = document.createElementNS(svgNS, "image");
+        image.setAttribute("width", canvas.width);
+        image.setAttribute("height", canvas.height);
+        image.setAttribute("href", canvas.toDataURL("image/png"));
+        svg.appendChild(image);
+
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([svgData], {
+            type: "image/svg+xml;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = url;
+        link.click();
+
+        URL.revokeObjectURL(url);
+    }
+};
 
 const tooltip = ref({
     visible: false,
