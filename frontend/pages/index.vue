@@ -24,7 +24,7 @@
         </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <Card class="text-center h-full">
                     <template #content>
                         <div class="p-6">
@@ -101,6 +101,33 @@
                             <div class="flex flex-wrap gap-2 justify-center">
                                 <Tag value="Heritability" severity="primary" />
                                 <Tag value="SNP-based" severity="info" />
+                            </div>
+                        </div>
+                    </template>
+                </Card>
+
+                <Card class="text-center h-full">
+                    <template #content>
+                        <div class="p-6">
+                            <div
+                                class="w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
+                            >
+                                <i
+                                    class="pi pi-sparkles text-2xl text-orange-600 dark:text-orange-400"
+                                ></i>
+                            </div>
+                            <h3
+                                class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
+                            >
+                                PIGEAN Analysis
+                            </h3>
+                            <p class="text-gray-600 dark:text-gray-300 mb-4">
+                                Priors Inferred from GEne ANnotations for gene
+                                prioritization
+                            </p>
+                            <div class="flex flex-wrap gap-2 justify-center">
+                                <Tag value="Gene Priors" severity="warn" />
+                                <Tag value="Annotation" severity="info" />
                             </div>
                         </div>
                     </template>
