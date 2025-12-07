@@ -80,6 +80,16 @@ const router = useRouter();
                                                 analysis</span
                                             >
                                         </li>
+                                        <li class="flex items-start gap-3">
+                                            <i
+                                                class="pi pi-check-circle text-green-500 mt-0.5 text-lg"
+                                            ></i>
+                                            <span
+                                                ><strong>PIGEAN:</strong> Priors
+                                                Inferred from GEne
+                                                ANnotations</span
+                                            >
+                                        </li>
                                     </ul>
                                 </div>
                                 <Button
@@ -87,8 +97,8 @@ const router = useRouter();
                                     label="Upload GWAS Data"
                                     icon="pi pi-upload"
                                     size="large"
-                                    class="w-full"
-                                    severity="primary"
+                                    class="w-full hover:!bg-primary hover:!border-primary hover:!text-white"
+                                    severity="secondary"
                                 />
                             </div>
                         </template>
@@ -163,7 +173,7 @@ const router = useRouter();
                                     label="Upload BED File"
                                     icon="pi pi-upload"
                                     size="large"
-                                    class="w-full"
+                                    class="w-full hover:!bg-primary hover:!border-primary hover:!text-white"
                                     severity="secondary"
                                 />
                             </div>
