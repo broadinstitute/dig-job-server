@@ -96,12 +96,12 @@ const downloadMenu = ref(null);
 
 const downloadMenuItems = [
     {
-        label: "Download as PNG",
+        label: "Save as PNG",
         icon: "pi pi-image",
         command: () => downloadChart("png"),
     },
     {
-        label: "Download as SVG",
+        label: "Save as SVG",
         icon: "pi pi-file",
         command: () => downloadChart("svg"),
     },
