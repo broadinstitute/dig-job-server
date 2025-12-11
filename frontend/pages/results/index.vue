@@ -1080,7 +1080,7 @@
                                         </Column>
                                         <Column
                                             field="log_bf"
-                                            header="log10 BF"
+                                            header="Direct Score"
                                             sortable
                                             :showFilterMenu="false"
                                         >
@@ -1255,7 +1255,7 @@
                                                                 "
                                                                 :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(
                                                                     data.gene_set,
-                                                                )}&genesetSize=small&traitGroup=all`"
+                                                                )}&genesetSize=small&traitGroup=portal`"
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
@@ -1269,24 +1269,7 @@
                                                             >
                                                         </template>
                                                     </Column>
-                                                    <Column
-                                                        field="combined"
-                                                        header="Combined Score"
-                                                    >
-                                                        <template #body="row">
-                                                            {{
-                                                                typeof row.data
-                                                                    .combined ===
-                                                                "number"
-                                                                    ? formatNumber(
-                                                                          row
-                                                                              .data
-                                                                              .combined,
-                                                                      )
-                                                                    : "—"
-                                                            }}
-                                                        </template>
-                                                    </Column>
+
                                                     <Column
                                                         field="beta"
                                                         header="Beta (Joint)"
@@ -1318,42 +1301,6 @@
                                                                           row
                                                                               .data
                                                                               .beta_uncorrected,
-                                                                      )
-                                                                    : "—"
-                                                            }}
-                                                        </template>
-                                                    </Column>
-                                                    <Column
-                                                        field="prior"
-                                                        header="Prior"
-                                                    >
-                                                        <template #body="row">
-                                                            {{
-                                                                typeof row.data
-                                                                    .prior ===
-                                                                "number"
-                                                                    ? formatNumber(
-                                                                          row
-                                                                              .data
-                                                                              .prior,
-                                                                      )
-                                                                    : "—"
-                                                            }}
-                                                        </template>
-                                                    </Column>
-                                                    <Column
-                                                        field="log_bf"
-                                                        header="log10 BF"
-                                                    >
-                                                        <template #body="row">
-                                                            {{
-                                                                typeof row.data
-                                                                    .log_bf ===
-                                                                "number"
-                                                                    ? formatNumber(
-                                                                          row
-                                                                              .data
-                                                                              .log_bf,
                                                                       )
                                                                     : "—"
                                                             }}
@@ -1523,7 +1470,7 @@
                                                 <a
                                                     :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(
                                                         data.gene_set || '',
-                                                    )}&genesetSize=small&traitGroup=all`"
+                                                    )}&genesetSize=small&traitGroup=portal`"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
@@ -1727,42 +1674,7 @@
                                                             }}
                                                         </template>
                                                     </Column>
-                                                    <Column
-                                                        field="beta_uncorrected"
-                                                        header="Beta (Marginal)"
-                                                    >
-                                                        <template #body="row">
-                                                            {{
-                                                                typeof row.data
-                                                                    .beta_uncorrected ===
-                                                                "number"
-                                                                    ? formatNumber(
-                                                                          row
-                                                                              .data
-                                                                              .beta_uncorrected,
-                                                                      )
-                                                                    : "—"
-                                                            }}
-                                                        </template>
-                                                    </Column>
-                                                    <Column
-                                                        field="beta"
-                                                        header="Beta (Joint)"
-                                                    >
-                                                        <template #body="row">
-                                                            {{
-                                                                typeof row.data
-                                                                    .beta ===
-                                                                "number"
-                                                                    ? formatNumber(
-                                                                          row
-                                                                              .data
-                                                                              .beta,
-                                                                      )
-                                                                    : "—"
-                                                            }}
-                                                        </template>
-                                                    </Column>
+
                                                     <Column
                                                         field="prior"
                                                         header="Prior"
@@ -1783,7 +1695,7 @@
                                                     </Column>
                                                     <Column
                                                         field="log_bf"
-                                                        header="log10 BF"
+                                                        header="Direct Score"
                                                     >
                                                         <template #body="row">
                                                             {{

@@ -59,10 +59,10 @@
                             HuGE Score: {{ formatNumber(tooltip.huge_score) }}
                         </div>
                         <div>
-                            Direct Support: {{ formatNumber(tooltip.log_bf) }}
+                            Direct Score: {{ formatNumber(tooltip.log_bf) }}
                         </div>
                         <div>
-                            Indirect Support: {{ formatNumber(tooltip.prior) }}
+                            Indirect Score: {{ formatNumber(tooltip.prior) }}
                         </div>
                     </div>
                 </div>
@@ -98,12 +98,12 @@ const downloadMenu = ref(null);
 
 const downloadMenuItems = [
     {
-        label: "Download as PNG",
+        label: "Save as PNG",
         icon: "pi pi-image",
         command: () => downloadChart("png"),
     },
     {
-        label: "Download as SVG",
+        label: "Save as SVG",
         icon: "pi pi-file",
         command: () => downloadChart("svg"),
     },
@@ -338,7 +338,7 @@ const chartOptions = {
             position: "bottom",
             title: {
                 display: true,
-                text: "Indirect Support (Prior)",
+                text: "Indirect Score", //Prior
                 font: {
                     size: 14,
                     weight: "bold",
@@ -352,7 +352,7 @@ const chartOptions = {
             type: "linear",
             title: {
                 display: true,
-                text: "Direct Support (log10 BF)",
+                text: "Direct Score", //log10 BF
                 font: {
                     size: 14,
                     weight: "bold",
