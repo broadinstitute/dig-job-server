@@ -373,6 +373,8 @@ async function uploadBedData() {
 
         // Clear the form after successful upload
         clearForm();
+        // Redirect to datasets page after upload
+        route.push("/datasets#annotation");
     } catch (error) {
         if (error.response?.status === 409) {
             toast.add({
