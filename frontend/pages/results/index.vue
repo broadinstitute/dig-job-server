@@ -162,11 +162,29 @@
                                         />
                                     </div>
 
+                                    <!-- Volcano Plot -->
+                                    <div
+                                        v-if="sldscAllData.length > 0"
+                                        class="mb-6"
+                                    >
+                                        <SldscVolcanoPlot
+                                            :annotationResults="
+                                                filteredSldscData
+                                            "
+                                            :key="
+                                                'sldsc-plot-' +
+                                                dataset +
+                                                '-' +
+                                                sldscTotalRecords
+                                            "
+                                        />
+                                    </div>
+
                                     <!-- Loading skeleton -->
                                     <div
                                         v-if="
                                             sldscLoading &&
-                                            sldscResults.length === 0
+                                            sldscAllData.length === 0
                                         "
                                         class="p-4"
                                     >
@@ -191,14 +209,14 @@
 
                                     <!-- SLDSC Results Table -->
                                     <DataTable
-                                        v-else-if="sldscResults.length > 0"
+                                        v-else-if="filteredSldscData.length > 0"
                                         :first="sldscFirst"
                                         :rows="sldscRows"
                                         :sortField="sldscSortField"
                                         :sortOrder="sldscSortOrder"
-                                        :value="sldscResults"
+                                        :value="filteredSldscData"
                                         ref="sldscDt"
-                                        :lazy="true"
+                                        :lazy="false"
                                         :totalRecords="sldscTotalRecords"
                                         :loading="sldscLoading"
                                         paginator
@@ -1776,7 +1794,7 @@ const hasWorkflowData = ref(false);
 
 // SLDSC specific data
 const sldscResults = ref([]);
-const sldscTotalRecords = ref(0);
+const sldscAllData = ref([]); // All fetched data for client-side filtering
 const sldscLoading = ref(false);
 const sldscFirst = ref(0);
 const sldscRows = ref(10);
@@ -1784,6 +1802,7 @@ const sldscSortField = ref("pValue");
 const sldscSortOrder = ref(1);
 const sldscDt = ref();
 const hasSldscResults = ref(false);
+const sldscDataLoaded = ref(false);
 
 // MAGMA specific data
 const magmaResults = ref([]);
@@ -2026,6 +2045,68 @@ const paginatedPigeanGeneData = computed(() => {
     const start = pigeanGeneFirst.value;
     const end = start + pigeanGeneRows.value;
     return filteredPigeanGeneData.value.slice(start, end);
+});
+
+// Client-side filtering for SLDSC data
+const filteredSldscData = computed(() => {
+    let data = [...sldscAllData.value];
+
+    // Apply filters
+    const filterObj = filters.value;
+
+    if (filterObj.annotation?.value) {
+        const searchTerm = filterObj.annotation.value.toLowerCase();
+        data = data.filter((item) =>
+            item.annotation?.toLowerCase().includes(searchTerm),
+        );
+    }
+
+    if (filterObj.tissue?.value) {
+        data = data.filter((item) => item.tissue === filterObj.tissue.value);
+    }
+
+    if (filterObj.biosample?.value) {
+        data = data.filter(
+            (item) => item.biosample === filterObj.biosample.value,
+        );
+    }
+
+    if (filterObj.enrichment?.value != null) {
+        data = data.filter(
+            (item) => item.enrichment >= filterObj.enrichment.value,
+        );
+    }
+
+    if (filterObj.pValue?.value != null) {
+        data = data.filter((item) => item.pValue <= filterObj.pValue.value);
+    }
+
+    // Apply sorting
+    if (sldscSortField.value) {
+        const field = sldscSortField.value;
+        const order = sldscSortOrder.value || 1;
+        data.sort((a, b) => {
+            const aVal = a[field] ?? 0;
+            const bVal = b[field] ?? 0;
+            if (aVal < bVal) return -1 * order;
+            if (aVal > bVal) return 1 * order;
+            return 0;
+        });
+    }
+
+    return data;
+});
+
+// Total records after filtering (for SLDSC pagination)
+const sldscTotalRecords = computed(() => {
+    return filteredSldscData.value.length;
+});
+
+// Client-side pagination for SLDSC table
+const paginatedSldscData = computed(() => {
+    const start = sldscFirst.value;
+    const end = start + sldscRows.value;
+    return filteredSldscData.value.slice(start, end);
 });
 
 const sldscWorkflowStatus = computed(() => {
@@ -2423,59 +2504,56 @@ const onTabChange = (event) => {
     tab.value = newValue;
 };
 
-// SLDSC Results functions
-const loadSldscResults = async () => {
+// SLDSC Results functions - Load all data upfront for volcano plot and filtering
+const loadSldscAllData = async () => {
     try {
         sldscLoading.value = true;
         resultsStore.init();
 
+        // Fetch all SLDSC data at once (no pagination for initial load)
         const queryParams = new URLSearchParams({
-            first: sldscFirst.value,
-            rows: sldscRows.value,
-            sort_field: sldscSortField.value,
-            sort_order: sldscSortOrder.value,
-        });
-
-        // Add any filter parameters
-        const transformedFilters = transformFilters(filters.value);
-        Object.entries(transformedFilters).forEach(([key, value]) => {
-            queryParams.append(key, value);
+            first: 0,
+            rows: 10000, // Fetch a large batch to get all results
         });
 
         const endpoint = `/api/results/${dataset.value}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
         if (data.items) {
-            sldscResults.value = data.items;
+            sldscAllData.value = data.items; // Store all data
             hasSldscResults.value = data.items.length > 0;
+            sldscDataLoaded.value = true;
         }
-        if (data.totalRecords) sldscTotalRecords.value = data.totalRecords;
         if (data.tissues) apiTissues.value = data.tissues;
         if (data.biosamples) apiBiosamples.value = data.biosamples;
         if (data.annotations) apiAnnotations.value = data.annotations;
         if (data.jobId) sldscJobId.value = data.jobId;
     } catch (err) {
         console.error("Failed to load SLDSC results:", err);
+        sldscDataLoaded.value = false;
     } finally {
         sldscLoading.value = false;
     }
 };
 
+// Update the displayed results based on current pagination settings
+// Not needed when lazy=false - DataTable handles pagination internally
+
 const onSldscPage = (event) => {
     sldscFirst.value = event.first;
     sldscRows.value = event.rows;
-    loadSldscResults();
+    // DataTable handles pagination internally when lazy=false
 };
 
 const onSldscSort = (event) => {
     sldscSortField.value = event.sortField;
     sldscSortOrder.value = event.sortOrder;
-    loadSldscResults();
+    // DataTable handles sorting internally when lazy=false
 };
 
 const onSldscFilter = () => {
     sldscFirst.value = 0;
-    loadSldscResults();
+    // DataTable handles filtering internally when lazy=false
 };
 
 // MAGMA Results functions
@@ -3044,12 +3122,8 @@ watch(activeTab, (newTab) => {
         });
     }
 
-    if (
-        newTab === "sldsc" &&
-        hasSldscResults.value &&
-        sldscResults.value.length === 0
-    ) {
-        loadSldscResults();
+    if (newTab === "sldsc" && hasSldscResults.value && !sldscDataLoaded.value) {
+        loadSldscAllData();
     } else if (
         newTab === "magma" &&
         hasMagmaResults.value &&
@@ -3103,12 +3177,15 @@ watch(
         if (newDataset && newDataset !== dataset.value) {
             dataset.value = newDataset;
             // Reset loaded flags so data will be fetched again
+            sldscDataLoaded.value = false;
             pigeanGeneDataLoaded.value = false;
             pigeanGeneSetDataLoaded.value = false;
             // Clear existing data
+            sldscAllData.value = [];
             pigeanGeneAllData.value = [];
             pigeanGeneSetAllData.value = [];
             // Reset pagination
+            sldscFirst.value = 0;
             pigeanGeneFirst.value = 0;
             pigeanGeneSetFirst.value = 0;
             biosampleFilterInput.value = null;
@@ -3133,9 +3210,9 @@ onMounted(async () => {
     } else if (
         activeTab.value === "sldsc" &&
         hasSldscResults.value &&
-        sldscResults.value.length === 0
+        !sldscDataLoaded.value
     ) {
-        loadSldscResults();
+        loadSldscAllData();
     }
 
     // Also load pathways if on magma tab
