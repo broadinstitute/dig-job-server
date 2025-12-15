@@ -96,6 +96,8 @@
                     paginator
                     :rows-per-page-options="[10, 20, 50]"
                     :filters="pigeanGeneFilters"
+                    @update:first="pigeanGeneFirst = $event"
+                    @update:rows="pigeanGeneRows = $event"
                     @page="onPigeanGenePage"
                     @sort="onPigeanGeneSort"
                     :expandedRows="pigeanGeneExpandedRows"
@@ -418,6 +420,8 @@
                     paginator
                     :rows-per-page-options="[10, 20, 50]"
                     :filters="pigeanGeneSetFilters"
+                    @update:first="pigeanGeneSetFirst = $event"
+                    @update:rows="pigeanGeneSetRows = $event"
                     @page="onPigeanGeneSetPage"
                     @sort="onPigeanGeneSetSort"
                     :expandedRows="pigeanGeneSetExpandedRows"

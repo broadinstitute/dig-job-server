@@ -18,7 +18,9 @@
                         :key="method"
                         class="flex justify-between items-center"
                     >
-                        <span class="capitalize">{{ workflow }}/{{ method }}:</span>
+                        <span class="capitalize"
+                            >{{ workflow }}/{{ method }}:</span
+                        >
                         <span
                             :class="getStatusClass(details.status)"
                             class="px-2 py-1 rounded text-sm"
@@ -28,7 +30,8 @@
                     </div>
                 </div>
                 <p class="mt-3 text-sm">
-                    Results will be available once workflows complete successfully.
+                    Results will be available once workflows complete
+                    successfully.
                     <Button
                         label="Refresh"
                         @click="checkResultsAvailability"
@@ -39,7 +42,8 @@
             </div>
             <div v-else>
                 <p>
-                    No results or workflow information available for this dataset.
+                    No results or workflow information available for this
+                    dataset.
                 </p>
                 <Button
                     label="Refresh"
@@ -121,7 +125,9 @@
                                 :magmaWorkflowRunning="magmaWorkflowRunning"
                                 :magmaWorkflowStatus="magmaWorkflowStatus"
                                 :hasMagmaResults="hasMagmaResults"
-                                :hasMagmaPathwaysResults="hasMagmaPathwaysResults"
+                                :hasMagmaPathwaysResults="
+                                    hasMagmaPathwaysResults
+                                "
                                 @refresh="checkResultsAvailability"
                                 @dataLoaded="onMagmaDataLoaded"
                                 ref="magmaTab"
@@ -135,7 +141,9 @@
                                 :pigeanWorkflowRunning="pigeanWorkflowRunning"
                                 :pigeanWorkflowStatus="pigeanWorkflowStatus"
                                 :hasPigeanGeneResults="hasPigeanGeneResults"
-                                :hasPigeanGeneSetResults="hasPigeanGeneSetResults"
+                                :hasPigeanGeneSetResults="
+                                    hasPigeanGeneSetResults
+                                "
                                 @refresh="checkResultsAvailability"
                                 @dataLoaded="onPigeanDataLoaded"
                                 ref="pigeanTab"
@@ -224,13 +232,13 @@ const shouldShowPigeanTab = computed(() => {
 
 // Tab headers
 const sldscTabHeader = computed(() =>
-    sldscWorkflowRunning.value ? "SLDSC ⏳" : "SLDSC"
+    sldscWorkflowRunning.value ? "SLDSC ⏳" : "SLDSC",
 );
 const magmaTabHeader = computed(() =>
-    magmaWorkflowRunning.value ? "MAGMA ⏳" : "MAGMA"
+    magmaWorkflowRunning.value ? "MAGMA ⏳" : "MAGMA",
 );
 const pigeanTabHeader = computed(() =>
-    pigeanWorkflowRunning.value ? "PIGEAN ⏳" : "PIGEAN"
+    pigeanWorkflowRunning.value ? "PIGEAN ⏳" : "PIGEAN",
 );
 
 // Download functionality
@@ -256,7 +264,7 @@ const downloadUrl = computed(() => {
 function openDownloadLink() {
     window.open(
         downloadUrl.value + `&token=${localStorage.getItem("authToken")}`,
-        "_blank"
+        "_blank",
     );
 }
 
@@ -268,7 +276,8 @@ const jobId = computed(() => {
         if (activeTab.value === "magma" && workflows.magma?.magma?.job_id) {
             return workflows.magma.magma.job_id;
         } else if (activeTab.value === "sldsc") {
-            if (workflows.sldsc?.sldsc?.job_id) return workflows.sldsc.sldsc.job_id;
+            if (workflows.sldsc?.sldsc?.job_id)
+                return workflows.sldsc.sldsc.job_id;
             if (workflows.ldsc?.ldsc?.job_id) return workflows.ldsc.ldsc.job_id;
         } else if (
             activeTab.value === "pigean" &&
@@ -315,6 +324,14 @@ const onTabChange = (event) => {
     }
 
     activeTab.value = newValue;
+
+    // Update URL with new tab parameter
+    router.push({
+        query: {
+            ...route.query,
+            tab: newValue,
+        },
+    });
 };
 
 // Check workflow status and results availability
@@ -323,7 +340,7 @@ const checkResultsAvailability = async () => {
         resultsStore.init();
 
         const workflowResponse = await resultsStore.axios.get(
-            `/api/workflow-status/${dataset.value}`
+            `/api/workflow-status/${dataset.value}`,
         );
         const workflows = workflowResponse.data;
 
@@ -336,7 +353,7 @@ const checkResultsAvailability = async () => {
         sldscWorkflowRunning.value =
             sldscStatus &&
             ["RUNNING", "RUNNABLE", "PENDING", "SUBMITTED"].includes(
-                sldscStatus.toUpperCase()
+                sldscStatus.toUpperCase(),
             );
         sldscWorkflowStatus.value = sldscStatus || "";
         hasSldscResults.value = sldscStatus === "SUCCEEDED";
@@ -346,7 +363,7 @@ const checkResultsAvailability = async () => {
         magmaWorkflowRunning.value =
             magmaStatus &&
             ["RUNNING", "RUNNABLE", "PENDING", "SUBMITTED"].includes(
-                magmaStatus.toUpperCase()
+                magmaStatus.toUpperCase(),
             );
         magmaWorkflowStatus.value = magmaStatus || "";
         hasMagmaResults.value = magmaStatus === "SUCCEEDED";
@@ -357,7 +374,7 @@ const checkResultsAvailability = async () => {
         pigeanWorkflowRunning.value =
             pigeanStatus &&
             ["RUNNING", "RUNNABLE", "PENDING", "SUBMITTED"].includes(
-                pigeanStatus.toUpperCase()
+                pigeanStatus.toUpperCase(),
             );
         pigeanWorkflowStatus.value = pigeanStatus || "";
         hasPigeanGeneResults.value = pigeanStatus === "SUCCEEDED";
@@ -380,7 +397,7 @@ const checkResultsAvailability = async () => {
 const checkResultsDirectly = async () => {
     try {
         const sldscResponse = await resultsStore.axios.get(
-            `/api/results/${dataset.value}?first=0&rows=1`
+            `/api/results/${dataset.value}?first=0&rows=1`,
         );
         hasSldscResults.value =
             sldscResponse.data.items && sldscResponse.data.items.length > 0;
@@ -390,7 +407,7 @@ const checkResultsDirectly = async () => {
 
     try {
         const magmaResponse = await resultsStore.axios.get(
-            `/api/magma-results/${dataset.value}?first=0&rows=1`
+            `/api/magma-results/${dataset.value}?first=0&rows=1`,
         );
         hasMagmaResults.value =
             magmaResponse.data.items && magmaResponse.data.items.length > 0;
@@ -400,17 +417,18 @@ const checkResultsDirectly = async () => {
 
     try {
         const pathwaysResponse = await resultsStore.axios.get(
-            `/api/magma-pathways-results/${dataset.value}?first=0&rows=1`
+            `/api/magma-pathways-results/${dataset.value}?first=0&rows=1`,
         );
         hasMagmaPathwaysResults.value =
-            pathwaysResponse.data.items && pathwaysResponse.data.items.length > 0;
+            pathwaysResponse.data.items &&
+            pathwaysResponse.data.items.length > 0;
     } catch {
         hasMagmaPathwaysResults.value = false;
     }
 
     try {
         const pigeanGeneResponse = await resultsStore.axios.get(
-            `/api/pigean-gene-results/${dataset.value}?first=0&rows=1`
+            `/api/pigean-gene-results/${dataset.value}?first=0&rows=1`,
         );
         hasPigeanGeneResults.value =
             pigeanGeneResponse.data.items &&
@@ -421,7 +439,7 @@ const checkResultsDirectly = async () => {
 
     try {
         const pigeanGeneSetResponse = await resultsStore.axios.get(
-            `/api/pigean-gene-set-results/${dataset.value}?first=0&rows=1`
+            `/api/pigean-gene-set-results/${dataset.value}?first=0&rows=1`,
         );
         hasPigeanGeneSetResults.value =
             pigeanGeneSetResponse.data.items &&
@@ -485,7 +503,7 @@ watch(
             hasPigeanGeneSetResults.value = false;
             checkResultsAvailability();
         }
-    }
+    },
 );
 
 watch(
@@ -494,7 +512,7 @@ watch(
         if (newTab && newTab !== activeTab.value) {
             activeTab.value = newTab;
         }
-    }
+    },
 );
 
 // On mount
