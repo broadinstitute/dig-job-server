@@ -74,15 +74,20 @@
                 <!-- SLDSC Results Table -->
                 <DataTable
                     v-else-if="filteredSldscData.length > 0"
+                    :value="paginatedSldscData"
+                    dataKey="id"
                     :first="sldscFirst"
                     :rows="sldscRows"
-                    :value="filteredSldscData"
+                    :sortField="sldscSortField"
+                    :sortOrder="sldscSortOrder"
                     ref="sldscDt"
-                    :lazy="false"
+                    :lazy="true"
                     :totalRecords="sldscTotalRecords"
                     :loading="sldscLoading"
                     paginator
                     :rows-per-page-options="[10, 20, 50]"
+                    @update:first="sldscFirst = $event"
+                    @update:rows="sldscRows = $event"
                     @page="onSldscPage"
                     @sort="onSldscSort"
                     :filters="filters"
@@ -339,12 +344,33 @@ const filteredSldscData = computed(() => {
         data = data.filter((item) => item.pValue <= filterObj.pValue.value);
     }
 
-    // Do NOT sort here - DataTable with lazy="false" handles sorting internally
+    // Apply sorting
+    if (sldscSortField.value) {
+        const field = sldscSortField.value;
+        const order = sldscSortOrder.value || 1;
+        data.sort((a, b) => {
+            const aVal = a[field] ?? 0;
+            const bVal = b[field] ?? 0;
+            if (aVal < bVal) return -1 * order;
+            if (aVal > bVal) return 1 * order;
+            return 0;
+        });
+    }
+
     return data;
 });
 
 const sldscTotalRecords = computed(() => {
     return filteredSldscData.value.length;
+});
+
+const paginatedSldscData = computed(() => {
+    const data = filteredSldscData.value;
+    if (!data.length) return [];
+
+    const start = Math.min(sldscFirst.value, data.length - 1);
+    const end = start + sldscRows.value;
+    return data.slice(start, end);
 });
 
 // Dropdown options
@@ -471,7 +497,11 @@ const loadSldscAllData = async () => {
         const { data } = await resultsStore.axios.get(endpoint);
 
         if (data.items) {
-            sldscAllData.value = data.items;
+            // Add unique ID for dataKey to ensure proper reactivity
+            sldscAllData.value = data.items.map((item, index) => ({
+                ...item,
+                id: index,
+            }));
             sldscDataLoaded.value = true;
             emit("dataLoaded", {
                 hasResults: data.items.length > 0,
@@ -498,11 +528,24 @@ const onSldscPage = (event) => {
 const onSldscSort = (event) => {
     sldscSortField.value = event.sortField;
     sldscSortOrder.value = event.sortOrder;
+    sldscFirst.value = 0;
 };
 
 const onSldscFilter = () => {
     sldscFirst.value = 0;
 };
+
+watch(filteredSldscData, (newVal) => {
+    if (sldscFirst.value >= newVal.length) {
+        sldscFirst.value = 0;
+    }
+});
+
+watch(sldscRows, () => {
+    if (sldscFirst.value >= filteredSldscData.value.length) {
+        sldscFirst.value = 0;
+    }
+});
 
 // Load data on mount if results are available
 onMounted(async () => {
