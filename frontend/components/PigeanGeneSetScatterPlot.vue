@@ -33,7 +33,7 @@
                 <div class="text-sm">
                     <div class="flex items-start justify-between gap-2">
                         <a
-                            :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(tooltip.gene_set)}&genesetSize=small&traitGroup=all`"
+                            :href="`https://a2f.hugeamp.org/pigean/geneset.html?geneset=${encodeURIComponent(tooltip.gene_set)}&genesetSize=small&traitGroup=portal`"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold hover:underline"
@@ -96,12 +96,12 @@ const downloadMenu = ref(null);
 
 const downloadMenuItems = [
     {
-        label: "Download as PNG",
+        label: "Save as PNG",
         icon: "pi pi-image",
         command: () => downloadChart("png"),
     },
     {
-        label: "Download as SVG",
+        label: "Save as SVG",
         icon: "pi pi-file",
         command: () => downloadChart("svg"),
     },
