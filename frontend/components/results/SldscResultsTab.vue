@@ -76,8 +76,6 @@
                     v-else-if="filteredSldscData.length > 0"
                     :first="sldscFirst"
                     :rows="sldscRows"
-                    :sortField="sldscSortField"
-                    :sortOrder="sldscSortOrder"
                     :value="filteredSldscData"
                     ref="sldscDt"
                     :lazy="false"
@@ -308,6 +306,7 @@ const filters = ref({
 });
 
 // Computed: filtered data with client-side filtering
+// NOTE: Do NOT sort here - DataTable handles sorting when lazy="false"
 const filteredSldscData = computed(() => {
     let data = [...sldscAllData.value];
 
@@ -340,19 +339,7 @@ const filteredSldscData = computed(() => {
         data = data.filter((item) => item.pValue <= filterObj.pValue.value);
     }
 
-    // Apply sorting
-    if (sldscSortField.value) {
-        const field = sldscSortField.value;
-        const order = sldscSortOrder.value || 1;
-        data.sort((a, b) => {
-            const aVal = a[field] ?? 0;
-            const bVal = b[field] ?? 0;
-            if (aVal < bVal) return -1 * order;
-            if (aVal > bVal) return 1 * order;
-            return 0;
-        });
-    }
-
+    // Do NOT sort here - DataTable with lazy="false" handles sorting internally
     return data;
 });
 
