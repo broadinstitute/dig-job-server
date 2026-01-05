@@ -158,8 +158,8 @@ async def get_text_sample(file: UploadFile) -> list:
     except EOFError:
         pass
 
-    # Only remove last line if there's more than one (last might be incomplete)
-    return lines[:-1] if len(lines) > 1 else lines
+    # Remove potentially incomplete last line, but keep at least 2 lines for valid CSV/TSV
+    return lines[:-1] if len(lines) > 2 else lines
 
 
 async def get_compressed_sample(file: UploadFile) -> list:
@@ -179,8 +179,9 @@ async def get_compressed_sample(file: UploadFile) -> list:
                 line = f.readline()
         except EOFError:
             pass
-    # Only remove last line if there's more than one (last might be incomplete)
-    return lines[:-1] if len(lines) > 1 else lines
+
+    # Remove potentially incomplete last line, but keep at least 2 lines for valid CSV/TSV
+    return lines[:-1] if len(lines) > 2 else lines
 
 
 def validate_bed_line(line: str, line_number: int) -> dict:
