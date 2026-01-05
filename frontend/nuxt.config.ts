@@ -21,7 +21,7 @@ const IndigoAura = definePreset(Aura, {
 });
 export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
-    devtools: { enabled: true },
+    devtools: { enabled: process.env.NUXT_DEVTOOLS === "true" },
     ssr: false,
     css: [
         "primeicons/primeicons.css",
