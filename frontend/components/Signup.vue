@@ -1,8 +1,5 @@
 <script setup>
-import { useToast } from "primevue/usetoast";
-
 const toast = useToast();
-import { useTheme } from "~/composables/useTheme";
 
 const username = ref("");
 const password = ref("");
