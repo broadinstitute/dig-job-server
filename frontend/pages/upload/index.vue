@@ -214,18 +214,18 @@
                                             v-if="
                                                 Object.values(
                                                     selectedFields,
-                                                ).includes(field)
+                                                ).includes(field.value)
                                             "
-                                            :key="field"
+                                            :key="field.value"
                                             icon="pi pi-check"
-                                            :label="field"
+                                            :label="field.name"
                                             class="selected-chip"
                                         />
 
                                         <Chip
                                             v-else
-                                            :label="field"
-                                            :key="'else-' + field"
+                                            :label="field.name"
+                                            :key="'else-' + field.name"
                                         />
                                     </template>
                                     <Chip
@@ -263,17 +263,17 @@
                                 >
                                     <Column
                                         field="column"
-                                        header="Column"
+                                        header="Column from data"
                                         class="col-span-4"
-                                        style="width: 30%"
+                                        style="width: 35%"
                                     ></Column>
                                     <Column
                                         header=">>"
                                         style="width: 5%"
                                     ></Column>
                                     <Column
-                                        header="Represents"
-                                        style="width: 65%"
+                                        header="Required field"
+                                        style="width: 60%"
                                     >
                                         <template #body="{ data }">
                                             <Dropdown
@@ -402,7 +402,7 @@ watch(
         }
 
         const hasRequiredFields = requiredFields.every(
-            (field) => field in colMap.value && colMap.value[field],
+            (field) => field.value in colMap.value,
         );
         const hasEffectSize =
             "beta" in colMap.value || "oddsRatio" in colMap.value;
@@ -430,14 +430,20 @@ const ancestryOptions = [
 const colOptions = [
     { name: "chromosome", value: "chromosome" },
     { name: "position", value: "position" },
-    { name: "reference", value: "reference" },
-    { name: "alt", value: "alt" },
+    { name: "other_allele", value: "reference" },
+    { name: "effect_allele", value: "alt" },
     { name: "pValue", value: "pValue" },
     { name: "beta", value: "beta" },
     { name: "oddsRatio", value: "oddsRatio" },
     { name: "n", value: "n" },
 ];
-const requiredFields = ["chromosome", "position", "reference", "alt", "pValue"];
+const requiredFields = [
+    { name: "chromosome", value: "chromosome" },
+    { name: "position", value: "position" },
+    { name: "other_allele", value: "reference" },
+    { name: "effect_allele", value: "alt" },
+    { name: "pValue", value: "pValue" },
+];
 
 const tableRows = computed(() => {
     return fileInfo.value.columns
@@ -467,7 +473,7 @@ const formIncomplete = computed(() => {
         !file.value ||
         !dataSetName.value ||
         !requiredFields.every(
-            (field) => field in colMap.value && colMap.value[field],
+            (field) => field.value in colMap.value && colMap.value[field.value],
         ) ||
         !("beta" in colMap.value || "oddsRatio" in colMap.value) ||
         !ancestry.value ||
