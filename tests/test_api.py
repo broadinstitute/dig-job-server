@@ -79,6 +79,81 @@ def test_gzip_csv(api_client: TestClient, auth_token: str):
         "delimiter": ","
     }
 
+def test_preview_any_extension_csv(api_client: TestClient, auth_token: str):
+    """Test that .txt file with CSV content is accepted"""
+    csv_content = "col1,col2,col3\n1,2,3\n4,5,6"
+    csv_file = io.BytesIO(csv_content.encode())
+    files = {"file": ("data.txt", csv_file, "text/plain")}
+    response = api_client.post("api/preview-delimited-file", files=files, headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "columns": ["col1", "col2", "col3"],
+        "delimiter": ","
+    }
+
+def test_preview_any_extension_tsv(api_client: TestClient, auth_token: str):
+    """Test that .dat file with TSV content is accepted"""
+    tsv_content = "col1\tcol2\tcol3\n1\t2\t3\n4\t5\t6"
+    tsv_file = io.BytesIO(tsv_content.encode())
+    files = {"file": ("data.dat", tsv_file, "application/octet-stream")}
+    response = api_client.post("api/preview-delimited-file", files=files, headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "columns": ["col1", "col2", "col3"],
+        "delimiter": "\t"
+    }
+
+def test_preview_gzipped_any_extension(api_client: TestClient, auth_token: str):
+    """Test that .gz file with any base extension works"""
+    import gzip
+    csv_content = "col1,col2,col3\n1,2,3\n4,5,6"
+    gzipped_content = gzip.compress(csv_content.encode())
+    gz_file = io.BytesIO(gzipped_content)
+    files = {"file": ("data.txt.gz", gz_file, "application/gzip")}
+    response = api_client.post("api/preview-delimited-file", files=files, headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "columns": ["col1", "col2", "col3"],
+        "delimiter": ","
+    }
+
+def test_preview_delimiter_inference_tab(api_client: TestClient, auth_token: str):
+    """Test delimiter inference from content for tab-delimited file with .csv extension"""
+    tsv_content = "chromosome\tposition\treference\talt\tpValue\n1\t12345\tA\tG\t0.001"
+    tsv_file = io.BytesIO(tsv_content.encode())
+    # Use .csv extension but tab-delimited content - should infer tab
+    files = {"file": ("genetic_data.csv", tsv_file, "text/csv")}
+    response = api_client.post("api/preview-delimited-file", files=files, headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    assert response.json()["delimiter"] == "\t"
+    assert "chromosome" in response.json()["columns"]
+
+def test_preview_quoted_fields_with_embedded_delimiter(api_client: TestClient, auth_token: str):
+    """Test that quoted fields with embedded delimiters are handled correctly"""
+    csv_content = 'name,description,notes\n"John Smith","Works at ACME, Inc.","Has a PhD, MSc"\n"Jane Doe","Engineer at XYZ, LLC","Expert in AI, ML"'
+    csv_file = io.BytesIO(csv_content.encode())
+    files = {"file": ("data.csv", csv_file, "text/csv")}
+    response = api_client.post("api/preview-delimited-file", files=files, headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["delimiter"] == ","
+    # Should correctly parse 3 columns, not be confused by embedded commas
+    assert len(result["columns"]) == 3
+    assert result["columns"] == ["name", "description", "notes"]
+
+def test_preview_quoted_fields_tab_delimited(api_client: TestClient, auth_token: str):
+    """Test that quoted fields with embedded tabs in TSV are handled correctly"""
+    tsv_content = 'name\tdescription\tnotes\n"John Smith"\t"Data:\tTab separated"\t"Note:\tImportant"\n"Jane Doe"\t"Info:\tTab test"\t"Test:\tOK"'
+    tsv_file = io.BytesIO(tsv_content.encode())
+    files = {"file": ("data.tsv", tsv_file, "text/tab-separated-values")}
+    response = api_client.post("api/preview-delimited-file", files=files, headers={"Authorization": f"Bearer {auth_token}"})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["delimiter"] == "\t"
+    # Should correctly parse 3 columns, not be confused by embedded tabs
+    assert len(result["columns"]) == 3
+    assert result["columns"] == ["name", "description", "notes"]
+
 @mock_aws
 def test_generate_presigned_url_success(api_client: TestClient, auth_token: str):
     mock_url = "https://fake-presigned-url.com/test"
