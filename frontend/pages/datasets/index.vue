@@ -1,5 +1,4 @@
 <script setup>
-import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 
@@ -1081,7 +1080,7 @@ function openBedResultsInNewTab(dataset) {
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
-        <div class="col-span-12">
+        <div id="gwas" class="col-span-12">
             <Toast position="top-center" />
             <ConfirmDialog />
             <ConfirmDialog group="workflow-confirmation">
@@ -1714,7 +1713,7 @@ function openBedResultsInNewTab(dataset) {
         </div>
 
         <!-- BED Annotation Files Table -->
-        <div class="col-span-12">
+        <div id="annotation" class="col-span-12">
             <Card class="m-4">
                 <template #title>
                     <div class="flex items-center justify-between">
