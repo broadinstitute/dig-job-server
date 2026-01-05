@@ -140,20 +140,50 @@ async def get_log_info(job_id: str, method_name: str = Query(None), user: User =
 
 @router.post("/preview-delimited-file")
 async def preview_file(file: UploadFile, user: User = Depends(get_current_user)):
+    """
+    Preview delimited file with automatic delimiter detection.
+    Supports any file extension with .gz compression.
+    """
+    # Read first bytes to check for gzip compression
     contents = await file.read(100)
     await file.seek(0)
 
+    # Get sample lines (handles both compressed and uncompressed)
     if contents.startswith(b'\x1f\x8b'):
         sample_lines = await file_utils.get_compressed_sample(file)
     else:
         sample_lines = await file_utils.get_text_sample(file)
 
-    df = await file_utils.parse_file(io.StringIO('\n'.join(sample_lines)), file.filename)
-    dupes = file_utils.find_dupe_cols(sample_lines[0], ".csv" in file.filename, df.columns)
+    # Create StringIO from sample
+    sample_content = io.StringIO('\n'.join(sample_lines))
+
+    # Infer delimiter from content (not filename)
+    try:
+        delimiter = file_utils.infer_delimiter(sample_content)
+    except ValueError as e:
+        raise fastapi.HTTPException(
+            status_code=400,
+            detail=f"Could not detect file delimiter: {str(e)}"
+        )
+
+    # Parse file with detected delimiter
+    sample_content.seek(0)  # Reset position
+    df = await file_utils.parse_file(sample_content, delimiter=delimiter)
+
+    # Check for duplicate columns
+    # Use inferred delimiter for duplicate check
+    dupes = file_utils.find_dupe_cols(sample_lines[0], delimiter == ",", df.columns)
     if len(dupes) > 0:
         duped_col_str = ', '.join(set([re.sub(r"\.\d+$", '', dupe) for dupe in dupes]))
-        raise fastapi.HTTPException(detail=f"{duped_col_str} specified more than once", status_code=400)
-    return {"columns": [column for column in df.columns], "delimiter": "\t" if ".tsv" in file.filename else ","}
+        raise fastapi.HTTPException(
+            detail=f"{duped_col_str} specified more than once",
+            status_code=400
+        )
+
+    return {
+        "columns": [column for column in df.columns],
+        "delimiter": delimiter
+    }
 
 
 @router.post("/validate-bed-file")

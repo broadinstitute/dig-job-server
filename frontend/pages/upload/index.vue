@@ -158,12 +158,11 @@
                                     <label
                                         for="file"
                                         class="block text-surface-600 dark:text-surface-50 text-l font-medium ml-2"
-                                        >Select a file</label
+                                        >Select a delimited file (comma or tab separated, optionally .gz compressed)</label
                                     >
                                     <FileUpload
                                         ref="fileInput"
                                         id="file"
-                                        accept=".csv, .tsv, .gz, .gzip"
                                         @select="sampleFile"
                                         @clear="resetFile"
                                         @remove="resetFile"
@@ -530,21 +529,7 @@ async function sampleFile(e) {
     file.value = e.files[0];
     fileName = e.files[0].name;
 
-    const lowercaseFileName = fileName.toLowerCase();
-    const isGzipped = lowercaseFileName.endsWith(".gz");
-    const baseFileName = isGzipped
-        ? lowercaseFileName.slice(0, -3)
-        : lowercaseFileName;
-
-    if (!baseFileName.endsWith(".csv") && !baseFileName.endsWith(".tsv")) {
-        toast.add({
-            severity: "error",
-            summary: "Error",
-            detail: "File must be a .csv or .tsv file (optionally gzipped)",
-        });
-        fileInput.value.clear();
-        return;
-    }
+    // No file extension validation - backend will infer delimiter from content
     try {
         fileInfo.value = await store.sampleTextFile(e.files[0]);
         //copy fileInfo.columns to selectedFields
@@ -553,8 +538,14 @@ async function sampleFile(e) {
         });
     } catch (e) {
         console.log(e);
+        toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: e.response?.data?.detail || "Could not parse file. Please ensure it is comma or tab delimited.",
+        });
         fileInfo.value = {};
         selectedFields.value = {};
+        fileInput.value.clear();
     }
 }
 

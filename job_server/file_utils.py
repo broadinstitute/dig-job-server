@@ -25,13 +25,120 @@ def find_dupe_cols(header, is_csv, panda_header):
     renamed_columns = [col for col in panda_header if col not in header_list]
     return renamed_columns
 
-async def parse_file(file_content, file_name) -> pd.DataFrame:
-    if '.csv' in file_name:
-        return pd.read_csv(file_content)
-    elif '.tsv' in file_name:
-        return pd.read_csv(file_content, sep='\t')
-    else:
-        raise ValueError("Unsupported file format")
+def infer_delimiter(file_content: io.StringIO, max_lines: int = 10) -> str:
+    """
+    Infer delimiter from file content using csv.Sniffer.
+
+    Args:
+        file_content: StringIO object containing file data
+        max_lines: Number of lines to sample for detection
+
+    Returns:
+        Detected delimiter (',' or '\t')
+
+    Raises:
+        ValueError: If delimiter cannot be detected or is not comma/tab
+    """
+    import csv
+
+    # Save current position
+    pos = file_content.tell()
+
+    try:
+        # Read sample for detection
+        sample_lines = []
+        file_content.seek(0)
+        for _ in range(max_lines):
+            line = file_content.readline()
+            if not line:
+                break
+            sample_lines.append(line)
+
+        # Reset to start
+        file_content.seek(0)
+
+        # Filter out trailing empty lines
+        while sample_lines and not sample_lines[-1].strip():
+            sample_lines.pop()
+
+        if not sample_lines:
+            raise ValueError("Empty file")
+
+        sample = ''.join(sample_lines)
+
+        # Primary approach: Use csv.Sniffer to detect delimiter
+        # Sniffer properly handles quoted fields
+        try:
+            sniffer = csv.Sniffer()
+            dialect = sniffer.sniff(sample, delimiters=',\t')
+            detected_delimiter = dialect.delimiter
+
+            # Validate: only support comma and tab
+            if detected_delimiter not in [',', '\t']:
+                raise ValueError(f"Unsupported delimiter '{detected_delimiter}' detected. Only comma and tab are supported.")
+
+            return detected_delimiter
+
+        except (csv.Error, Exception):
+            # Fallback: Use pandas auto-detection
+            try:
+                # Test both delimiters to see which produces more columns
+                comma_df = pd.read_csv(io.StringIO(sample), sep=',', nrows=2)
+                tab_df = pd.read_csv(io.StringIO(sample), sep='\t', nrows=2)
+
+                # Compare number of columns
+                if len(tab_df.columns) > len(comma_df.columns):
+                    return '\t'
+                elif len(comma_df.columns) > 1:
+                    return ','
+                else:
+                    # Check first non-empty line for delimiters
+                    for line in sample_lines:
+                        if line.strip():
+                            if '\t' in line:
+                                return '\t'
+                            elif ',' in line:
+                                return ','
+                    # Single column file, default to comma
+                    return ','
+
+            except Exception as e:
+                # Last resort: check first non-empty line for presence of delimiters
+                for line in sample_lines:
+                    if line.strip():
+                        if '\t' in line:
+                            return '\t'
+                        elif ',' in line:
+                            return ','
+                # Single column file, default to comma
+                return ','
+
+    finally:
+        # Restore original position
+        file_content.seek(pos)
+
+async def parse_file(file_content, file_name: str = None, delimiter: str = None) -> pd.DataFrame:
+    """
+    Parse delimited file with optional delimiter inference.
+
+    Args:
+        file_content: File content as StringIO
+        file_name: Optional filename (for backward compatibility)
+        delimiter: Optional explicit delimiter. If None, will be inferred from content
+
+    Returns:
+        Parsed DataFrame
+
+    Raises:
+        ValueError: If file cannot be parsed
+    """
+    if delimiter:
+        # Explicit delimiter provided
+        return pd.read_csv(file_content, sep=delimiter)
+
+    # Infer delimiter from content
+    detected_delimiter = infer_delimiter(file_content)
+    return pd.read_csv(file_content, sep=detected_delimiter)
 
 
 async def is_gzip(stream: bytes) -> bool:
