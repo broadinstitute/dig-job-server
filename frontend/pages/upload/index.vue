@@ -315,15 +315,6 @@
                                 </div>
                             </Fieldset>
                             <div class="field">
-                                <!-- <p v-if="formIncomplete" class="mb-2 text-sm">
-                                    {{
-                                        `You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
-                  includes ${requiredFields.join(
-                      ", ",
-                  )}, and either beta or odds ratio.  You also must specify n in your column mapping
-                  or provide an effective n before you can upload.`
-                                    }}
-                                </p> -->
                                 <Button
                                     label="Upload Dataset"
                                     class="w-full mt-4"
@@ -331,6 +322,16 @@
                                     :disabled="formIncomplete"
                                     @click="uploadData"
                                     raised
+                                    v-tooltip.top="{
+                                        value: tooltipContent,
+                                        disabled: !formIncomplete,
+                                        escape: false,
+                                        pt: {
+                                            root: {
+                                                style: 'max-width: 450px;',
+                                            },
+                                        },
+                                    }"
                                 />
                             </div>
                         </template>
@@ -468,6 +469,54 @@ function resetFile() {
     file.value = null;
     fileName = null;
 }
+
+const missingRequirementsMessages = computed(() => {
+    const messages = [];
+
+    if (!dataSetName.value) {
+        messages.push("Dataset name is required");
+    }
+    if (!file.value) {
+        messages.push("Please upload a file");
+    }
+    if (!ancestry.value) {
+        messages.push("Ancestry is required");
+    }
+    if (!genomeBuild.value) {
+        messages.push("Genome build is required");
+    }
+
+    const missingFields = requiredFields.filter(
+        (field) => !(field.value in colMap.value),
+    );
+    if (missingFields.length > 0) {
+        messages.push(
+            `Map required fields: ${missingFields.map((f) => f.name).join(", ")}`,
+        );
+    }
+
+    if (!("beta" in colMap.value || "oddsRatio" in colMap.value)) {
+        messages.push("Map either beta or oddsRatio field");
+    }
+
+    if (!("n" in colMap.value || effectiveN.value)) {
+        messages.push("Map n field or provide effective N");
+    }
+
+    return messages;
+});
+
+const tooltipContent = computed(() => {
+    if (!formIncomplete.value) return "";
+
+    const msgs = missingRequirementsMessages.value;
+    return `<div style="white-space: normal;">
+        <div style="font-weight: 600; margin-bottom: 8px;">Missing Requirements:</div>
+        <ul style="margin: 0; padding-left: 20px; font-size: 0.875rem; line-height: 1.5;">
+            ${msgs.map((msg) => `<li style="margin-bottom: 4px;">${msg}</li>`).join("")}
+        </ul>
+    </div>`;
+});
 
 const formIncomplete = computed(() => {
     return (
