@@ -61,57 +61,35 @@ def infer_delimiter(file_content: io.StringIO, max_lines: int = 10) -> str:
         while sample_lines and not sample_lines[-1].strip():
             sample_lines.pop()
 
+        # Check if we have any content
         if not sample_lines:
             raise ValueError("Empty file")
 
+        # CSV/TSV files need at least 2 lines (header + data)
+        if len(sample_lines) < 2:
+            raise ValueError("File must be comma or tab delimited")
+
         sample = ''.join(sample_lines)
 
-        # Primary approach: Use csv.Sniffer to detect delimiter
-        # Sniffer properly handles quoted fields
+        # Check if sample has any non-whitespace content
+        if not sample.strip():
+            raise ValueError("File contains no data")
+
+        # Use csv.Sniffer constrained to comma and tab only
         try:
             sniffer = csv.Sniffer()
             dialect = sniffer.sniff(sample, delimiters=',\t')
-            detected_delimiter = dialect.delimiter
+            delimiter = dialect.delimiter
 
-            # Validate: only support comma and tab
-            if detected_delimiter not in [',', '\t']:
-                raise ValueError(f"Unsupported delimiter '{detected_delimiter}' detected. Only comma and tab are supported.")
+            # Validate (should always be comma or tab due to delimiters parameter)
+            if delimiter not in [',', '\t']:
+                raise ValueError("File must be comma or tab delimited")
 
-            return detected_delimiter
+            return delimiter
 
-        except (csv.Error, Exception):
-            # Fallback: Use pandas auto-detection
-            try:
-                # Test both delimiters to see which produces more columns
-                comma_df = pd.read_csv(io.StringIO(sample), sep=',', nrows=2)
-                tab_df = pd.read_csv(io.StringIO(sample), sep='\t', nrows=2)
-
-                # Compare number of columns
-                if len(tab_df.columns) > len(comma_df.columns):
-                    return '\t'
-                elif len(comma_df.columns) > 1:
-                    return ','
-                else:
-                    # Check first non-empty line for delimiters
-                    for line in sample_lines:
-                        if line.strip():
-                            if '\t' in line:
-                                return '\t'
-                            elif ',' in line:
-                                return ','
-                    # Single column file, default to comma
-                    return ','
-
-            except Exception as e:
-                # Last resort: check first non-empty line for presence of delimiters
-                for line in sample_lines:
-                    if line.strip():
-                        if '\t' in line:
-                            return '\t'
-                        elif ',' in line:
-                            return ','
-                # Single column file, default to comma
-                return ','
+        except csv.Error:
+            # Sniffer couldn't detect comma or tab delimiter
+            raise ValueError("File must be comma or tab delimited")
 
     finally:
         # Restore original position
@@ -180,7 +158,8 @@ async def get_text_sample(file: UploadFile) -> list:
     except EOFError:
         pass
 
-    return lines[:-1]
+    # Only remove last line if there's more than one (last might be incomplete)
+    return lines[:-1] if len(lines) > 1 else lines
 
 
 async def get_compressed_sample(file: UploadFile) -> list:
@@ -200,8 +179,8 @@ async def get_compressed_sample(file: UploadFile) -> list:
                 line = f.readline()
         except EOFError:
             pass
-    # last line might not be a full line
-    return lines[:-1]
+    # Only remove last line if there's more than one (last might be incomplete)
+    return lines[:-1] if len(lines) > 1 else lines
 
 
 def validate_bed_line(line: str, line_number: int) -> dict:
