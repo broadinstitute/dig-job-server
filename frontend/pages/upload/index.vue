@@ -158,7 +158,9 @@
                                     <label
                                         for="file"
                                         class="block text-surface-600 dark:text-surface-50 text-l font-medium ml-2"
-                                        >Select a delimited file (comma or tab separated, optionally .gz compressed)</label
+                                        >Select a delimited file (comma or tab
+                                        separated, optionally .gz
+                                        compressed)</label
                                     >
                                     <FileUpload
                                         ref="fileInput"
@@ -347,7 +349,6 @@
 </template>
 
 <script setup>
-import { useToast } from "primevue/usetoast";
 import { useUserStore } from "~/stores/UserStore";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore";
 import axios from "axios";
@@ -543,7 +544,9 @@ async function sampleFile(e) {
         toast.add({
             severity: "error",
             summary: "Error",
-            detail: e.response?.data?.detail || "Could not parse file. Please ensure it is comma or tab delimited.",
+            detail:
+                e.response?.data?.detail ||
+                "Could not parse file. Please ensure it is comma or tab delimited.",
         });
         fileInfo.value = {};
         selectedFields.value = {};

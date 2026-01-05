@@ -157,11 +157,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
 import { useResultsStore } from "~/stores/ResultsStore.js";
-import SldscResultsTab from "~/components/results/SldscResultsTab.vue";
-import MagmaResultsTab from "~/components/results/MagmaResultsTab.vue";
-import PigeanResultsTab from "~/components/results/PigeanResultsTab.vue";
 
 const route = useRoute();
 const router = useRouter();

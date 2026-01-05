@@ -118,7 +118,6 @@
 }
 </style>
 <script setup>
-import { useTheme } from "~/composables/useTheme";
 import { useUserStore } from "~/stores/UserStore";
 
 const userStore = useUserStore();

@@ -236,7 +236,6 @@
 </template>
 
 <script setup>
-import { useToast } from "primevue/usetoast";
 import { useUserStore } from "~/stores/UserStore";
 import axios from "axios";
 
@@ -373,6 +372,8 @@ async function uploadBedData() {
 
         // Clear the form after successful upload
         clearForm();
+        // Redirect to datasets page after upload
+        route.push("/datasets#annotation");
     } catch (error) {
         if (error.response?.status === 409) {
             toast.add({
