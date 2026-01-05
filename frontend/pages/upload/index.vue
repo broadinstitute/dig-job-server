@@ -163,6 +163,7 @@
                                     <FileUpload
                                         ref="fileInput"
                                         id="file"
+                                        :multiple="false"
                                         @select="sampleFile"
                                         @clear="resetFile"
                                         @remove="resetFile"
