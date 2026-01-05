@@ -276,7 +276,7 @@
                                         style="width: 60%"
                                     >
                                         <template #body="{ data }">
-                                            <Dropdown
+                                            <Select
                                                 data-cy="column-dropdown"
                                                 class="w-full"
                                                 :options="colOptions"
@@ -301,6 +301,7 @@
                                                     selectedFields[data.column]
                                                 "
                                                 showClear
+                                                placeholder="select field"
                                             />
                                         </template>
                                     </Column>
