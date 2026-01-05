@@ -154,30 +154,40 @@ async def preview_file(file: UploadFile, user: User = Depends(get_current_user))
     else:
         sample_lines = await file_utils.get_text_sample(file)
 
+    # Check if we got any content
+    if not sample_lines or not any(line.strip() for line in sample_lines):
+        raise fastapi.HTTPException(
+            status_code=400,
+            detail="File appears to be empty or contains no data"
+        )
+
     # Create StringIO from sample
     sample_content = io.StringIO('\n'.join(sample_lines))
 
-    # Infer delimiter from content (not filename)
+    # Infer delimiter from content (not filename) and parse file
     try:
         delimiter = file_utils.infer_delimiter(sample_content)
+
+        # Parse file with detected delimiter
+        sample_content.seek(0)  # Reset position
+        df = await file_utils.parse_file(sample_content, delimiter=delimiter)
+
+        # Check for duplicate columns
+        dupes = file_utils.find_dupe_cols(sample_lines[0], delimiter == ",", df.columns)
+        if len(dupes) > 0:
+            duped_col_str = ', '.join(set([re.sub(r"\.\d+$", '', dupe) for dupe in dupes]))
+            raise ValueError(f"{duped_col_str} specified more than once")
+
     except ValueError as e:
         raise fastapi.HTTPException(
             status_code=400,
-            detail=f"Could not detect file delimiter: {str(e)}"
+            detail=str(e)
         )
-
-    # Parse file with detected delimiter
-    sample_content.seek(0)  # Reset position
-    df = await file_utils.parse_file(sample_content, delimiter=delimiter)
-
-    # Check for duplicate columns
-    # Use inferred delimiter for duplicate check
-    dupes = file_utils.find_dupe_cols(sample_lines[0], delimiter == ",", df.columns)
-    if len(dupes) > 0:
-        duped_col_str = ', '.join(set([re.sub(r"\.\d+$", '', dupe) for dupe in dupes]))
+    except Exception:
+        # Catch any pandas parsing errors or other issues
         raise fastapi.HTTPException(
-            detail=f"{duped_col_str} specified more than once",
-            status_code=400
+            status_code=400,
+            detail="File must be comma or tab delimited"
         )
 
     return {
