@@ -1,5 +1,4 @@
 <script setup>
-import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 

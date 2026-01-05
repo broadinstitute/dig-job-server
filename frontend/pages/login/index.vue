@@ -1,14 +1,11 @@
 <script setup>
-import Login from '~/components/Login.vue';
 definePageMeta({
-  layout: false,
+    layout: false,
 });
 </script>
 
 <template>
-  <Login />
+    <Login />
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

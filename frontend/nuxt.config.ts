@@ -23,6 +23,12 @@ export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
     devtools: { enabled: process.env.NUXT_DEVTOOLS === "true" },
     ssr: false,
+    components: [
+        {
+            path: "~/components",
+            pathPrefix: false,
+        },
+    ],
     css: [
         "primeicons/primeicons.css",
         "~/assets/css/tailwind.css",
