@@ -163,11 +163,13 @@
                                     <FileUpload
                                         ref="fileInput"
                                         id="file"
+                                        :multiple="false"
                                         @select="sampleFile"
                                         @clear="resetFile"
                                         @remove="resetFile"
                                         :previewWidth="0"
                                         :show-upload-button="false"
+                                        :disabled="file !== null"
                                         class="file-upload"
                                     />
                                 </div>
