@@ -1281,16 +1281,25 @@ function openBedResultsInNewTab(dataset) {
             </ConfirmDialog>
 
             <div class="flex justify-between items-center">
-                <Button
-                    icon="pi pi-question-circle"
-                    label="Help"
-                    size="small"
-                    class="help-button ml-4"
-                    aria-haspopup="true"
-                    aria-controls="help-popover"
-                    @click="toggleHelp"
-                    outlined
-                />
+                <div class="flex gap-2 ml-4">
+                    <Button
+                        icon="pi pi-question-circle"
+                        label="Help"
+                        size="small"
+                        class="help-button"
+                        aria-haspopup="true"
+                        aria-controls="help-popover"
+                        @click="toggleHelp"
+                        outlined
+                    />
+                    <Button
+                        @click="router.push('/guide')"
+                        icon="pi pi-book"
+                        label="User Guide"
+                        size="small"
+                        outlined
+                    ></Button>
+                </div>
                 <Button
                     @click="router.push('/upload')"
                     icon="pi pi-upload"
