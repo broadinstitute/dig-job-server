@@ -491,7 +491,8 @@ const loadSldscAllData = async () => {
             rows: 10000,
         });
 
-        const endpoint = `/api/results/${props.dataset}?${queryParams.toString()}`;
+        const encodedDataset = encodeURIComponent(props.dataset);
+        const endpoint = `/api/results/${encodedDataset}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
         if (data.items) {

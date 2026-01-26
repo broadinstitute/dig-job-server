@@ -901,7 +901,8 @@ const loadPigeanGeneData = async () => {
             sort_order: -1,
         });
 
-        const endpoint = `/api/pigean-gene-results/${props.dataset}?${queryParams.toString()}`;
+        const encodedDataset = encodeURIComponent(props.dataset);
+        const endpoint = `/api/pigean-gene-results/${encodedDataset}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
         pigeanGeneAllData.value = data.items || [];
@@ -934,7 +935,8 @@ const loadPigeanGeneSetResults = async () => {
             sort_order: -1,
         });
 
-        const endpoint = `/api/pigean-gene-set-results/${props.dataset}?${queryParams.toString()}`;
+        const encodedDataset = encodeURIComponent(props.dataset);
+        const endpoint = `/api/pigean-gene-set-results/${encodedDataset}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
         pigeanGeneSetAllData.value = data.items || [];

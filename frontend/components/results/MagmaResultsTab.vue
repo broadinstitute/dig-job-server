@@ -503,7 +503,8 @@ const loadMagmaResults = async () => {
             queryParams.append(key, value);
         });
 
-        const endpoint = `/api/magma-results/${props.dataset}?${queryParams.toString()}`;
+        const encodedDataset = encodeURIComponent(props.dataset);
+        const endpoint = `/api/magma-results/${encodedDataset}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
         if (data.items) {
@@ -542,7 +543,8 @@ const loadMagmaPathwaysResults = async () => {
             queryParams.append(key, value);
         });
 
-        const endpoint = `/api/magma-pathways-results/${props.dataset}?${queryParams.toString()}`;
+        const encodedDataset = encodeURIComponent(props.dataset);
+        const endpoint = `/api/magma-pathways-results/${encodedDataset}?${queryParams.toString()}`;
         const { data } = await resultsStore.axios.get(endpoint);
 
         if (data.items) {
