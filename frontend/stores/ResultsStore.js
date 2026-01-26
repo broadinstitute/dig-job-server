@@ -1,5 +1,4 @@
 // stores/resultsStore.js
-import { defineStore } from "pinia";
 
 export const useResultsStore = defineStore("results", {
     state: () => ({

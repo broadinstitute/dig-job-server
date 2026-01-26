@@ -1,5 +1,4 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "nuxt/app";
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
@@ -29,8 +28,7 @@ function getAncestryName(code) {
 const dataset = computed(() => route.query.dataset);
 
 // Data refs
-const results = ref([]);
-const totalRecords = ref(0);
+const allResults = ref([]);
 const loading = ref(false);
 const phenotypes = ref([]);
 const jobId = ref("");
@@ -40,6 +38,53 @@ const first = ref(0);
 const rows = ref(10);
 const sortField = ref("pValue");
 const sortOrder = ref(1); // 1 for ascending, -1 for descending
+
+const sortedResults = computed(() => {
+    const data = [...allResults.value];
+    const field = sortField.value;
+    if (!field) return data;
+
+    const order = sortOrder.value || 1;
+
+    return data.sort((a, b) => {
+        const valueA = a[field];
+        const valueB = b[field];
+
+        if (valueA == null && valueB == null) return 0;
+        if (valueA == null) return 1;
+        if (valueB == null) return -1;
+
+        if (typeof valueA === "string" && typeof valueB === "string") {
+            return valueA.localeCompare(valueB) * order;
+        }
+
+        if (valueA === valueB) return 0;
+        return valueA > valueB ? order : -order;
+    });
+});
+
+// Enriched results with phenotype descriptions for the volcano plot
+const enrichedResults = computed(() => {
+    return sortedResults.value.map((item) => ({
+        ...item,
+        phenotypeDescription:
+            phenotypeStore.getPhenotypeByName(item.phenotype)?.description ||
+            item.phenotype,
+    }));
+});
+
+const totalRecords = computed(() => sortedResults.value.length);
+
+const paginatedResults = computed(() => {
+    const data = sortedResults.value;
+    if (data.length === 0) return [];
+
+    const maxFirst = Math.max(data.length - rows.value, 0);
+    const start = Math.min(first.value, maxFirst);
+    const end = start + rows.value;
+
+    return data.slice(start, end);
+});
 
 // Fetch results from API
 async function fetchResults() {
@@ -59,18 +104,32 @@ async function fetchResults() {
             `/api/annot-sldsc-results/${dataset.value}`,
             {
                 params: {
-                    first: first.value,
-                    rows: rows.value,
+                    first: 0,
+                    rows: 10000,
                     sort_field: sortField.value,
                     sort_order: sortOrder.value,
                 },
             },
         );
 
-        results.value = response.data.items || [];
-        totalRecords.value = response.data.totalRecords || 0;
+        const items = response.data.items || [];
+
+        allResults.value = items.map((item, index) => ({
+            ...item,
+            id: `${item.phenotype || "annotation"}-${index}`,
+            enrichment:
+                typeof item.enrichment === "string"
+                    ? Number(item.enrichment)
+                    : item.enrichment,
+            pValue:
+                typeof item.pValue === "string"
+                    ? Number(item.pValue)
+                    : item.pValue,
+        }));
+
         phenotypes.value = response.data.phenotypes || [];
         jobId.value = response.data.jobId || "";
+        first.value = 0;
     } catch (error) {
         console.error("Error fetching annotation results:", error);
         toast.add({
@@ -88,14 +147,13 @@ async function fetchResults() {
 function onPage(event) {
     first.value = event.first;
     rows.value = event.rows;
-    fetchResults();
 }
 
 // Handle sort
 function onSort(event) {
     sortField.value = event.sortField;
     sortOrder.value = event.sortOrder;
-    fetchResults();
+    first.value = 0;
 }
 
 // Format p-value for display
@@ -134,6 +192,27 @@ onMounted(async () => {
     // Fetch results
     await fetchResults();
 });
+
+watch(dataset, async (newDataset, oldDataset) => {
+    if (newDataset && newDataset !== oldDataset) {
+        await fetchResults();
+    }
+});
+
+watch(
+    () => [sortedResults.value.length, rows.value],
+    ([length]) => {
+        if (length === 0) {
+            first.value = 0;
+            return;
+        }
+
+        const maxFirst = Math.max(length - rows.value, 0);
+        if (first.value > maxFirst) {
+            first.value = maxFirst;
+        }
+    },
+);
 </script>
 
 <template>
@@ -188,6 +267,13 @@ onMounted(async () => {
                     </div>
                 </template>
             </Card>
+
+            <!-- Volcano Plot -->
+            <AnnotVolcanoPlot
+                v-if="!loading && totalRecords > 0"
+                class="mb-6"
+                :results="enrichedResults"
+            />
 
             <!-- Results Table -->
             <Card>
@@ -280,13 +366,14 @@ onMounted(async () => {
                 </template>
                 <template #content>
                     <DataTable
-                        :value="results"
+                        :value="paginatedResults"
                         :lazy="true"
                         :paginator="true"
                         :rows="rows"
                         :totalRecords="totalRecords"
                         :loading="loading"
                         :first="first"
+                        dataKey="id"
                         @page="onPage"
                         @sort="onSort"
                         :rowsPerPageOptions="[10, 25, 50]"

@@ -1,5 +1,3 @@
-import { defineStore } from "pinia";
-
 export const usePhenotypeStore = defineStore("phenotype", {
     state: () => ({
         phenotypes: [],

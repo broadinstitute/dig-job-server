@@ -158,7 +158,9 @@
                                     <label
                                         for="file"
                                         class="block text-surface-600 dark:text-surface-50 text-l font-medium ml-2"
-                                        >Select a delimited file (comma or tab separated, optionally .gz compressed)</label
+                                        >Select a delimited file (comma or tab
+                                        separated, optionally .gz
+                                        compressed)</label
                                     >
                                     <FileUpload
                                         ref="fileInput"
@@ -212,18 +214,18 @@
                                             v-if="
                                                 Object.values(
                                                     selectedFields,
-                                                ).includes(field)
+                                                ).includes(field.value)
                                             "
-                                            :key="field"
+                                            :key="field.value"
                                             icon="pi pi-check"
-                                            :label="field"
+                                            :label="field.name"
                                             class="selected-chip"
                                         />
 
                                         <Chip
                                             v-else
-                                            :label="field"
-                                            :key="'else-' + field"
+                                            :label="field.name"
+                                            :key="'else-' + field.name"
                                         />
                                     </template>
                                     <Chip
@@ -261,20 +263,20 @@
                                 >
                                     <Column
                                         field="column"
-                                        header="Column"
+                                        header="Column from data"
                                         class="col-span-4"
-                                        style="width: 30%"
+                                        style="width: 35%"
                                     ></Column>
                                     <Column
                                         header=">>"
                                         style="width: 5%"
                                     ></Column>
                                     <Column
-                                        header="Represents"
-                                        style="width: 65%"
+                                        header="Required field"
+                                        style="width: 60%"
                                     >
                                         <template #body="{ data }">
-                                            <Dropdown
+                                            <Select
                                                 data-cy="column-dropdown"
                                                 class="w-full"
                                                 :options="colOptions"
@@ -299,6 +301,7 @@
                                                     selectedFields[data.column]
                                                 "
                                                 showClear
+                                                placeholder="select field"
                                             />
                                         </template>
                                     </Column>
@@ -312,15 +315,6 @@
                                 </div>
                             </Fieldset>
                             <div class="field">
-                                <!-- <p v-if="formIncomplete" class="mb-2 text-sm">
-                                    {{
-                                        `You must specify a dataset name, gwas file, ancestry, genome build, and column mapping that
-                  includes ${requiredFields.join(
-                      ", ",
-                  )}, and either beta or odds ratio.  You also must specify n in your column mapping
-                  or provide an effective n before you can upload.`
-                                    }}
-                                </p> -->
                                 <Button
                                     label="Upload Dataset"
                                     class="w-full mt-4"
@@ -328,6 +322,16 @@
                                     :disabled="formIncomplete"
                                     @click="uploadData"
                                     raised
+                                    v-tooltip.top="{
+                                        value: tooltipContent,
+                                        disabled: !formIncomplete,
+                                        escape: false,
+                                        pt: {
+                                            root: {
+                                                style: 'max-width: 450px;',
+                                            },
+                                        },
+                                    }"
                                 />
                             </div>
                         </template>
@@ -347,7 +351,6 @@
 </template>
 
 <script setup>
-import { useToast } from "primevue/usetoast";
 import { useUserStore } from "~/stores/UserStore";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore";
 import axios from "axios";
@@ -401,7 +404,7 @@ watch(
         }
 
         const hasRequiredFields = requiredFields.every(
-            (field) => field in colMap.value && colMap.value[field],
+            (field) => field.value in colMap.value,
         );
         const hasEffectSize =
             "beta" in colMap.value || "oddsRatio" in colMap.value;
@@ -429,14 +432,20 @@ const ancestryOptions = [
 const colOptions = [
     { name: "chromosome", value: "chromosome" },
     { name: "position", value: "position" },
-    { name: "reference", value: "reference" },
-    { name: "alt", value: "alt" },
+    { name: "other_allele", value: "reference" },
+    { name: "effect_allele", value: "alt" },
     { name: "pValue", value: "pValue" },
     { name: "beta", value: "beta" },
     { name: "oddsRatio", value: "oddsRatio" },
     { name: "n", value: "n" },
 ];
-const requiredFields = ["chromosome", "position", "reference", "alt", "pValue"];
+const requiredFields = [
+    { name: "chromosome", value: "chromosome" },
+    { name: "position", value: "position" },
+    { name: "other_allele", value: "reference" },
+    { name: "effect_allele", value: "alt" },
+    { name: "pValue", value: "pValue" },
+];
 
 const tableRows = computed(() => {
     return fileInfo.value.columns
@@ -461,12 +470,60 @@ function resetFile() {
     fileName = null;
 }
 
+const missingRequirementsMessages = computed(() => {
+    const messages = [];
+
+    if (!dataSetName.value) {
+        messages.push("Dataset name is required");
+    }
+    if (!file.value) {
+        messages.push("Please upload a file");
+    }
+    if (!ancestry.value) {
+        messages.push("Ancestry is required");
+    }
+    if (!genomeBuild.value) {
+        messages.push("Genome build is required");
+    }
+
+    const missingFields = requiredFields.filter(
+        (field) => !(field.value in colMap.value),
+    );
+    if (missingFields.length > 0) {
+        messages.push(
+            `Map required fields: ${missingFields.map((f) => f.name).join(", ")}`,
+        );
+    }
+
+    if (!("beta" in colMap.value || "oddsRatio" in colMap.value)) {
+        messages.push("Map either beta or oddsRatio field");
+    }
+
+    if (!("n" in colMap.value || effectiveN.value)) {
+        messages.push("Map n field or provide effective N");
+    }
+
+    return messages;
+});
+
+const tooltipContent = computed(() => {
+    if (!formIncomplete.value) return "";
+
+    const msgs = missingRequirementsMessages.value;
+    return `<div style="white-space: normal;">
+        <div style="font-weight: 600; margin-bottom: 8px;">Missing Requirements:</div>
+        <ul style="margin: 0; padding-left: 20px; font-size: 0.875rem; line-height: 1.5;">
+            ${msgs.map((msg) => `<li style="margin-bottom: 4px;">${msg}</li>`).join("")}
+        </ul>
+    </div>`;
+});
+
 const formIncomplete = computed(() => {
     return (
         !file.value ||
         !dataSetName.value ||
         !requiredFields.every(
-            (field) => field in colMap.value && colMap.value[field],
+            (field) => field.value in colMap.value && colMap.value[field.value],
         ) ||
         !("beta" in colMap.value || "oddsRatio" in colMap.value) ||
         !ancestry.value ||
@@ -543,7 +600,9 @@ async function sampleFile(e) {
         toast.add({
             severity: "error",
             summary: "Error",
-            detail: e.response?.data?.detail || "Could not parse file. Please ensure it is comma or tab delimited.",
+            detail:
+                e.response?.data?.detail ||
+                "Could not parse file. Please ensure it is comma or tab delimited.",
         });
         fileInfo.value = {};
         selectedFields.value = {};
