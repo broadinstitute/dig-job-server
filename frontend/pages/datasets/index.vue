@@ -728,18 +728,18 @@ function progress(data) {
 }
 
 function viewResults(dataset) {
-    router.push(`/results?dataset=${dataset}`);
+    router.push(`/results?dataset=${encodeURIComponent(dataset)}`);
 }
 
 function openInNewTab(dataset) {
-    window.open(`/results?dataset=${dataset}`, "_blank");
+    window.open(`/results?dataset=${encodeURIComponent(dataset)}`, "_blank");
 }
 
 function goToWorkflowResults(dataset, method) {
     if (method) {
-        router.push(`/results?dataset=${dataset}&tab=${method}`);
+        router.push(`/results?dataset=${encodeURIComponent(dataset)}&tab=${method}`);
     } else {
-        router.push(`/results?dataset=${dataset}`);
+        router.push(`/results?dataset=${encodeURIComponent(dataset)}`);
     }
 }
 
