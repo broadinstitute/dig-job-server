@@ -1,5 +1,4 @@
 <script setup>
-import { ref } from "vue";
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 
@@ -1081,7 +1080,7 @@ function openBedResultsInNewTab(dataset) {
 </script>
 <template>
     <div class="grid grid-cols-12 gap-4 grid-cols-12 gap-6 m-6">
-        <div class="col-span-12">
+        <div id="gwas" class="col-span-12">
             <Toast position="top-center" />
             <ConfirmDialog />
             <ConfirmDialog group="workflow-confirmation">
@@ -1282,16 +1281,25 @@ function openBedResultsInNewTab(dataset) {
             </ConfirmDialog>
 
             <div class="flex justify-between items-center">
-                <Button
-                    icon="pi pi-question-circle"
-                    label="Help"
-                    size="small"
-                    class="help-button ml-4"
-                    aria-haspopup="true"
-                    aria-controls="help-popover"
-                    @click="toggleHelp"
-                    outlined
-                />
+                <div class="flex gap-2 ml-4">
+                    <Button
+                        icon="pi pi-question-circle"
+                        label="Help"
+                        size="small"
+                        class="help-button"
+                        aria-haspopup="true"
+                        aria-controls="help-popover"
+                        @click="toggleHelp"
+                        outlined
+                    />
+                    <Button
+                        @click="router.push('/guide')"
+                        icon="pi pi-book"
+                        label="User Guide"
+                        size="small"
+                        outlined
+                    ></Button>
+                </div>
                 <Button
                     @click="router.push('/upload')"
                     icon="pi pi-upload"
@@ -1714,7 +1722,7 @@ function openBedResultsInNewTab(dataset) {
         </div>
 
         <!-- BED Annotation Files Table -->
-        <div class="col-span-12">
+        <div id="annotation" class="col-span-12">
             <Card class="m-4">
                 <template #title>
                     <div class="flex items-center justify-between">

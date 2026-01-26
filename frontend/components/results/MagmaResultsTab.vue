@@ -318,9 +318,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
 import { useResultsStore } from "~/stores/ResultsStore.js";
-import { storeToRefs } from "pinia";
 
 const props = defineProps({
     dataset: {
