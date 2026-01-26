@@ -338,9 +338,10 @@ const onTabChange = (event) => {
 const checkResultsAvailability = async () => {
     try {
         resultsStore.init();
+        const encodedDataset = encodeURIComponent(dataset.value);
 
         const workflowResponse = await resultsStore.axios.get(
-            `/api/workflow-status/${dataset.value}`,
+            `/api/workflow-status/${encodedDataset}`,
         );
         const workflows = workflowResponse.data;
 
@@ -395,9 +396,11 @@ const checkResultsAvailability = async () => {
 
 // Fallback: check results by attempting API calls
 const checkResultsDirectly = async () => {
+    const encodedDataset = encodeURIComponent(dataset.value);
+    
     try {
         const sldscResponse = await resultsStore.axios.get(
-            `/api/results/${dataset.value}?first=0&rows=1`,
+            `/api/results/${encodedDataset}?first=0&rows=1`,
         );
         hasSldscResults.value =
             sldscResponse.data.items && sldscResponse.data.items.length > 0;
@@ -407,7 +410,7 @@ const checkResultsDirectly = async () => {
 
     try {
         const magmaResponse = await resultsStore.axios.get(
-            `/api/magma-results/${dataset.value}?first=0&rows=1`,
+            `/api/magma-results/${encodedDataset}?first=0&rows=1`,
         );
         hasMagmaResults.value =
             magmaResponse.data.items && magmaResponse.data.items.length > 0;
@@ -417,7 +420,7 @@ const checkResultsDirectly = async () => {
 
     try {
         const pathwaysResponse = await resultsStore.axios.get(
-            `/api/magma-pathways-results/${dataset.value}?first=0&rows=1`,
+            `/api/magma-pathways-results/${encodedDataset}?first=0&rows=1`,
         );
         hasMagmaPathwaysResults.value =
             pathwaysResponse.data.items &&
@@ -428,7 +431,7 @@ const checkResultsDirectly = async () => {
 
     try {
         const pigeanGeneResponse = await resultsStore.axios.get(
-            `/api/pigean-gene-results/${dataset.value}?first=0&rows=1`,
+            `/api/pigean-gene-results/${encodedDataset}?first=0&rows=1`,
         );
         hasPigeanGeneResults.value =
             pigeanGeneResponse.data.items &&
@@ -439,7 +442,7 @@ const checkResultsDirectly = async () => {
 
     try {
         const pigeanGeneSetResponse = await resultsStore.axios.get(
-            `/api/pigean-gene-set-results/${dataset.value}?first=0&rows=1`,
+            `/api/pigean-gene-set-results/${encodedDataset}?first=0&rows=1`,
         );
         hasPigeanGeneSetResults.value =
             pigeanGeneSetResponse.data.items &&

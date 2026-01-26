@@ -129,8 +129,9 @@ export const useResultsStore = defineStore("results", {
 
             try {
                 // Check workflow status first
+                const encodedDataset = encodeURIComponent(this.dataset);
                 const workflowResponse = await this.axios.get(
-                    `/api/workflow-status/${this.dataset}`,
+                    `/api/workflow-status/${encodedDataset}`,
                 );
                 this.workflowStatus = workflowResponse.data.status || {};
                 this.hasWorkflowData =
@@ -228,9 +229,11 @@ export const useResultsStore = defineStore("results", {
 
         async checkResultsDirectly() {
             // Check each result type by attempting to fetch with limit 1
+            const encodedDataset = encodeURIComponent(this.dataset);
+            
             try {
                 const sldscCheck = await this.axios.get(
-                    `/api/results/${this.dataset}?rows=1`,
+                    `/api/results/${encodedDataset}?rows=1`,
                 );
                 this.hasSldscResults =
                     sldscCheck.data.totalRecords > 0 ||
@@ -241,7 +244,7 @@ export const useResultsStore = defineStore("results", {
 
             try {
                 const magmaCheck = await this.axios.get(
-                    `/api/magma-results/${this.dataset}?rows=1`,
+                    `/api/magma-results/${encodedDataset}?rows=1`,
                 );
                 this.hasMagmaResults =
                     magmaCheck.data.totalRecords > 0 ||
@@ -252,7 +255,7 @@ export const useResultsStore = defineStore("results", {
 
             try {
                 const pathwayCheck = await this.axios.get(
-                    `/api/magma-pathways-results/${this.dataset}?rows=1`,
+                    `/api/magma-pathways-results/${encodedDataset}?rows=1`,
                 );
                 this.hasMagmaPathwaysResults =
                     pathwayCheck.data.totalRecords > 0 ||
@@ -263,7 +266,7 @@ export const useResultsStore = defineStore("results", {
 
             try {
                 const pigeanGeneCheck = await this.axios.get(
-                    `/api/pigean-gene-results/${this.dataset}?rows=1`,
+                    `/api/pigean-gene-results/${encodedDataset}?rows=1`,
                 );
                 this.hasPigeanGeneResults =
                     pigeanGeneCheck.data.totalRecords > 0 ||
@@ -274,7 +277,7 @@ export const useResultsStore = defineStore("results", {
 
             try {
                 const pigeanGeneSetCheck = await this.axios.get(
-                    `/api/pigean-gene-set-results/${this.dataset}?rows=1`,
+                    `/api/pigean-gene-set-results/${encodedDataset}?rows=1`,
                 );
                 this.hasPigeanGeneSetResults =
                     pigeanGeneSetCheck.data.totalRecords > 0 ||
@@ -362,12 +365,13 @@ export const useResultsStore = defineStore("results", {
                 });
 
                 // Choose the appropriate endpoint based on result type
+                const encodedDataset = encodeURIComponent(dataset);
                 const endpoint =
                     resultType === "magma"
-                        ? `/api/magma-results/${dataset}?${queryParams.toString()}`
-                        : `/api/results/${dataset}?${queryParams.toString()}`;
+                        ? `/api/magma-results/${encodedDataset}?${queryParams.toString()}`
+                        : `/api/results/${encodedDataset}?${queryParams.toString()}`;
 
-                const { data } = await this.axios.get(endpoint);
+                const { data} = await this.axios.get(endpoint);
 
                 if (data.items) this.items = data.items;
                 if (data.totalRecords) this.totalRecords = data.totalRecords;
