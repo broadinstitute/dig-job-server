@@ -59,7 +59,7 @@ export default defineNuxtConfig({
                     darkModeSelector: "html.dark",
                     cssLayer: {
                         name: "primevue",
-                        order: "theme, base, primevue",
+                        order: "theme, base, primevue, components, utilities",
                     },
                 },
             },
