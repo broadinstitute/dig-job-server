@@ -37,10 +37,8 @@ export default defineNuxtConfig({
     ],
     modules: [
         "@pinia/nuxt",
-        "@nuxt/devtools",
         "@primevue/nuxt-module",
         "nuxt-shiki",
-        //"@nuxtjs/tailwindcss", //not yet compatible with tailwind 4
     ],
 
     app: {
