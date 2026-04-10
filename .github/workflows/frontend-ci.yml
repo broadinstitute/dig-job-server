@@ -17,7 +17,7 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
+                  node-version: "24"
 
             - name: Install dependencies
               working-directory: ./frontend
@@ -36,7 +36,6 @@ jobs:
                   echo "NUXT_PUBLIC_USER_SERVICE_TOKEN=47c5488c-1660-4133-8700-23c14e942788" >> .env
                   echo "NUXT_PUBLIC_FINAL_REDIRECT_URI=https://gwas-ce.kpndataregistry.org" >> .env
                   echo "NUXT_PUBLIC_USER_GROUP=gwas-ce" >> .env
-                  
 
             - name: Build
               working-directory: ./frontend
