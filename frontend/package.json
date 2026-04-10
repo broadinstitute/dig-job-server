@@ -12,36 +12,35 @@
     },
     "dependencies": {
         "@pinia/nuxt": "^0.11.3",
-        "@primeuix/themes": "^1.2.5",
-        "@primevue/forms": "^4.5.0",
-        "axios": "^1.13.2",
+        "@primeuix/themes": "^2.0.3",
+        "@primevue/forms": "^4.5.5",
+        "axios": "^1.15.0",
         "chart.js": "^4.5.1",
-        "nuxt": "^3.20.1",
-        "nuxt-primevue": "^3.0.0",
-        "nuxt-shiki": "^0.3.1",
+        "nuxt": "^3.21.2",
+        "nuxt-shiki": "^0.3.2",
         "pako": "^2.1.0",
         "pinia": "^3.0.1",
         "primeicons": "^7.0.0",
-        "primevue": "^4.3.3",
-        "shiki": "^3.2.1",
+        "primevue": "^4.5.5",
+        "shiki": "^3.23.0",
         "tailwindcss-primeui": "^0.6.1",
-        "vue": "latest",
-        "vue-router": "latest"
+        "vue": "^3.5.32",
+        "vue-router": "^4.6.3"
     },
     "overrides": {
-        "vue": "latest"
+        "vue": "^3.5.32"
     },
     "devDependencies": {
-        "@primevue/nuxt-module": "^4.3.3",
-        "@tailwindcss/postcss": "^4.1.2",
-        "autoprefixer": "^10.4.21",
+        "@primevue/nuxt-module": "^4.5.5",
+        "@tailwindcss/postcss": "^4.2.2",
+        "autoprefixer": "^10.4.27",
         "cross-env": "^10.1.0",
-        "eslint-plugin-vue": "^10.6.2",
-        "postcss": "^8.5.3",
-        "prettier": "^3.5.3",
+        "eslint-plugin-vue": "^10.8.0",
+        "postcss": "^8.5.9",
+        "prettier": "^3.8.2",
         "prettier-plugin-tailwindcss": "^0.7.2",
-        "sass": "^1.86.2",
-        "sass-loader": "^16.0.5",
-        "tailwindcss": "^4.1.2"
+        "sass": "^1.99.0",
+        "sass-loader": "^16.0.7",
+        "tailwindcss": "^4.2.2"
     }
 }
