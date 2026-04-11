@@ -56,7 +56,7 @@ export default defineNuxtConfig({
             theme: {
                 preset: IndigoAura,
                 options: {
-                    darkModeSelector: "html.dark",
+                    darkModeSelector: ".dark",
                     cssLayer: {
                         name: "primevue",
                         order: "theme, base, primevue, components, utilities",
