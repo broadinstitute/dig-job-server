@@ -711,10 +711,10 @@ onMounted(async () => {
 }
 
 .card {
-    background: var(--surface-card);
+    background: var(--p-content-background);
     padding: 2rem;
     margin-bottom: 2rem;
-    border-radius: var(--content-border-radius);
+    border-radius: var(--p-content-border-radius);
 }
 
 .card:last-child {

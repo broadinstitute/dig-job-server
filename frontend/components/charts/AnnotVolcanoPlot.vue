@@ -403,9 +403,9 @@ onUnmounted(() => {
 <style scoped>
 .annot-volcano-card {
     padding: 1.5rem;
-    border: 1px solid var(--surface-border);
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.75rem;
-    background: var(--surface-card);
+    background: var(--p-content-background);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
@@ -420,13 +420,13 @@ onUnmounted(() => {
 .card-header h3 {
     font-weight: 600;
     font-size: 1.125rem;
-    color: var(--text-color);
+    color: var(--p-text-color);
 }
 
 .card-header p {
     margin-top: 0.25rem;
     font-size: 0.875rem;
-    color: var(--text-color-secondary);
+    color: var(--p-text-muted-color);
 }
 
 .chart-shell {
@@ -441,8 +441,8 @@ onUnmounted(() => {
 
 .chart-tooltip {
     position: absolute;
-    background: var(--surface-overlay, #ffffff);
-    border: 1px solid var(--surface-border);
+    background: var(--p-overlay-popover-background);
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.5rem;
     padding: 0.75rem;
     width: 14rem;
@@ -465,7 +465,7 @@ onUnmounted(() => {
 .tooltip-title {
     font-weight: 600;
     margin-bottom: 0.5rem;
-    color: var(--text-color);
+    color: var(--p-text-color);
 }
 
 .tooltip-close {
@@ -473,17 +473,17 @@ onUnmounted(() => {
     border: none;
     cursor: pointer;
     padding: 0;
-    color: var(--text-color-secondary);
+    color: var(--p-text-muted-color);
     font-size: 0.75rem;
     line-height: 1;
 }
 
 .tooltip-close:hover {
-    color: var(--text-color);
+    color: var(--p-text-color);
 }
 
 .tooltip-row {
-    color: var(--text-color-secondary);
+    color: var(--p-text-muted-color);
     line-height: 1.3;
 }
 </style>
