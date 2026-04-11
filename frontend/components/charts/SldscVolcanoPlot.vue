@@ -527,9 +527,9 @@ onUnmounted(() => {
 <style scoped>
 .sldsc-volcano-card {
     padding: 1.5rem;
-    border: 1px solid var(--surface-border);
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.75rem;
-    background: var(--surface-card);
+    background: var(--p-content-background);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
@@ -545,13 +545,13 @@ onUnmounted(() => {
 .sldsc-card-header h3 {
     font-weight: 600;
     font-size: 1.125rem;
-    color: var(--text-color);
+    color: var(--p-text-color);
 }
 
 .sldsc-card-header p {
     margin-top: 0.25rem;
     font-size: 0.875rem;
-    color: var(--text-color-secondary);
+    color: var(--p-text-muted-color);
 }
 
 .sldsc-card-actions {
@@ -568,7 +568,7 @@ onUnmounted(() => {
     align-items: center;
     gap: 0.75rem;
     font-size: 0.85rem;
-    color: var(--text-color-secondary);
+    color: var(--p-text-muted-color);
 }
 
 .legend-item {
@@ -587,8 +587,8 @@ onUnmounted(() => {
 .empty-state {
     padding: 2rem;
     text-align: center;
-    color: var(--text-color-secondary);
-    border: 1px dashed var(--surface-border);
+    color: var(--p-text-muted-color);
+    border: 1px dashed var(--p-content-border-color);
     border-radius: 0.75rem;
 }
 

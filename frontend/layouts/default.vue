@@ -68,15 +68,15 @@
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    background-color: var(--surface-background);
-    color: var(--text-primary);
+    background-color: var(--p-content-background);
+    color: var(--p-text-color);
 }
 .layout-header {
     width: 100%;
     padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--surface-border);
+    border-bottom: 1px solid var(--p-content-border-color);
     margin-bottom: 1rem;
-    background-color: var(--surface-elevation-1);
+    background-color: var(--p-content-background);
     box-shadow:
         0 1px 3px rgba(0, 0, 0, 0.12),
         0 1px 2px rgba(0, 0, 0, 0.24);
@@ -109,7 +109,7 @@
     justify-content: center;
     padding: 1rem 0 1rem 0;
     gap: 0.5rem;
-    border-top: 1px solid var(--surface-border);
+    border-top: 1px solid var(--p-content-border-color);
     font-size: small;
 }
 

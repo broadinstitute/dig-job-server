@@ -482,7 +482,7 @@ watch(
 }
 
 :deep(.p-datatable-thead > tr > th) {
-    background-color: var(--surface-elevation-1);
+    background-color: var(--p-content-background);
 }
 
 :deep(.p-paginator) {
