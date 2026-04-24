@@ -79,8 +79,10 @@ export const useFalconStore = defineStore("falcon", () => {
   }
 
   // ─── actions: stubs; wired in subsequent tasks ───
-  async function loadFolder(/* files */) {
-    throw new Error("loadFolder not wired yet (see plan Task 8)");
+  async function loadFolder(files) {
+    const { useFalconDataSource } = await import("~/composables/useFalconDataSource");
+    const source = useFalconDataSource(useFalconStore());
+    await source.loadFromLocalFiles(files);
   }
   async function loadClinicalTrialsCsv(/* file */) {
     throw new Error("loadClinicalTrialsCsv not wired yet (see plan Task 12)");
