@@ -15,6 +15,7 @@ export function useFalconDataSource(store) {
     store.resetCaches();
     store.resetDatasets();
 
+    store.rawFiles = files;
     store.folderName = files[0]?.webkitRelativePath?.split("/")[0] || "(unknown folder)";
 
     const geneFile    = files.find((f) => f.name.endsWith(".wg.genes"));

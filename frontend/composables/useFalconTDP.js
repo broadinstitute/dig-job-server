@@ -3,21 +3,16 @@
 // Entry point: runAnalysis(cfg) returns a Plotly {data, layout} spec.
 //
 // Substitution rules (documented in plan Task 15):
-// - DataStore.* / FileLoader.ldFiles → store.*
+// - DataStore.* → store.*
 // - ColorManager → getColorForClump / FALCON_PALETTE
 // - No DOM touched; returns spec for the component to mount
 // - Respects store.globalFilter at run-analysis time only (spec §11 preserved quirk)
 //
-// Notes on fidelity:
-// - The original TDPModule pulled per-chromosome variant/v2g trait files from
-//   FileLoader.rawFiles (the whole folder the user originally selected) and
-//   the .ld chunk files from FileLoader.ldFiles. In this port both live in
-//   store.tdp.ldFiles — the plan's substitution table maps ldFiles → tdp.ldFiles,
-//   and there is no separate mapping for rawFiles. Treating the LD folder as
-//   the source for both .variants/.v2g/.ld trait files matches the
-//   "tdp file bundle" pattern the user loads via loadLdFolder(). If the
-//   per-chr trait files live elsewhere, the discovery regex below still works
-//   over whatever FileList is stored there.
+// Dual-source file model (mirrors the original TDPModule):
+// - Per-chromosome trait files (.variants, .v2g, .genes) come from store.rawFiles,
+//   which holds the File[] from the main folder the user selected.
+// - LD chunk files (.ld / .ld.gz / .sorted) come from store.tdp.ldFiles,
+//   which holds the File[] from the separate LD folder (loadLdFolder()).
 // - LD chunk cache: original used TDPModule.ldCache (a plain object keyed by
 //   `chr${chr}_${bin}`). Port uses store.caches.ldBinCache (a Map, same keys).
 import Papa from "papaparse";
@@ -57,11 +52,10 @@ export function useFalconTDP(store) {
   // (app.js:1875-1915). Results cached in store.caches.ldBinCache by chunkKey.
   async function loadLDChunk(file, chunkKey) {
     if (store.caches.ldBinCache.has(chunkKey)) {
-      console.log(`[LD Debug] Cache hit for chunk ${chunkKey}.`);
       return store.caches.ldBinCache.get(chunkKey);
     }
 
-    console.log(`[LD Debug] Parsing tiny LD chunk: ${file.name}`);
+
     const dataArray = [];
 
     // Support .ld.gz (inflate → text → Papa.parse(string)) and plain .ld
@@ -150,9 +144,6 @@ export function useFalconTDP(store) {
     } = cfg || {};
 
     try {
-      console.log(`\n--- [LD Debug] STARTING NEW ANALYSIS ---`);
-
-      console.log(`[LD Debug] Step 1: Reading inputs...`);
       if (!targetGeneInput || !String(targetGeneInput).trim()) {
         setStatus("Error: Target Gene is required.");
         return null;
@@ -160,14 +151,12 @@ export function useFalconTDP(store) {
       const trimmedGene = String(targetGeneInput).trim();
       setStatus(`Searching genome for ${trimmedGene}...`);
 
-      console.log(`[LD Debug] Step 2: Accessing store for Genes...`);
       const allGenes = store.datasets.genes.data || [];
       if (!allGenes || allGenes.length === 0) {
         setStatus("Error: Genes dataset not loaded. Please select your folder again.");
         return null;
       }
 
-      console.log(`[LD Debug] Step 3: Finding Target Gene...`);
       const targetGeneUpper = trimmedGene.toUpperCase();
       const geneRow = allGenes.find(
         (r) => (r["GENE"] || r["ID"] || "").toUpperCase() === targetGeneUpper,
@@ -184,12 +173,8 @@ export function useFalconTDP(store) {
         return null;
       }
 
-      console.log(`[LD Debug] Step 4: Calculating Boundaries...`);
       const plotStart = parseInt(geneRow["START"]) - boundary;
       const plotEnd = parseInt(geneRow["END"]) + boundary;
-      console.log(
-        `[LD Debug] Window calculated: Chr ${chr} | Start: ${plotStart} | End: ${plotEnd}`,
-      );
 
       let genesToPlot = [];
       if (focus === "gene") {
@@ -238,20 +223,19 @@ export function useFalconTDP(store) {
 
       setStatus(`Scanning region Chr ${chr}:${plotStart}-${plotEnd}...`);
 
-      console.log(`[LD Debug] Step 5: Accessing store.tdp.ldFiles...`);
-      const files = store.tdp.ldFiles || [];
-      if (files.length === 0) {
+      // Per-chromosome trait file discovery from the main folder (same regex
+      // logic as original, app.js:2044-2055). Try chr-specific match first,
+      // fall back to .wg.<ext> / .<ext>.
+      const traitFiles = store.rawFiles || [];
+      if (traitFiles.length === 0) {
         setStatus(
-          `Error: Files lost from memory. Please select the folder again.`,
+          `Error: Main folder files lost from memory. Please select the folder again.`,
         );
         return null;
       }
 
-      // Per-chromosome trait file discovery (same regex logic as original,
-      // app.js:2044-2055). Try chr-specific match first, fall back to
-      // .wg.<ext> / .<ext>.
       const getFile = (ext, exactChr) => {
-        let f = files.find((file) => {
+        let f = traitFiles.find((file) => {
           const n = file.name;
           if (exactChr) {
             const chrRegex = new RegExp(
@@ -263,7 +247,7 @@ export function useFalconTDP(store) {
           return n.endsWith(ext);
         });
         if (!f)
-          f = files.find(
+          f = traitFiles.find(
             (file) =>
               file.name.endsWith(`.wg.${ext}`) || file.name.endsWith(`.${ext}`),
           );
@@ -277,7 +261,6 @@ export function useFalconTDP(store) {
         return null;
       }
 
-      console.log(`[LD Debug] Step 6: Processing GWAS/V2G Variants Data...`);
       const processTrait = async (fVars, fV2G) => {
         if (!fVars) return null;
 
@@ -452,10 +435,6 @@ export function useFalconTDP(store) {
       };
 
       const tData = await processTrait(fVars, fV2G);
-      console.log(`[LD Debug] Step 7: Checking Extracted Variants...`);
-      console.log(
-        `[LD Debug] Total valid RSIDs collected: ${tData.validRsids.size}`,
-      );
 
       let overlapWarning = "";
       if (tData && tData.clumps.size > 0) {
@@ -473,7 +452,6 @@ export function useFalconTDP(store) {
       // =========================================================
       // STEP 8: SMART SHARD FETCHING & DYNAMIC BUMPERS
       // =========================================================
-      console.log(`[LD Debug] Step 8: Initializing Smart LD Chunk Fetching...`);
       let ldTrace = null;
       let hasLD = false;
 
@@ -481,16 +459,10 @@ export function useFalconTDP(store) {
       if (isNaN(stretchValue)) stretchValue = 1.0;
       if (stretchValue < 0.1) stretchValue = 0.1;
 
-      console.log(`[LD Debug] Max Stretch Slider Value: ${stretchValue}`);
-
       if (store.tdp.ldFiles && store.tdp.ldFiles.length > 0) {
         const CHUNK_SIZE = 1000000;
         const startBin = Math.floor(plotStart / CHUNK_SIZE) * CHUNK_SIZE;
         const endBin = Math.floor(plotEnd / CHUNK_SIZE) * CHUNK_SIZE;
-
-        console.log(
-          `[LD Debug] Plot requires chunks from ${startBin} to ${endBin}`,
-        );
 
         let combinedLD = [];
         let filesFound = 0;
@@ -515,18 +487,12 @@ export function useFalconTDP(store) {
               const chunkData = await loadLDChunk(chunkFile, chunkKey);
               combinedLD = combinedLD.concat(chunkData);
             } catch (err) {
-              console.error(
-                `[LD Debug] Error loading chunk ${chunkFile.name}:`,
-                err,
-              );
+              console.error(`Error loading LD chunk ${chunkFile.name}:`, err);
             }
           }
         }
 
         if (combinedLD.length > 0) {
-          console.log(
-            `[LD Debug] Successfully assembled ${filesFound} chunks. Total rows to scan: ${combinedLD.length}`,
-          );
           setStatus(
             `Executing Fast LD Scan (R2 >= ${minR2}) for Chr ${chr}...`,
           );
@@ -636,14 +602,9 @@ export function useFalconTDP(store) {
             };
             hasLD = true;
           }
-        } else {
-          console.log(
-            "[LD Debug] No matching LD chunk files found for this region in the loaded folder.",
-          );
         }
       }
 
-      console.log(`[LD Debug] Step 9: Rendering Subplots...`);
       setStatus(`Rendering Unified Subplots...${overlapWarning}`);
       const traces = [];
 
@@ -912,7 +873,6 @@ export function useFalconTDP(store) {
         };
       }
 
-      console.log(`[LD Debug] Step 10: Complete!`);
       setStatus(`Complete. Unified interactive plots rendered.${overlapWarning}`);
 
       const result = { data: traces, layout };
@@ -920,7 +880,7 @@ export function useFalconTDP(store) {
       store.tdp.lastAnalysis = { data: traces, layout, cfg };
       return result;
     } catch (err) {
-      console.error(`[LD Debug] UNCAUGHT ERROR:`, err);
+      console.error(`TDP analysis error:`, err);
       setStatus(`Error during analysis: ${err.message}`);
       return null;
     }

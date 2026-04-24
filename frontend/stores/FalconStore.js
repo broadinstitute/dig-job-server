@@ -21,6 +21,10 @@ export const useFalconStore = defineStore("falcon", () => {
   });
 
   const folderName = ref("");
+  // Raw File[] from the main folder picker — retained so TDP can
+  // discover per-chromosome trait files (.variants, .v2g, .genes)
+  // without re-reading the whole folder. Populated by the data source.
+  const rawFiles = ref([]);
   const status = ref("");
 
   // ─── global filters (affect plots; Summary table preserves original quirk) ───
@@ -76,6 +80,7 @@ export const useFalconStore = defineStore("falcon", () => {
     datasets.log.chromosomes = new Set();
     datasets.log.totalTime = "Not Found / Incomplete Run";
     datasets.log.isLoaded = false;
+    rawFiles.value = [];
   }
 
   // ─── actions: stubs; wired in subsequent tasks ───
@@ -98,6 +103,7 @@ export const useFalconStore = defineStore("falcon", () => {
   return {
     datasets,
     folderName,
+    rawFiles,
     status,
     globalFilter,
     tableStates,
