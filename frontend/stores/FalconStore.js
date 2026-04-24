@@ -89,8 +89,10 @@ export const useFalconStore = defineStore("falcon", () => {
     const { loadCsv } = useClinicalTrials(useFalconStore());
     await loadCsv(file);
   }
-  async function loadLdFolder(/* files */) {
-    throw new Error("loadLdFolder not wired yet (see plan Task 15)");
+  async function loadLdFolder(files) {
+    const arr = Array.from(files);
+    tdp.ldFiles = arr;
+    tdp.ldFolderName = arr[0]?.webkitRelativePath?.split("/")[0] || "(ld folder)";
   }
 
   return {
