@@ -11,10 +11,12 @@ Port the standalone FALCON Results Viewer — a client-side dashboard that inges
 
 The port is client-only. The user selects a folder from their machine, the browser parses files in-place, and all analysis happens locally. A data-source seam is left in place so a server-backed mode can slot in later without re-plumbing the UI.
 
-To compare visual treatments, the port lands on two divergent branches off a shared foundation:
+To compare visual treatments on a single deployment, both variants land in `main` at separate routes:
 
-- **Branch B (`falcon-port-b`) — "PrimeVue shell, custom guts."** Outer chrome uses PrimeVue; charts, data tables, the genomic-region filter, and the data inspector keep their original look.
-- **Branch A (`falcon-port-a`) — "full PrimeVue."** Every surface with a PrimeVue equivalent uses it (DataTable, Slider, SelectButton, Card, etc.); dark-mode works throughout.
+- **Variant B — `/falcon-b`, "PrimeVue shell, custom guts."** Outer chrome uses PrimeVue; charts, data tables, the genomic-region filter, and the data inspector keep their original look.
+- **Variant A — `/falcon-a`, "full PrimeVue."** Every surface with a PrimeVue equivalent uses it (DataTable, Slider, SelectButton, Card, etc.); dark-mode works throughout.
+
+Each variant's UI lives under its own directory (`components/falcon-a/` and `components/falcon-b/`); shared composables, stores, and utils are untouched. After comparison on the deployed environment, a third short PR deletes the loser's page and components directory.
 
 ## 2. Goals and non-goals
 
@@ -41,41 +43,49 @@ A Nuxt page at `pages/falcon/index.vue` lazy-loads Plotly on route entry and ren
 
 ### Directory layout (additions to `frontend/`)
 
+Base plan (`falcon-port-base`, already landed) contributes the scaffold page, the store, and all composables + utils — everything shared between variants:
+
 ```
 pages/
   falcon/
-    index.vue                      # host page, tab shell, URL-synced active tab
+    index.vue                      # base scaffold — kept as a minimal "health check" page
+  falcon-a/
+    index.vue                      # Variant A — added by Plan 2
+  falcon-b/
+    index.vue                      # Variant B — added by Plan 3
 components/
-  falcon/
+  falcon-a/                        # added by Plan 2
     ExecutiveSummaryTab.vue
     GenesScatterTab.vue
     VariantsScatterTab.vue
     DataTableTab.vue
     LogSummaryTab.vue
-    TDPTab.vue                     # FALCON Zoom & LD Correlation
-    GlobalFilterBar.vue            # strict filter / min prob / min NegP
-    FolderPicker.vue               # wraps <input type=file webkitdirectory>
-    GenomicRegionFilter.vue        # chromosome pills + BP range slider
-    DataInspectorPanel.vue         # floating click-point details
-    TraitCard.vue                  # expandable summary row
+    TDPTab.vue
+    GlobalFilterBar.vue
+    FolderPicker.vue
+    GenomicRegionFilter.vue
+    DataInspectorPanel.vue
+    TraitCard.vue
+  falcon-b/                        # added by Plan 3 — same component set, Variant B styling
+    ... (symmetric with falcon-a/)
 stores/
-  FalconStore.js
-composables/
-  useFalconDataSource.js           # loadFromLocalFiles (v1) / loadFromServer (v2 stub)
-  useFalconFileLoader.js           # .wg.genes / .wg.variants TSV parse
-  useFalconLogParser.js            # .wg.log regex state machine
-  useFalconFilters.js              # strict filter + genomic-region filter
-  useFalconPlots.js                # Plotly {data, layout} builders
-  useFalconTDP.js                  # Zoom/LD analysis
-  useFalconSummary.js              # top + lead signal aggregation, novelty
-  useClinicalTrials.js             # CSV → gene→trial map
-  useGeneTraitFetcher.js           # codetabs → hugeampkpncms; AbortSignal support
-  usePlotly.js                     # dynamic import wrapper, mount/unmount
-utils/
+  FalconStore.js                   # base — shared
+composables/                       # base — all shared
+  useFalconDataSource.js
+  useFalconFileLoader.js
+  useFalconLogParser.js
+  useFalconFilters.js
+  useFalconPlots.js
+  useFalconTDP.js
+  useFalconSummary.js
+  useClinicalTrials.js
+  useGeneTraitFetcher.js
+  usePlotly.js
+utils/                             # base — all shared
   falcon/
-    colorPalette.js                # port of ColorManager
-    config.js                      # port of AppConfig.tabs
-    pako.js                        # gzip helper (existing pako dep)
+    colorPalette.js
+    config.js
+    pako.js
 ```
 
 ### Data flow
@@ -103,14 +113,19 @@ FolderPicker ──▶ FalconStore.loadFolder(files)
 
 ```
 main
- └── falcon-port-base              # shared foundation (stores/, composables/, page scaffold)
-      ├── falcon-port-b            # Branch B: PrimeVue shell, custom guts
-      └── falcon-port-a            # Branch A: full PrimeVue
+ └── falcon-port-base              # shared foundation (stores/, composables/, utils/, scaffold)
+ └── falcon-variant-a              # forks from main after base merges; adds /falcon-a
+ └── falcon-variant-b              # forks from main after base merges; adds /falcon-b
+ └── falcon-cleanup                # forks from main after eval; deletes the loser
 ```
 
-Both branches fork from `falcon-port-base`, which contains 100% of `stores/`, `composables/`, `utils/falcon/`, and the scaffold of `pages/falcon/index.vue`. Only files under `components/falcon/` diverge.
+**Workflow:**
+1. `falcon-port-base` → PR → merge to `main`. Contributes the shared foundation.
+2. `falcon-variant-a` and `falcon-variant-b` fork from `main` in parallel. Each adds its own page + components dir. Neither touches the other's files, so the two PRs never conflict.
+3. Both variant PRs merge to `main`. Deploy. Compare live at `/falcon-a` vs `/falcon-b`.
+4. Pick the winner. `falcon-cleanup` deletes the loser's page and components directory, possibly renames the winner to `/falcon` (consolidating) or leaves it at `/falcon-<winner>` if a nicer URL can wait. PR, merge, done.
 
-**Workflow:** base lands to `main` via PR first. Branch A and B stay open side-by-side until a winner is picked; the winner's `components/falcon/**` merges to `main`, the loser branch is deleted.
+No long-lived feature branches, no merge waiting on product decisions, and the deployed env always carries whatever's been merged.
 
 ## 5. Pinia store shape
 
@@ -233,8 +248,8 @@ All tabs: no props, read from `useFalconStore()`, mount charts via `usePlotly()`
 - **`VariantsScatterTab.vue`** — identical structure, reads `datasets.variants`, no genomic-region filter (matches original).
 
 - **`DataTableTab.vue`** — ports `TableModule`. Inner genes/variants switch, search, sortable columns, pagination.
-  - Branch B: native `<table>` with sticky headers and custom sort/paginator (verbatim port).
-  - Branch A: `<DataTable :lazy>` with `<Column v-for>`, `@sort`, `@page`, `filterDisplay="row"`.
+  - Variant B: native `<table>` with sticky headers and custom sort/paginator (verbatim port).
+  - Variant A: `<DataTable :lazy>` with `<Column v-for>`, `@sort`, `@page`, `filterDisplay="row"`.
 
 - **`LogSummaryTab.vue`** — ports `LogSummaryModule`. Total-time pill, explainer card (the "Parallel Wall Time Calculation" note, verbatim), per-chromosome dropdown, pre-process bar chart, grid of per-component histograms with min/med/mean/max stats.
 
@@ -246,13 +261,15 @@ All tabs: no props, read from `useFalconStore()`, mount charts via `usePlotly()`
 
 - **`FolderPicker.vue`** — custom `<input type=file webkitdirectory>` on both branches (PrimeVue `FileUpload` doesn't support directory selection).
 
-- **`GenomicRegionFilter.vue`** — chromosome pill grid + BP range slider; Branch B uses original CSS, Branch A uses PrimeVue `SelectButton` + `Slider :range` inside a `Card`.
+- **`GenomicRegionFilter.vue`** — chromosome pill grid + BP range slider; Variant B uses original CSS, Variant A uses PrimeVue `SelectButton` + `Slider :range` inside a `Card`.
 
 Active tab synced to `?tab=summary|genes|variants|table|log|tdp` via `router.push({ query: { ...route.query, tab } })`, mirroring `pages/results/index.vue`.
 
-## 8. Branch A vs Branch B divergence
+## 8. Variant A vs Variant B divergence
 
-| Concern | Branch B | Branch A |
+Both variants implement the full tab set (§7) under `components/falcon-a/` and `components/falcon-b/` respectively, and each gets its own page at `pages/falcon-a/index.vue` and `pages/falcon-b/index.vue`. The divergence below applies per-component:
+
+| Concern | Variant B | Variant A |
 |---|---|---|
 | Folder picker | Custom `<input webkitdirectory>` | Custom `<input>` styled with PrimeVue `Button` trigger |
 | Outer chrome | PrimeVue `Tabs` + `Tag` for active-dataset pill | Same |
@@ -263,7 +280,7 @@ Active tab synced to `?tab=summary|genes|variants|table|log|tdp` via `router.pus
 | TDP controls | Grouped flex toolbar, original CSS | `InputText`/`InputNumber`/`Select`, nested `Card`, `Slider` |
 | Log summary cards | Plain white cards + inline stats row | `Card` with `<template #title>` + `Tag` per metric |
 | Inspector panel | Fixed-position panel, original CSS | `Dialog` or `OverlayPanel` |
-| Plotly specs | Identical | Identical (Branch A optionally swaps paper/font colors on dark mode) |
+| Plotly specs | Identical | Identical (Variant A optionally swaps paper/font colors on dark mode) |
 | Dark mode | Partial (PrimeVue chrome works; custom CSS is light-only) | Full |
 | Copy-to-translate ratio | ~60% copy, ~40% Vue wrapping | ~25% copy, ~75% rewrite |
 
@@ -319,7 +336,7 @@ No test framework; documented manual test plan, executed per branch:
 8. Log summary: switch chromosome → histograms rebuild.
 9. Data table: sort, search, paginate.
 10. Reload with a different dataset → caches reset (new clump colors; no LD leak).
-11. Dark mode: toggle from footer — Branch A must pass fully; Branch B partial OK.
+11. Dark mode: toggle from footer — Variant A must pass fully; Variant B partial OK.
 12. Auth: logged-out visit to `/falcon` → redirected to `/login`.
 13. Sample data: `PEGS/src/dashboard/data/clinical_trials.csv` for test 6; bring your own FALCON folder otherwise.
 
@@ -361,10 +378,12 @@ Fixtures live outside both repos at `~/falcon-fixtures/kp5/`, synced from `s3://
 
 ## 13. Rollout
 
-1. Merge `falcon-port-base` to `main` via PR. No user-visible route yet.
-2. Keep Branches A and B open side-by-side for demo.
-3. Pick a winner. Merge winner's `components/falcon/**` to `main`. Delete loser branch.
-4. Soft-launch: share `/falcon` URL with pilot users. No header link.
+1. Merge `falcon-port-base` to `main` via PR. `/falcon` (scaffold) reachable behind auth but not useful yet.
+2. Merge `falcon-variant-a` and `falcon-variant-b` to `main` (in either order; PRs are independent). Deployed env now has three FALCON routes: `/falcon` (scaffold), `/falcon-a`, `/falcon-b`.
+3. Soft-launch: share both variant URLs with pilot reviewers for comparison. No header link to either.
+4. Pick a winner based on pilot feedback.
+5. Merge `falcon-cleanup` — deletes the loser's `pages/falcon-<loser>/` + `components/falcon-<loser>/`. Optionally renames winner's path to `/falcon` (consolidating), replacing the old scaffold page.
+6. (Optional v2 follow-up) add a header nav link once the winner has been used in the wild for a bit.
 
 ## 14. Future work (v2 candidates)
 
