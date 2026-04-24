@@ -40,31 +40,31 @@
       </TabList>
 
       <TabPanels>
-        <TabPanel value="summary">
+        <TabPanel value="summary" :lazy="true">
           <ExecutiveSummaryTab v-if="store.datasets.genes.isLoaded" />
           <EmptyTab v-else reason="Load a folder to see the executive summary." />
         </TabPanel>
 
-        <TabPanel value="tdp">
+        <TabPanel value="tdp" :lazy="true">
           <TDPTab />
         </TabPanel>
 
-        <TabPanel value="genes">
+        <TabPanel value="genes" :lazy="true">
           <GenesScatterTab v-if="store.datasets.genes.isLoaded" />
           <EmptyTab v-else reason="Load a folder containing .wg.genes." />
         </TabPanel>
 
-        <TabPanel value="variants">
+        <TabPanel value="variants" :lazy="true">
           <VariantsScatterTab v-if="store.datasets.variants.isLoaded" />
           <EmptyTab v-else reason="Load a folder containing .wg.variants." />
         </TabPanel>
 
-        <TabPanel value="table">
+        <TabPanel value="table" :lazy="true">
           <DataTableTab v-if="store.datasets.genes.isLoaded" />
           <EmptyTab v-else reason="Load a folder to browse the raw tables." />
         </TabPanel>
 
-        <TabPanel value="log">
+        <TabPanel value="log" :lazy="true">
           <LogSummaryTab v-if="store.datasets.log.isLoaded" />
           <EmptyTab v-else reason="Load a folder containing .wg.log." />
         </TabPanel>
