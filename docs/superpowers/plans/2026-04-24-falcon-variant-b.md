@@ -763,26 +763,141 @@ The chromosome bounds and the store wiring are identical to Plan 2's Task 4 — 
 
 **Files:** modify both stubs.
 
-**IDENTICAL to Variant A Task 5** — the Plotly specs come from the same shared composable (`useFalconPlots`), and the click-to-inspector pattern is the same. The only thing that differs is the `<GenomicRegionFilter>` inside `GenesScatterTab.vue` uses Variant B's styled component. Since Variant-B's filter is drop-in at the same path, the template looks the same. So:
+Shared Plotly specs via `useFalconPlots`; `plotly_click` feeds the injected inspector. **Note on Nuxt component auto-resolution:** if ambiguity surfaces between `components/falcon-a/` and `components/falcon-b/` (e.g., the wrong `GenomicRegionFilter` gets picked), use an explicit import at the top of `<script setup>`:
+```js
+import GenomicRegionFilter from '~/components/falcon-b/GenomicRegionFilter.vue';
+```
+`DataInspectorPanel` doesn't need an explicit import — it's accessed via `inject`.
 
-- [ ] **Step 1:** Use exactly the Variant-A Task 5 component code (see `plans/2026-04-24-falcon-variant-a.md` §Task 5) but save the files at `components/falcon-b/GenesScatterTab.vue` and `.../VariantsScatterTab.vue`. The imports from `~/composables/*` are shared; the only component import in-template is `GenomicRegionFilter` — that's auto-resolved via Nuxt's component auto-discovery to the `falcon-b` sibling since both files live under `components/falcon-b/`.
+### 5a — `GenesScatterTab.vue`
 
-    Note: if Nuxt's component auto-discovery is ambiguous (e.g., picks `components/falcon-a/GenomicRegionFilter.vue` instead), switch to an explicit import:
-    ```js
-    import GenomicRegionFilter from '~/components/falcon-b/GenomicRegionFilter.vue';
-    ```
-    Same for `DataInspectorPanel` if needed — though that's injected via `provide`/`inject` so auto-import doesn't matter.
+```vue
+<template>
+  <div class="space-y-4">
+    <GenomicRegionFilter />
+    <div class="plot-wrapper">
+      <div ref="plotEl" class="w-full" style="height: 600px" />
+    </div>
+  </div>
+</template>
 
-- [ ] **Step 2:** Dev check: load T2D, click "Genes Plot" — scatter renders; chromosome filter pills appear with the original aesthetic. Click a point → inspector panel appears bottom-right with the original fixed-position styling.
+<script setup>
+import { ref, watchEffect, onBeforeUnmount, inject } from 'vue';
+import { useFalconStore } from '~/stores/FalconStore';
+import { useFalconPlots } from '~/composables/useFalconPlots';
+import { usePlotly } from '~/composables/usePlotly';
+// If auto-resolution lands on the wrong variant, uncomment:
+// import GenomicRegionFilter from '~/components/falcon-b/GenomicRegionFilter.vue';
 
+const store = useFalconStore();
+const { buildGenesScatterSpec } = useFalconPlots(store);
+const { mount, unmount, getPlotly } = usePlotly();
+const inspector = inject('falcon-inspector', null);
+const plotEl = ref(null);
+
+let current = null;
+let clickHandler = null;
+
+watchEffect(async () => {
+  const spec = buildGenesScatterSpec();
+  if (!plotEl.value) return;
+  await mount(plotEl.value, spec);
+  current = plotEl.value;
+
+  await getPlotly();
+  if (clickHandler) current.removeAllListeners?.('plotly_click');
+  clickHandler = (ev) => {
+    if (!ev?.points?.length || !inspector?.value) return;
+    const p = ev.points[0];
+    const txt = p.text || p.hovertext || 'No data available.';
+    inspector.value.show(txt);
+  };
+  current.on('plotly_click', clickHandler);
+});
+
+onBeforeUnmount(async () => {
+  if (current) await unmount(current);
+});
+</script>
+
+<style scoped>
+.plot-wrapper {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 8px;
+}
+</style>
+```
+
+### 5b — `VariantsScatterTab.vue`
+
+```vue
+<template>
+  <div class="space-y-4">
+    <div class="plot-wrapper">
+      <div ref="plotEl" class="w-full" style="height: 600px" />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, watchEffect, onBeforeUnmount, inject } from 'vue';
+import { useFalconStore } from '~/stores/FalconStore';
+import { useFalconPlots } from '~/composables/useFalconPlots';
+import { usePlotly } from '~/composables/usePlotly';
+
+const store = useFalconStore();
+const { buildVariantsScatterSpec } = useFalconPlots(store);
+const { mount, unmount, getPlotly } = usePlotly();
+const inspector = inject('falcon-inspector', null);
+const plotEl = ref(null);
+
+let current = null;
+let clickHandler = null;
+
+watchEffect(async () => {
+  const spec = buildVariantsScatterSpec();
+  if (!plotEl.value) return;
+  await mount(plotEl.value, spec);
+  current = plotEl.value;
+
+  await getPlotly();
+  if (clickHandler) current.removeAllListeners?.('plotly_click');
+  clickHandler = (ev) => {
+    if (!ev?.points?.length || !inspector?.value) return;
+    const p = ev.points[0];
+    const txt = p.text || p.hovertext || 'No data available.';
+    inspector.value.show(txt);
+  };
+  current.on('plotly_click', clickHandler);
+});
+
+onBeforeUnmount(async () => {
+  if (current) await unmount(current);
+});
+</script>
+
+<style scoped>
+.plot-wrapper {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 8px;
+}
+</style>
+```
+
+- [ ] **Step 1:** Replace both stubs with the code above.
+- [ ] **Step 2:** Dev check: load T2D, click "Genes Plot" — scatter renders; chromosome filter pills appear with the original aesthetic. Click a point → floating inspector panel (fixed bottom-right) opens with point details.
 - [ ] **Step 3:** Commit:
     ```
     feat(falcon-b): genes and variants scatter tabs
 
-    Identical chart logic to Variant A (same useFalconPlots composable,
-    same plotly_click → inspector wiring). The visual divergence from
-    Variant A lives in the components they host — the Variant-B
-    GenomicRegionFilter and DataInspectorPanel.
+    Plotly scatter + plotly_click → inspector via provide/inject, same
+    pattern as Variant A. The visual divergence lives in the components
+    each tab hosts (the Variant-B GenomicRegionFilter and
+    DataInspectorPanel).
     ```
 
 ---
