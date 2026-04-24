@@ -84,8 +84,10 @@ export const useFalconStore = defineStore("falcon", () => {
     const source = useFalconDataSource(useFalconStore());
     await source.loadFromLocalFiles(files);
   }
-  async function loadClinicalTrialsCsv(/* file */) {
-    throw new Error("loadClinicalTrialsCsv not wired yet (see plan Task 12)");
+  async function loadClinicalTrialsCsv(file) {
+    const { useClinicalTrials } = await import("~/composables/useClinicalTrials");
+    const { loadCsv } = useClinicalTrials(useFalconStore());
+    await loadCsv(file);
   }
   async function loadLdFolder(/* files */) {
     throw new Error("loadLdFolder not wired yet (see plan Task 15)");
