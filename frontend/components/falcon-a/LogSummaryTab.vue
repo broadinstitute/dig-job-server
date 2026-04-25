@@ -4,7 +4,7 @@
       <h3 class="text-xl font-semibold">FALCON Execution Time Summary</h3>
       <Tag
         severity="success"
-        :value="`Total Execution Time: ${totalTime}`"
+        :value="`Total Execution Time: ${formattedTotalTime}`"
         class="text-base"
       />
     </div>
@@ -48,7 +48,47 @@
       />
     </div>
 
-    <div ref="preprocessEl" class="w-full" style="height: 320px" />
+    <Card>
+      <template #title>
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <span>Pre-process Steps Accumulation Time</span>
+          <Tag
+            severity="success"
+            :value="`${preProcess.parallel ? 'Total Pre-process (Parallel Wall Time)' : 'Total Pre-process'}: ${formatTime(preProcess.totalTime)}`"
+          />
+        </div>
+      </template>
+      <template #content>
+        <div
+          class="grid gap-2"
+          style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));"
+        >
+          <div
+            v-for="step in preProcess.perStep"
+            :key="step.key"
+            class="flex justify-between items-center px-3 py-2 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm"
+          >
+            <span class="text-gray-500 dark:text-gray-400">{{ step.key }}</span>
+            <strong
+              :class="
+                step.time === 0
+                  ? 'text-red-500 font-normal'
+                  : 'text-emerald-700 dark:text-emerald-400'
+              "
+            >
+              {{ step.time === 0 ? 'Skipped / 0.00s' : `${step.time.toFixed(2)}s` }}
+            </strong>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card>
+      <template #title>Total Pre-process Time by Chromosome</template>
+      <template #content>
+        <div ref="preprocessEl" class="w-full" style="height: 320px" />
+      </template>
+    </Card>
 
     <div
       class="grid gap-4"
@@ -102,12 +142,32 @@ import { useFalconLogParser } from '~/composables/useFalconLogParser';
 import { usePlotly } from '~/composables/usePlotly';
 
 const store = useFalconStore();
-const { buildLogIterHistogramSpec, buildLogPreprocessBarSpec } =
-  useFalconPlots(store);
-const { ITER_COMPONENTS: components } = useFalconLogParser();
+const {
+  buildLogIterHistogramSpec,
+  buildLogPreprocessBarSpec,
+  buildLogPreprocessByStepSpec,
+} = useFalconPlots(store);
+const { ITER_COMPONENTS: components, PRE_PROCESS_KEYS } = useFalconLogParser();
 const { mount, unmount } = usePlotly();
 
+function formatTime(seconds) {
+  if (!isFinite(seconds) || seconds <= 0) return '0.00s';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = (seconds % 60).toFixed(2);
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || h > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  return `${parts.join(' ')} (${seconds.toFixed(2)}s)`;
+}
+
 const chrView = ref('all');
+
+const preProcess = computed(() =>
+  buildLogPreprocessByStepSpec(chrView.value, PRE_PROCESS_KEYS),
+);
+
 const chrOptions = computed(() => {
   const chrs = Array.from(store.datasets.log.chromosomes).sort((a, b) => {
     const na = parseInt(a, 10),
@@ -122,6 +182,15 @@ const chrOptions = computed(() => {
 });
 
 const totalTime = computed(() => store.datasets.log.totalTime);
+
+// Reformat the parsed totalTime ("6149.27 seconds") into h/m/s + raw,
+// matching LogSummaryModule.render (PEGS app.js:2531-2548). When the parser
+// found no total (string "Not Found / Incomplete Run"), pass it through.
+const formattedTotalTime = computed(() => {
+  const raw = parseFloat(totalTime.value);
+  if (isNaN(raw)) return totalTime.value || 'No log file detected.';
+  return formatTime(raw);
+});
 
 const preprocessEl = ref(null);
 const histRefs = ref({});
@@ -142,7 +211,7 @@ const compStats = computed(() => {
 
 watchEffect(async () => {
   if (preprocessEl.value) {
-    await mount(preprocessEl.value, buildLogPreprocessBarSpec());
+    await mount(preprocessEl.value, buildLogPreprocessBarSpec(chrView.value));
     mounted.add(preprocessEl.value);
   }
   for (const comp of components) {
