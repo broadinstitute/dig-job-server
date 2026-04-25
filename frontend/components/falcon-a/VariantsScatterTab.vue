@@ -1,5 +1,22 @@
 <template>
   <div class="space-y-4">
+    <div class="flex items-center gap-4 text-xs text-gray-700 dark:text-gray-300">
+      <span class="inline-flex items-center gap-1">
+        <span class="inline-block w-3 h-3 rounded-full" style="background: #6b7280" /> Other
+      </span>
+      <span class="inline-flex items-center gap-1">
+        <span
+          class="inline-block w-3 h-3"
+          style="background: #fbbf24; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);"
+        /> Lead (★)
+      </span>
+      <span class="inline-flex items-center gap-1">
+        <span
+          class="inline-block w-3 h-3 rounded-full border-2"
+          style="border-color: #9333ea"
+        /> Top (per clump)
+      </span>
+    </div>
     <div
       class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2"
     >

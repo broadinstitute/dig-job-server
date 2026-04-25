@@ -13,9 +13,11 @@ import {
   STRICT_TOP_MIN_NEGP,
 } from "~/utils/falcon/config";
 import { useFalconFilters } from "~/composables/useFalconFilters";
+import { useTheme } from "~/composables/useTheme";
 
 export function useFalconPlots(store) {
   const { getNegP, normalizedClumpId } = useFalconFilters(store);
+  const { isDarkMode } = useTheme();
 
   function buildScatterSpec(name /* 'genes' | 'variants' */) {
     const data = store.datasets[name].data;
@@ -98,25 +100,70 @@ export function useFalconPlots(store) {
       }
     });
 
-    const traces = [];
+    // Build three category traces: Top, Lead, Other.
+    // Per-point text/color preserved so the inspector click handler (which
+    // reads p.text) keeps working without any change.
+    const cats = {
+      top:   { x: [], y: [], text: [], colors: [], symbols: [], sizes: [] },
+      lead:  { x: [], y: [], text: [], colors: [], symbols: [], sizes: [] },
+      other: { x: [], y: [], text: [], colors: [], symbols: [], sizes: [] },
+    };
+
     Array.from(groups.keys()).sort().forEach((clumpId) => {
       const g = groups.get(clumpId);
+      const color = getColorForClump(store.caches.clumpColor, clumpId);
+      for (let i = 0; i < g.x.length; i++) {
+        // 'star' symbol means Lead per the existing assignment at line 80.
+        // Top points come through the separate topData accumulator (open-ring
+        // overlay added below); they additionally land in lead/other here so
+        // their per-clump color stays visible under the ring.
+        const isLead = g.symbols[i] === "star";
+        const bucket = isLead ? cats.lead : cats.other;
+        bucket.x.push(g.x[i]);
+        bucket.y.push(g.y[i]);
+        bucket.text.push(g.text[i]);
+        bucket.colors.push(color);
+        bucket.symbols.push(g.symbols[i]);
+        bucket.sizes.push(g.sizes[i]);
+      }
+    });
+
+    // Top points come from the separate topData accumulator (open-ring overlay).
+    const traces = [];
+    if (cats.other.x.length > 0) {
       traces.push({
-        x: g.x,
-        y: g.y,
-        text: g.text,
-        name: clumpId,
+        x: cats.other.x,
+        y: cats.other.y,
+        text: cats.other.text,
+        name: "Other",
         mode: "markers",
         type: "scattergl",
         hoverinfo: "text",
         marker: {
-          symbol: g.symbols,
-          size: g.sizes,
+          symbol: cats.other.symbols,
+          size: cats.other.sizes,
           opacity: 0.8,
-          color: getColorForClump(store.caches.clumpColor, clumpId),
+          color: cats.other.colors,
         },
       });
-    });
+    }
+    if (cats.lead.x.length > 0) {
+      traces.push({
+        x: cats.lead.x,
+        y: cats.lead.y,
+        text: cats.lead.text,
+        name: "Lead",
+        mode: "markers",
+        type: "scattergl",
+        hoverinfo: "text",
+        marker: {
+          symbol: cats.lead.symbols,
+          size: cats.lead.sizes,
+          opacity: 0.9,
+          color: cats.lead.colors,
+        },
+      });
+    }
     if (topData.x.length > 0) {
       traces.push({
         x: topData.x,
@@ -135,32 +182,13 @@ export function useFalconPlots(store) {
       });
     }
 
-    // The CLUMP ID legend is only useful while it stays compact. Once the
-    // dataset has more clumps than will visually fit alongside the plot
-    // (~25), Plotly's external legend column eats most of the horizontal
-    // space and makes the scatter unreadable. Hide it past that threshold;
-    // the per-trace name is still in hover text + the data table.
-    const LEGEND_TRACE_LIMIT = 25;
-    const showLegend = traces.length <= LEGEND_TRACE_LIMIT;
     const layout = {
-      xaxis: { title: "PROBABILITY" },
-      yaxis: { title: "Negative Log10(P-Value)" },
+      xaxis: { title: { text: "PROBABILITY" } },
+      yaxis: { title: { text: "Negative Log10(P-Value)" } },
       hovermode: "closest",
-      margin: { t: 30, l: 60, r: showLegend ? 20 : 30, b: 50 },
-      showlegend: showLegend,
+      margin: { t: 30, l: 60, r: 20, b: 50 },
+      showlegend: false,
     };
-    if (showLegend) {
-      layout.legend = {
-        title: { text: "CLUMP ID" },
-        x: 1.02,
-        y: 1,
-        xanchor: "left",
-        yanchor: "top",
-        bgcolor: "rgba(255,255,255,0.8)",
-        bordercolor: "#d1d5db",
-        borderwidth: 1,
-      };
-    }
     return { data: traces, layout };
   }
 
@@ -210,14 +238,15 @@ export function useFalconPlots(store) {
           x: positives,
           type: "histogram",
           name: component,
+          nbinsx: 50,
           marker: { color: FALCON_PALETTE[idx], line: { color: "white", width: 1 } },
           opacity: 0.8,
         },
       ],
       layout: {
         margin: { t: 10, l: 45, r: 20, b: 40 },
-        xaxis: { title: "Time (Seconds)", zeroline: false },
-        yaxis: { title: "Count" },
+        xaxis: { title: { text: "Time (Seconds)" }, zeroline: false },
+        yaxis: { title: { text: "Count" }, type: "log" },
         plot_bgcolor: "rgba(0,0,0,0)",
         paper_bgcolor: "rgba(0,0,0,0)",
         autosize: true,
@@ -252,14 +281,15 @@ export function useFalconPlots(store) {
           type: "bar",
           marker: { color: colors },
           text: totals.map((t) => `${t.toFixed(2)}s`),
-          textposition: "auto",
+          textposition: "inside",
+          insidetextanchor: "middle",
           hoverinfo: "x+y",
         },
       ],
       layout: {
         margin: { t: 10, l: 45, r: 20, b: 40 },
-        xaxis: { title: "Chromosome", type: "category" },
-        yaxis: { title: "Time (Seconds)" },
+        xaxis: { title: { text: "Chromosome" }, type: "category" },
+        yaxis: { title: { text: "Time (Seconds)" } },
         plot_bgcolor: "rgba(0,0,0,0)",
         paper_bgcolor: "rgba(0,0,0,0)",
         autosize: true,
@@ -349,6 +379,11 @@ export function useFalconPlots(store) {
       .filter((c) => c.count > 0)
       .sort((a, b) => b.count - a.count);
 
+    // M2: drop set rows that never appear in any surviving combination.
+    const activeSetNames = setNames.filter((s) =>
+      plotData.some((c) => c.sets.includes(s)),
+    );
+
     if (plotData.length === 0) {
       return {
         data: [],
@@ -372,16 +407,19 @@ export function useFalconPlots(store) {
       marker: { color: "#93c5fd" },
       xaxis: "x",
       yaxis: "y",
-      hovertemplate: "%{y}<extra></extra>",
+      customdata: plotData.map((c) =>
+        c.sets.length === 0 ? "∅" : c.sets.join(" ∩ "),
+      ),
+      hovertemplate: "<b>%{customdata}</b>: %{y}<extra></extra>",
     };
 
     const matrixTraces = [];
-    setNames.forEach((setName, setIdx) => {
+    activeSetNames.forEach((setName, setIdx) => {
       matrixTraces.push({
         x: xValues,
         y: Array(xValues.length).fill(setIdx),
         mode: "markers",
-        marker: { color: "#e5e7eb", size: 12 },
+        marker: { color: isDarkMode.value ? "#374151" : "#e5e7eb", size: 12 },
         showlegend: false,
         xaxis: "x",
         yaxis: "y2",
@@ -391,7 +429,7 @@ export function useFalconPlots(store) {
 
     plotData.forEach((combo, xIdx) => {
       const activeIdx = [];
-      setNames.forEach((setName, setIdx) => {
+      activeSetNames.forEach((setName, setIdx) => {
         if (combo.sets.includes(setName)) activeIdx.push(setIdx);
       });
 
@@ -400,7 +438,7 @@ export function useFalconPlots(store) {
           x: [xIdx, xIdx],
           y: [Math.min(...activeIdx), Math.max(...activeIdx)],
           mode: "lines",
-          line: { color: "#1f2937", width: 3 },
+          line: { color: isDarkMode.value ? "#f3f4f6" : "#1f2937", width: 3 },
           showlegend: false,
           xaxis: "x",
           yaxis: "y2",
@@ -412,7 +450,7 @@ export function useFalconPlots(store) {
         x: Array(activeIdx.length).fill(xIdx),
         y: activeIdx,
         mode: "markers",
-        marker: { color: "#1f2937", size: 14 },
+        marker: { color: isDarkMode.value ? "#f3f4f6" : "#1f2937", size: 14 },
         showlegend: false,
         xaxis: "x",
         yaxis: "y2",
@@ -426,16 +464,16 @@ export function useFalconPlots(store) {
       showlegend: false,
       xaxis: { visible: false, domain: [0, 1] },
       yaxis: {
-        title: "Intersection Size",
+        title: { text: "Intersection Size" },
         domain: [0.4, 1],
         fixedrange: true,
       },
       yaxis2: {
-        title: "Sets",
+        title: { text: "Sets" },
         domain: [0, 0.35],
-        tickvals: [0, 1, 2, 3],
-        ticktext: setNames,
-        range: [-0.5, 3.5],
+        tickvals: activeSetNames.map((_, i) => i),
+        ticktext: activeSetNames,
+        range: [-0.5, activeSetNames.length - 0.5],
         autorange: "reversed",
         fixedrange: true,
       },
@@ -498,7 +536,7 @@ export function useFalconPlots(store) {
         { x: 0.75, y: 0.95, text: "<b>Lead</b>", showarrow: false, font: { size: 16, color: "#38bdf8" } },
         { x: 0.25, y: 0.48, text: `<b>${s.topOnly}</b><br>(${getPct(s.topOnly)})`, showarrow: false, font: { size: 14 } },
         { x: 0.75, y: 0.48, text: `<b>${s.leadOnly}</b><br>(${getPct(s.leadOnly)})`, showarrow: false, font: { size: 14, color: "#38bdf8" } },
-        { x: 0.5, y: 0.48, text: `<b>${s.both}</b><br>(${getPct(s.both)})`, showarrow: false, font: { size: 14, color: "#111827" } },
+        { x: 0.5, y: 0.48, text: `<b>${s.both}</b><br>(${getPct(s.both)})`, showarrow: false, font: { size: 14, color: isDarkMode.value ? "#f3f4f6" : "#111827" } },
       ],
     };
 
@@ -520,7 +558,7 @@ export function useFalconPlots(store) {
         marker: { color },
         boxpoints: "all",
         jitter: 0.3,
-        pointpos: -1.8,
+        pointpos: 0,
         hoverinfo: "y+text",
       };
     };
@@ -533,7 +571,7 @@ export function useFalconPlots(store) {
 
     const layout = {
       margin: { t: 20, l: 40, r: 20, b: 30 },
-      yaxis: { title: "Probability", range: [-0.05, 1.05] },
+      yaxis: { title: { text: "Probability" }, range: [-0.05, 1.05] },
       showlegend: false,
       plot_bgcolor: "rgba(0,0,0,0)",
       paper_bgcolor: "rgba(0,0,0,0)",
@@ -555,7 +593,7 @@ export function useFalconPlots(store) {
       };
     }
 
-    const yVals = distances.map((d) => d.dist);
+    const yVals = distances.map((d) => (d.dist > 0 ? d.dist : NaN));
     const textVals = distances.map(
       (d) =>
         `<b>Variant:</b> ${d.variant}<br><b>Gene:</b> ${d.gene}<br><b>Distance:</b> ${d.dist.toLocaleString()} BP`,
@@ -570,14 +608,14 @@ export function useFalconPlots(store) {
         marker: { color: "#059669" },
         boxpoints: "all",
         jitter: 0.3,
-        pointpos: -1.8,
+        pointpos: 0,
         hoverinfo: "y+text",
       },
     ];
 
     const layout = {
       margin: { t: 20, l: 60, r: 20, b: 30 },
-      yaxis: { title: "Distance (BP)", autorange: true },
+      yaxis: { title: { text: "Distance (BP, log)" }, type: "log" },
       showlegend: false,
       plot_bgcolor: "rgba(0,0,0,0)",
       paper_bgcolor: "rgba(0,0,0,0)",
@@ -599,7 +637,7 @@ export function useFalconPlots(store) {
       };
     }
 
-    const yVals = leadDistances.map((d) => d.dist);
+    const yVals = leadDistances.map((d) => (d.dist > 0 ? d.dist : NaN));
     const textVals = leadDistances.map(
       (d) =>
         `<b>Chr:</b> ${d.chr}<br><b>Variant 1:</b> ${d.v1}<br><b>Variant 2:</b> ${d.v2}<br><b>Distance:</b> ${d.dist.toLocaleString()} BP`,
@@ -614,14 +652,14 @@ export function useFalconPlots(store) {
         marker: { color: "#eab308" },
         boxpoints: "all",
         jitter: 0.3,
-        pointpos: -1.8,
+        pointpos: 0,
         hoverinfo: "y+text",
       },
     ];
 
     const layout = {
       margin: { t: 20, l: 60, r: 20, b: 30 },
-      yaxis: { title: "Distance (BP)", autorange: true },
+      yaxis: { title: { text: "Distance (BP, log)" }, type: "log" },
       showlegend: false,
       plot_bgcolor: "rgba(0,0,0,0)",
       paper_bgcolor: "rgba(0,0,0,0)",

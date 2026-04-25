@@ -121,13 +121,25 @@
     <div
       class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2"
     >
-      <div ref="plotEl" class="w-full" style="height: 850px" />
+      <div
+        v-if="store.tdp.lastAnalysis"
+        ref="plotEl"
+        class="w-full"
+        style="height: 850px"
+      />
+      <div
+        v-else
+        class="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+        style="min-height: 120px"
+      >
+        Run an analysis to see results.
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onBeforeUnmount, inject } from 'vue';
+import { ref, reactive, nextTick, onBeforeUnmount, inject } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconTDP } from '~/composables/useFalconTDP';
 import { usePlotly } from '~/composables/usePlotly';
@@ -166,7 +178,9 @@ async function run() {
   running.value = true;
   try {
     const spec = await runAnalysis({ ...cfg });
-    if (!spec || !plotEl.value) return;
+    if (!spec) return;
+    await nextTick(); // ensure v-if has mounted plotEl
+    if (!plotEl.value) return;
     await mount(plotEl.value, spec);
     mountedEl = plotEl.value;
 

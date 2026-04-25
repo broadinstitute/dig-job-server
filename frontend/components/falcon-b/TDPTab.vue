@@ -87,12 +87,18 @@
       {{ store.tdp.status }}
     </div>
 
-    <div ref="plotEl" class="tdp-plot" />
+    <div v-if="store.tdp.lastAnalysis" ref="plotEl" class="tdp-plot" />
+    <div
+      v-else
+      class="tdp-empty"
+    >
+      Run an analysis to see results.
+    </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, onBeforeUnmount, inject } from 'vue';
+import { reactive, ref, nextTick, onBeforeUnmount, inject } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconTDP } from '~/composables/useFalconTDP';
 import { usePlotly } from '~/composables/usePlotly';
@@ -121,7 +127,9 @@ async function run() {
   running.value = true;
   try {
     const spec = await runAnalysis({ ...cfg });
-    if (!spec || !plotEl.value) return;
+    if (!spec) return;
+    await nextTick(); // ensure v-if has mounted plotEl
+    if (!plotEl.value) return;
     await mount(plotEl.value, spec);
     mountedEl = plotEl.value;
 
@@ -267,6 +275,14 @@ onBeforeUnmount(async () => {
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: white;
+}
+.tdp-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-size: 0.875rem;
+  color: var(--p-text-muted-color, #6b7280);
 }
 .hidden { display: none; }
 </style>
