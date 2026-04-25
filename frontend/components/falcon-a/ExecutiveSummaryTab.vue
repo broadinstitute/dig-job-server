@@ -40,6 +40,122 @@
       />
     </div>
 
+    <!-- ─── Executive Summary Plots (row 1: upset + venn) ─── -->
+    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
+      <Card>
+        <template #title>🧬 Gene Intersection: Top, Lead, and Novel</template>
+        <template #content>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            <strong>Top Genes</strong> are highest probability targets.
+            <strong>Lead Genes</strong> are physically nearest.
+            <strong>Novel Genes</strong> have no previous associations in our catalog.
+            <strong>Clinical Trials</strong> indicates genes with known clinical data.
+          </p>
+          <div class="relative" style="height: 350px">
+            <div ref="upsetEl" class="w-full h-full" />
+            <div
+              v-if="upsetSpec?.empty"
+              class="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 pointer-events-none"
+            >
+              No intersection data.
+            </div>
+          </div>
+        </template>
+      </Card>
+
+      <Card>
+        <template #title>🔬 Variant Overlap: Top vs. Lead</template>
+        <template #content>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            <strong>Top Variants</strong> are the variants with the highest FALCON probability in their clump.
+            <strong>Lead Variants</strong> represent the index signal of the clump.
+            This diagram shows how often the model's top variant matches the original index signal.
+          </p>
+          <div class="relative" style="height: 280px">
+            <div ref="vennEl" class="w-full h-full" />
+          </div>
+        </template>
+      </Card>
+    </div>
+
+    <!-- ─── row 2: probability distributions ─── -->
+    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+      <Card>
+        <template #title>📊 Gene Probability Distribution</template>
+        <template #content>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            Distribution of FALCON probabilities across the Top, Lead, and Concordant gene categories.
+          </p>
+          <div class="relative" style="height: 260px">
+            <div ref="probGenesEl" class="w-full h-full" />
+            <div
+              v-if="probGenesSpec?.empty"
+              class="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 pointer-events-none"
+            >
+              No gene probability data.
+            </div>
+          </div>
+        </template>
+      </Card>
+
+      <Card>
+        <template #title>📊 Variant Probability Distribution</template>
+        <template #content>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            Distribution of FALCON probabilities across the Top, Lead, and Concordant variant categories.
+          </p>
+          <div class="relative" style="height: 260px">
+            <div ref="probVariantsEl" class="w-full h-full" />
+            <div
+              v-if="probVariantsSpec?.empty"
+              class="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 pointer-events-none"
+            >
+              No variant probability data.
+            </div>
+          </div>
+        </template>
+      </Card>
+    </div>
+
+    <!-- ─── row 3: distance plots ─── -->
+    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+      <Card>
+        <template #title>📏 Distance to Nearest Gene</template>
+        <template #content>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            Physical distance (BP) from the <strong>Index Variant</strong> to its designated <strong>Lead Gene</strong>.
+          </p>
+          <div class="relative" style="height: 260px">
+            <div ref="distEl" class="w-full h-full" />
+            <div
+              v-if="distSpec?.empty"
+              class="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 pointer-events-none"
+            >
+              No distance data available.
+            </div>
+          </div>
+        </template>
+      </Card>
+
+      <Card>
+        <template #title>📏 Distance Between Lead Variants</template>
+        <template #content>
+          <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            Physical distance (BP) between adjacent <strong>Index Variants</strong> across the same chromosome.
+          </p>
+          <div class="relative" style="height: 260px">
+            <div ref="leadDistEl" class="w-full h-full" />
+            <div
+              v-if="leadDistSpec?.empty"
+              class="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 pointer-events-none"
+            >
+              Not enough adjacent lead variants available to measure distances.
+            </div>
+          </div>
+        </template>
+      </Card>
+    </div>
+
     <SummarySection
       title="Top Genes per Clump"
       :rows="summary.genes?.top || []"
@@ -69,14 +185,29 @@
 </template>
 
 <script setup>
-import { computed, h, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconSummary } from '~/composables/useFalconSummary';
+import { useFalconPlots } from '~/composables/useFalconPlots';
+import { usePlotly } from '~/composables/usePlotly';
 import TraitCard from '~/components/falcon-a/TraitCard.vue';
 
 const store = useFalconStore();
-const { computeTopAndLeadSignals, attachClinicalTrials, attachNoveltyFlags } =
-  useFalconSummary(store);
+const {
+  computeTopAndLeadSignals,
+  attachClinicalTrials,
+  attachNoveltyFlags,
+  computeSummaryRowsForPlots,
+  computeDistances,
+} = useFalconSummary(store);
+const {
+  buildSummaryUpsetSpec,
+  buildSummaryVennSpec,
+  buildSummaryProbDistSpec,
+  buildSummaryDistanceSpec,
+  buildSummaryLeadDistanceSpec,
+} = useFalconPlots(store);
+const { mount, unmount } = usePlotly();
 
 const clinicalTrials = store.clinicalTrials;
 const summary = ref({
@@ -88,11 +219,35 @@ const noveltyLoading = ref(false);
 const noveltyError = ref(false);
 let abortCtrl = null;
 
+// Plot-shaped summary data and refs.
+const genesPlotRows = ref([]);
+const variantsPlotRows = ref([]);
+const variantsStats = ref({ topOnly: 0, leadOnly: 0, both: 0 });
+const distances = ref([]);
+const leadDistances = ref([]);
+
+const upsetEl = ref(null);
+const vennEl = ref(null);
+const probGenesEl = ref(null);
+const probVariantsEl = ref(null);
+const distEl = ref(null);
+const leadDistEl = ref(null);
+
+const upsetSpec = computed(() => buildSummaryUpsetSpec(genesPlotRows.value));
+const vennSpec = computed(() => buildSummaryVennSpec(variantsStats.value));
+const probGenesSpec = computed(() => buildSummaryProbDistSpec(genesPlotRows.value));
+const probVariantsSpec = computed(() => buildSummaryProbDistSpec(variantsPlotRows.value));
+const distSpec = computed(() => buildSummaryDistanceSpec(distances.value));
+const leadDistSpec = computed(() => buildSummaryLeadDistanceSpec(leadDistances.value));
+
 watch(
   () => [
     store.datasets.genes.isLoaded,
     store.datasets.variants.isLoaded,
     clinicalTrials.isLoaded,
+    store.globalFilter.active,
+    store.globalFilter.minProb,
+    store.globalFilter.minNegP,
   ],
   recompute,
   { immediate: true },
@@ -105,7 +260,54 @@ function recompute() {
     attachClinicalTrials(s.variants[k]);
   });
   summary.value = s;
+
+  // Plot-shaped rows. `isNovel` starts null per original behaviour.
+  const genes = computeSummaryRowsForPlots('genes');
+  const variants = computeSummaryRowsForPlots('variants');
+  genesPlotRows.value = genes.results;
+  variantsPlotRows.value = variants.results;
+  variantsStats.value = variants.stats;
+
+  const d = computeDistances();
+  distances.value = d.distances;
+  leadDistances.value = d.leadDistances;
 }
+
+function mountPlot(el, spec) {
+  if (!el || !spec) return;
+  if (spec.empty) {
+    // Still mount so Plotly can draw an empty axis frame; the overlay in
+    // the template shows the placeholder text.
+    mount(el, spec);
+    return;
+  }
+  mount(el, spec);
+}
+
+watchEffect(() => {
+  mountPlot(upsetEl.value, upsetSpec.value);
+});
+watchEffect(() => {
+  mountPlot(vennEl.value, vennSpec.value);
+});
+watchEffect(() => {
+  mountPlot(probGenesEl.value, probGenesSpec.value);
+});
+watchEffect(() => {
+  mountPlot(probVariantsEl.value, probVariantsSpec.value);
+});
+watchEffect(() => {
+  mountPlot(distEl.value, distSpec.value);
+});
+watchEffect(() => {
+  mountPlot(leadDistEl.value, leadDistSpec.value);
+});
+
+onBeforeUnmount(async () => {
+  for (const el of [upsetEl, vennEl, probGenesEl, probVariantsEl, distEl, leadDistEl]) {
+    if (el.value) await unmount(el.value);
+  }
+});
 
 async function toggleNovelty() {
   // If we are turning OFF, just flip the flag — don't touch cached traits.
