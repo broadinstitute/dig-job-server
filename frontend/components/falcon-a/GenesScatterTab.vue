@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { ref, watchEffect, onBeforeUnmount, inject } from 'vue';
+import { ref, watchEffect, onBeforeUnmount, onActivated, onMounted, inject, nextTick } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconPlots } from '~/composables/useFalconPlots';
 import { usePlotly } from '~/composables/usePlotly';
@@ -40,6 +40,21 @@ watchEffect(async () => {
   };
   current.on('plotly_click', clickHandler);
 });
+
+// Re-resize after activation in case the plot was first laid out while the
+// parent tab panel was still display:none.
+async function nudgeResize() {
+  if (!current) return;
+  const Plotly = await getPlotly();
+  await nextTick();
+  try {
+    if (current.offsetParent !== null) Plotly.Plots.resize(current);
+  } catch {
+    // ignore
+  }
+}
+onMounted(nudgeResize);
+onActivated(nudgeResize);
 
 onBeforeUnmount(async () => {
   if (current) await unmount(current);

@@ -16,6 +16,17 @@ export function usePlotly() {
     const Plotly = await loadPlotly();
     const config = { responsive: true, displaylogo: false, ...(spec.config || {}) };
     await Plotly.newPlot(el, spec.data, spec.layout, config);
+    // PrimeVue Tabs lazy-mounts panels: when our plot first paints, the
+    // host is display:none, so Plotly latches a 0-width canvas. After the
+    // next animation frame the panel has its real dimensions; nudge Plotly
+    // to recompute. Fixes "Genes Plot / Variants Plot squished to the left".
+    requestAnimationFrame(() => {
+      try {
+        if (el && el.offsetParent !== null) Plotly.Plots.resize(el);
+      } catch {
+        // best-effort resize; safe to swallow if Plotly disposed the element.
+      }
+    });
     return el;
   }
 
