@@ -3,6 +3,7 @@
 // subsequent mounts are immediate.
 
 let plotlyPromise = null;
+const observers = new WeakMap();
 
 function loadPlotly() {
   if (!plotlyPromise) {
@@ -16,22 +17,34 @@ export function usePlotly() {
     const Plotly = await loadPlotly();
     const config = { responsive: true, displaylogo: false, ...(spec.config || {}) };
     await Plotly.newPlot(el, spec.data, spec.layout, config);
-    // PrimeVue Tabs lazy-mounts panels: when our plot first paints, the
-    // host is display:none, so Plotly latches a 0-width canvas. After the
-    // next animation frame the panel has its real dimensions; nudge Plotly
-    // to recompute. Fixes "Genes Plot / Variants Plot squished to the left".
-    requestAnimationFrame(() => {
+
+    // PrimeVue Tabs lazy-mounts panels: when our plot first paints inside
+    // an inactive tab, the host has zero dimensions and Plotly latches its
+    // default 700x450 canvas. `responsive: true` only listens for window
+    // resizes, not container size changes. Observe the host so any 0 → real
+    // transition (tab activation, sibling reflow) triggers a resize.
+    if (observers.has(el)) observers.get(el).disconnect();
+    const ro = new ResizeObserver(() => {
+      if (!el.isConnected) return;
       try {
-        if (el && el.offsetParent !== null) Plotly.Plots.resize(el);
+        Plotly.Plots.resize(el);
       } catch {
-        // best-effort resize; safe to swallow if Plotly disposed the element.
+        // Safe to swallow — Plotly may have been purged between frames.
       }
     });
+    ro.observe(el);
+    observers.set(el, ro);
+
     return el;
   }
 
   async function unmount(el) {
     if (!el) return;
+    const ro = observers.get(el);
+    if (ro) {
+      ro.disconnect();
+      observers.delete(el);
+    }
     const Plotly = await loadPlotly();
     Plotly.purge(el);
   }
