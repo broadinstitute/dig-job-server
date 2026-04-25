@@ -227,8 +227,9 @@ export function useFalconPlots(store) {
 
   /**
    * Per-chromosome total pre-process time bar chart.
+   * `chrView` highlights one chromosome in green if not 'all'.
    */
-  function buildLogPreprocessBarSpec() {
+  function buildLogPreprocessBarSpec(chrView /* 'all' | chromosome */) {
     const logStore = store.datasets.log;
     const chrs = Array.from(logStore.chromosomes).sort((a, b) => {
       const na = parseInt(a, 10);
@@ -240,11 +241,13 @@ export function useFalconPlots(store) {
       const pp = logStore.preProcess[chr] || {};
       return Object.values(pp).reduce((a, b) => a + b, 0);
     });
-    const colors = chrs.map((_, i) => FALCON_PALETTE[i % FALCON_PALETTE.length]);
+    const colors = chrs.map((c) =>
+      chrView && chrView !== "all" && chrView === c ? "#047857" : "#3b82f6",
+    );
     return {
       data: [
         {
-          x: chrs,
+          x: chrs.map((c) => `Chr ${c}`),
           y: totals,
           type: "bar",
           marker: { color: colors },
@@ -264,10 +267,58 @@ export function useFalconPlots(store) {
     };
   }
 
+  /**
+   * Pre-process step accumulation summary, mirroring LogSummaryModule.drawPlots
+   * (PEGS app.js:2584-2636).
+   *
+   * For chrView='all': totalTime = parallel-wall-time bottleneck (max chr total),
+   * and per-step values = max value across chromosomes (worst-case worker).
+   * For a specific chromosome: just the values for that chromosome.
+   *
+   * Returns { perStep: [{ key, time }], totalTime, parallel: bool }.
+   */
+  function buildLogPreprocessByStepSpec(chrView /* 'all' | chromosome */, preProcessKeys) {
+    const logStore = store.datasets.log;
+    const perStep = preProcessKeys.map((k) => ({ key: k, time: 0 }));
+    let totalTime = 0;
+    const parallel = chrView === "all";
+
+    if (parallel) {
+      // Wall-time bottleneck = the slowest single chromosome's total.
+      let maxChrTotal = 0;
+      Object.keys(logStore.preProcess).forEach((chr) => {
+        let chrTotal = 0;
+        preProcessKeys.forEach((k) => {
+          chrTotal += logStore.preProcess[chr][k] || 0;
+        });
+        if (chrTotal > maxChrTotal) maxChrTotal = chrTotal;
+      });
+      totalTime = maxChrTotal;
+
+      // Per-step worst case across workers.
+      preProcessKeys.forEach((k, i) => {
+        let maxVal = 0;
+        Object.keys(logStore.preProcess).forEach((chr) => {
+          maxVal = Math.max(maxVal, logStore.preProcess[chr][k] || 0);
+        });
+        perStep[i].time = maxVal;
+      });
+    } else if (logStore.preProcess[chrView]) {
+      preProcessKeys.forEach((k, i) => {
+        const v = logStore.preProcess[chrView][k] || 0;
+        perStep[i].time = v;
+        totalTime += v;
+      });
+    }
+
+    return { perStep, totalTime, parallel };
+  }
+
   return {
     buildGenesScatterSpec,
     buildVariantsScatterSpec,
     buildLogIterHistogramSpec,
     buildLogPreprocessBarSpec,
+    buildLogPreprocessByStepSpec,
   };
 }
