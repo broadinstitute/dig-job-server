@@ -135,13 +135,22 @@ export function useFalconPlots(store) {
       });
     }
 
+    // The CLUMP ID legend is only useful while it stays compact. Once the
+    // dataset has more clumps than will visually fit alongside the plot
+    // (~25), Plotly's external legend column eats most of the horizontal
+    // space and makes the scatter unreadable. Hide it past that threshold;
+    // the per-trace name is still in hover text + the data table.
+    const LEGEND_TRACE_LIMIT = 25;
+    const showLegend = traces.length <= LEGEND_TRACE_LIMIT;
     const layout = {
       xaxis: { title: "PROBABILITY" },
       yaxis: { title: "Negative Log10(P-Value)" },
       hovermode: "closest",
-      margin: { t: 30, l: 60, r: 20, b: 50 },
-      showlegend: true,
-      legend: {
+      margin: { t: 30, l: 60, r: showLegend ? 20 : 30, b: 50 },
+      showlegend: showLegend,
+    };
+    if (showLegend) {
+      layout.legend = {
         title: { text: "CLUMP ID" },
         x: 1.02,
         y: 1,
@@ -150,8 +159,8 @@ export function useFalconPlots(store) {
         bgcolor: "rgba(255,255,255,0.8)",
         bordercolor: "#d1d5db",
         borderwidth: 1,
-      },
-    };
+      };
+    }
     return { data: traces, layout };
   }
 
