@@ -45,8 +45,8 @@
         <Card class="mt-4 !bg-blue-50 dark:!bg-blue-950/40">
           <template #title>LD Matrix</template>
           <template #content>
-            <div class="flex flex-wrap items-end gap-3">
-              <div class="flex flex-col gap-1">
+            <div class="flex flex-wrap items-end gap-x-6 gap-y-4">
+              <div class="flex flex-col gap-1 shrink-0">
                 <label class="text-xs font-semibold"
                   >LD Folder (.gz / .sorted)</label
                 >
@@ -68,7 +68,7 @@
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col gap-1 shrink-0 w-40">
                 <label class="text-xs font-semibold">Min R²</label>
                 <InputNumber
                   v-model="cfg.minR2"
@@ -77,19 +77,22 @@
                   :step="0.1"
                   :min-fraction-digits="1"
                   :max-fraction-digits="2"
-                  class="w-28"
+                  :input-style="{ width: '100%' }"
+                  fluid
                 />
               </div>
-              <div class="flex flex-col gap-1 min-w-[160px]">
+              <div class="flex flex-col gap-2 shrink-0 w-64">
                 <label class="text-xs font-semibold"
                   >Max Stretch: {{ cfg.maxStretch.toFixed(2) }}</label
                 >
-                <Slider
-                  v-model="cfg.maxStretch"
-                  :min="0.1"
-                  :max="1"
-                  :step="0.05"
-                />
+                <div class="px-2 pt-3">
+                  <Slider
+                    v-model="cfg.maxStretch"
+                    :min="0.1"
+                    :max="1"
+                    :step="0.05"
+                  />
+                </div>
               </div>
             </div>
           </template>
@@ -124,14 +127,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onBeforeUnmount } from 'vue';
+import { ref, reactive, onBeforeUnmount, inject } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconTDP } from '~/composables/useFalconTDP';
 import { usePlotly } from '~/composables/usePlotly';
 
 const store = useFalconStore();
 const { runAnalysis } = useFalconTDP(store);
-const { mount, unmount } = usePlotly();
+const { mount, unmount, getPlotly } = usePlotly();
+const inspector = inject('falcon-inspector', null);
 
 const cfg = reactive({
   gene: 'CETP',
@@ -156,6 +160,7 @@ const plotEl = ref(null);
 const ldInput = ref(null);
 const running = ref(false);
 let mountedEl = null;
+let clickHandler = null;
 
 async function run() {
   running.value = true;
@@ -164,6 +169,18 @@ async function run() {
     if (!spec || !plotEl.value) return;
     await mount(plotEl.value, spec);
     mountedEl = plotEl.value;
+
+    // Restore InspectorModule.bindToPlot pattern (PEGS app.js:2862-2872):
+    // clicking a point opens the Data Inspector with the point's HTML text.
+    await getPlotly();
+    if (clickHandler) mountedEl.removeAllListeners?.('plotly_click');
+    clickHandler = (ev) => {
+      if (!ev?.points?.length || !inspector?.value) return;
+      const p = ev.points[0];
+      const txt = p.text || p.hovertext || 'No data available for this point.';
+      inspector.value.show(txt);
+    };
+    mountedEl.on('plotly_click', clickHandler);
   } catch (err) {
     console.error('TDP runAnalysis failed:', err);
     store.tdp.status = `Error: ${err.message || String(err)}`;

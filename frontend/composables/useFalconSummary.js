@@ -4,6 +4,11 @@
 // variants. Preserves original quirk: strict-filter toggle does NOT affect
 // this output (see spec §11).
 import { useFalconFilters } from "~/composables/useFalconFilters";
+import { getColorForClump } from "~/utils/falcon/colorPalette";
+
+const ROLE_TOP = "🏆 Top";
+const ROLE_LEAD = "⭐ Lead";
+const ROLE_BOTH = "🏆 Top & ⭐ Lead";
 
 export function useFalconSummary(store) {
   const { getNegP, normalizedClumpId } = useFalconFilters(store);
@@ -99,5 +104,191 @@ export function useFalconSummary(store) {
     });
   }
 
-  return { computeTopAndLeadSignals, attachClinicalTrials, attachNoveltyFlags };
+  // ---------------------------------------------------------------------
+  // Plot-shaped rows (matches SummaryModule.processDataset in original
+  // PEGS app.js:749-845). Each row has
+  //   { clump, color, name, prob, rawProb, rawSig, significance, role,
+  //     hasClinicalTrials, clinicalTrials, isNovel }
+  // plus `stats = { topOnly, leadOnly, both }` returned alongside.
+  // ---------------------------------------------------------------------
+  function computeSummaryRowsForPlots(name /* 'genes' | 'variants' */) {
+    const dataset = store.datasets[name];
+    if (!dataset || !dataset.isLoaded) {
+      return { results: [], stats: { topOnly: 0, leadOnly: 0, both: 0 } };
+    }
+
+    const data = dataset.data;
+    const isVariants = name === "variants";
+    const keyName = isVariants ? "VARIANT" : "GENE";
+    const keyLead = isVariants ? "LEAD_SNP" : "NEAREST_TO_LEAD";
+    const keyNegP = isVariants ? "P_VALUE" : "NEG_LOG_P";
+
+    // Pass 1: STRICT top-per-clump (prob >= 0.05 AND negP >= 1).
+    const topPerClump = new Map();
+    data.forEach((row, idx) => {
+      const prob = parseFloat(row["PROBABILITY"]);
+      const negP = getNegP(row, isVariants);
+      if (isNaN(prob) || prob < 0.05) return;
+      if (isNaN(negP) || negP < 1) return;
+      const clumpId = row["CLUMP"] ? row["CLUMP"].toString().trim() : "Unassigned";
+      if (!topPerClump.has(clumpId) || prob > topPerClump.get(clumpId).prob) {
+        topPerClump.set(clumpId, { index: idx, prob });
+      }
+    });
+
+    // Pass 2: emit flat rows under the user's global filter.
+    const results = [];
+    const stats = { topOnly: 0, leadOnly: 0, both: 0 };
+
+    data.forEach((row, idx) => {
+      const prob = parseFloat(row["PROBABILITY"]);
+      const negP = getNegP(row, isVariants);
+      if (store.globalFilter.active) {
+        if (isNaN(prob) || prob < store.globalFilter.minProb) return;
+        if (isNaN(negP) || negP < store.globalFilter.minNegP) return;
+      }
+
+      const clumpId = row["CLUMP"] ? row["CLUMP"].toString().trim() : "Unassigned";
+      const isTop = topPerClump.get(clumpId)?.index === idx;
+      const leadRaw = String(row[keyLead] || "").toLowerCase().trim();
+      const isLead = leadRaw === "true" || leadRaw === "1" || leadRaw === "yes";
+      if (!isTop && !isLead) return;
+
+      let role;
+      if (isTop && isLead) {
+        role = ROLE_BOTH;
+        stats.both++;
+      } else if (isTop) {
+        role = ROLE_TOP;
+        stats.topOnly++;
+      } else {
+        role = ROLE_LEAD;
+        stats.leadOnly++;
+      }
+
+      const rawSig = parseFloat(row[keyNegP]);
+      const formattedSig = isVariants
+        ? rawSig === 0
+          ? "0.0"
+          : isNaN(rawSig)
+            ? ""
+            : rawSig.toExponential(2)
+        : isNaN(rawSig)
+          ? ""
+          : rawSig.toFixed(2);
+
+      const itemName = row[keyName] || row["RSID"] || row["SNP"] || "Unknown";
+      const trials = !isVariants && store.clinicalTrials.isLoaded
+        ? store.clinicalTrials.byGene[itemName?.toUpperCase?.()] || []
+        : [];
+
+      results.push({
+        clump: clumpId,
+        color: getColorForClump(store.caches.clumpColor, clumpId),
+        name: itemName,
+        prob: prob.toFixed(4),
+        rawProb: prob,
+        rawSig,
+        significance: formattedSig,
+        role,
+        hasClinicalTrials: trials.length > 0,
+        clinicalTrials: trials,
+        isNovel: null,
+      });
+    });
+
+    return { results, stats };
+  }
+
+  function computeOverlapStats(name) {
+    return computeSummaryRowsForPlots(name).stats;
+  }
+
+  // ---------------------------------------------------------------------
+  // Replicates the PEGS "Distance Data Extraction" block (app.js:853-921).
+  // Returns { distances, leadDistances }:
+  //   distances = [{ dist, gene, variant }]
+  //   leadDistances = [{ dist, chr, v1, v2 }]
+  // ---------------------------------------------------------------------
+  function computeDistances() {
+    const distances = [];
+    const leadDistances = [];
+    if (!store.datasets.genes.isLoaded || !store.datasets.variants.isLoaded) {
+      return { distances, leadDistances };
+    }
+
+    const rawGenes = store.datasets.genes.data;
+    const rawVariants = store.datasets.variants.data;
+
+    const leadGenes = new Set();
+    rawGenes.forEach((row) => {
+      const leadVal = String(row["NEAREST_TO_LEAD"] || "").toLowerCase().trim();
+      if (leadVal === "true" || leadVal === "1" || leadVal === "yes") {
+        const gName = row["GENE"] || row["ID"];
+        if (gName) leadGenes.add(gName);
+      }
+    });
+
+    const leadsByChr = {};
+
+    rawVariants.forEach((row) => {
+      const leadRaw = String(row["LEAD_SNP"] || "").toLowerCase().trim();
+      const isLead = leadRaw === "true" || leadRaw === "1" || leadRaw === "yes";
+      if (!isLead) return;
+
+      // Distance to nearest gene.
+      const nearestGene = row["NEAREST_GENE"];
+      if (nearestGene && leadGenes.has(nearestGene)) {
+        const distStr = row["NEAREST_DISTANCE"];
+        if (distStr !== undefined && distStr !== "") {
+          const dist = parseFloat(distStr);
+          if (!isNaN(dist)) {
+            distances.push({
+              dist: Math.abs(dist),
+              gene: nearestGene,
+              variant: row["VARIANT"] || row["RSID"] || row["SNP"] || "Unknown",
+            });
+          }
+        }
+      }
+
+      // Collect leads grouped by chromosome.
+      const chr = row["CHR"] != null ? String(row["CHR"]).trim() : "";
+      const posStr = row["POS"];
+      if (chr && posStr !== undefined && posStr !== "") {
+        const pos = parseInt(posStr, 10);
+        if (!isNaN(pos)) {
+          if (!leadsByChr[chr]) leadsByChr[chr] = [];
+          leadsByChr[chr].push({
+            pos,
+            variant: row["VARIANT"] || row["RSID"] || row["SNP"] || "Unknown",
+          });
+        }
+      }
+    });
+
+    Object.keys(leadsByChr).forEach((chr) => {
+      const leads = leadsByChr[chr].sort((a, b) => a.pos - b.pos);
+      for (let i = 1; i < leads.length; i++) {
+        const dist = leads[i].pos - leads[i - 1].pos;
+        leadDistances.push({
+          dist,
+          chr,
+          v1: leads[i - 1].variant,
+          v2: leads[i].variant,
+        });
+      }
+    });
+
+    return { distances, leadDistances };
+  }
+
+  return {
+    computeTopAndLeadSignals,
+    attachClinicalTrials,
+    attachNoveltyFlags,
+    computeSummaryRowsForPlots,
+    computeOverlapStats,
+    computeDistances,
+  };
 }
