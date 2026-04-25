@@ -32,7 +32,7 @@
 
       <div class="toolbar-divider" />
 
-      <div class="input-group">
+      <div class="input-group ld-group">
         <label class="ld-label">LD Matrix (.gz or .sorted files)</label>
         <div class="ld-row">
           <button class="ld-btn" @click="triggerLdDialog">
@@ -47,25 +47,29 @@
             @change="onLdChange"
           />
           <span class="divider-v" />
-          <label>Min R²</label>
-          <input
-            v-model.number="cfg.minR2"
-            type="number"
-            min="0"
-            max="1"
-            step="0.1"
-            class="mini-input"
-          />
+          <div class="ld-field">
+            <label>Min R²</label>
+            <input
+              v-model.number="cfg.minR2"
+              type="number"
+              min="0"
+              max="1"
+              step="0.1"
+              class="mini-input"
+            />
+          </div>
           <span class="divider-v" />
-          <label>Max Stretch</label>
-          <input
-            v-model.number="cfg.maxStretch"
-            type="range"
-            min="0.1"
-            max="1"
-            step="0.05"
-            class="stretch-range"
-          />
+          <div class="ld-field stretch-field">
+            <label>Max Stretch ({{ cfg.maxStretch.toFixed(2) }})</label>
+            <input
+              v-model.number="cfg.maxStretch"
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.05"
+              class="stretch-range"
+            />
+          </div>
         </div>
       </div>
 
@@ -88,14 +92,15 @@
 </template>
 
 <script setup>
-import { reactive, ref, onBeforeUnmount } from 'vue';
+import { reactive, ref, onBeforeUnmount, inject } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconTDP } from '~/composables/useFalconTDP';
 import { usePlotly } from '~/composables/usePlotly';
 
 const store = useFalconStore();
 const { runAnalysis } = useFalconTDP(store);
-const { mount, unmount } = usePlotly();
+const { mount, unmount, getPlotly } = usePlotly();
+const inspector = inject('falcon-inspector', null);
 
 const cfg = reactive({
   gene: 'CETP',
@@ -110,6 +115,7 @@ const plotEl = ref(null);
 const ldInput = ref(null);
 const running = ref(false);
 let mountedEl = null;
+let clickHandler = null;
 
 async function run() {
   running.value = true;
@@ -118,6 +124,18 @@ async function run() {
     if (!spec || !plotEl.value) return;
     await mount(plotEl.value, spec);
     mountedEl = plotEl.value;
+
+    // Restore InspectorModule.bindToPlot pattern (PEGS app.js:2862-2872):
+    // clicking a point opens the Data Inspector with the point's HTML text.
+    await getPlotly();
+    if (clickHandler) mountedEl.removeAllListeners?.('plotly_click');
+    clickHandler = (ev) => {
+      if (!ev?.points?.length || !inspector?.value) return;
+      const p = ev.points[0];
+      const txt = p.text || p.hovertext || 'No data available for this point.';
+      inspector.value.show(txt);
+    };
+    mountedEl.on('plotly_click', clickHandler);
   } catch (err) {
     console.error('TDP runAnalysis failed:', err);
     store.tdp.status = `Error: ${err.message || String(err)}`;
@@ -182,12 +200,26 @@ onBeforeUnmount(async () => {
   margin: 0 5px;
 }
 .ld-label { color: #2563eb; font-weight: bold; }
+.ld-group { flex: 1 1 auto; min-width: 320px; }
 .ld-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  row-gap: 8px;
   flex-wrap: wrap;
 }
+.ld-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.ld-field > label {
+  font-size: 0.75em;
+  font-weight: bold;
+  color: #4b5563;
+}
+.stretch-field { min-width: 110px; }
 .ld-btn {
   padding: 6px 12px;
   background: #eff6ff;
