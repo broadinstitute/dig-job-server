@@ -12,24 +12,18 @@
         @click="triggerTrialsUpload"
       />
       <Button
-        :icon="showNovel ? 'pi pi-star-fill' : 'pi pi-star'"
-        :label="
-          noveltyLoading
-            ? 'Loading novelty…'
-            : showNovel
-              ? 'Novelty filter: ON'
-              : 'Novelty filter: OFF'
-        "
-        severity="secondary"
+        :icon="noveltyLoading ? 'pi pi-spin pi-spinner' : noveltyLoaded ? 'pi pi-check' : 'pi pi-download'"
+        :label="noveltyLoading ? 'Loading novelty…' : noveltyLoaded ? 'Novelty Loaded' : 'Load Novelty Data'"
+        :severity="noveltyLoaded ? 'success' : 'secondary'"
         outlined
-        :loading="noveltyLoading"
-        @click="toggleNovelty"
+        :disabled="noveltyLoading || noveltyLoaded"
+        @click="loadNovelty"
       />
       <span
-        v-if="noveltyError"
-        class="text-xs text-red-600 dark:text-red-400 ml-2"
+        v-if="noveltyLoading && noveltyProgress"
+        class="text-xs text-gray-600 dark:text-gray-400"
       >
-        Novelty fetch failed — see console.
+        {{ noveltyProgress.processed }} of {{ noveltyProgress.total }} genes
       </span>
       <input
         ref="trialsInput"
@@ -156,41 +150,27 @@
       </Card>
     </div>
 
-    <SummarySection
+    <SignalTable
       title="Top Genes per Clump"
-      :rows="summary.genes?.top || []"
-      :show-novelty="true"
-      :show-novel-filter="showNovel"
+      dataset="genes"
+      :rows="genesTableRows"
+      :show-novelty-cols="true"
     />
-
-    <SummarySection
-      title="Lead Genes per Chromosome"
-      :rows="summary.genes?.lead || []"
-      :show-novelty="true"
-      :show-novel-filter="showNovel"
-    />
-
-    <SummarySection
+    <SignalTable
       title="Top Variants per Clump"
-      :rows="summary.variants?.top || []"
-      :show-novelty="false"
-    />
-
-    <SummarySection
-      title="Lead Variants per Chromosome"
-      :rows="summary.variants?.lead || []"
-      :show-novelty="false"
+      dataset="variants"
+      :rows="variantsTableRows"
+      :show-novelty-cols="false"
     />
   </div>
 </template>
 
 <script setup>
-import { computed, h, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
+import { computed, h, onBeforeUnmount, reactive, ref, resolveComponent, watch, watchEffect } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconSummary } from '~/composables/useFalconSummary';
 import { useFalconPlots } from '~/composables/useFalconPlots';
 import { usePlotly } from '~/composables/usePlotly';
-import TraitCard from '~/components/falcon/TraitCard.vue';
 
 const store = useFalconStore();
 const {
@@ -214,9 +194,9 @@ const summary = ref({
   genes: { top: [], lead: [] },
   variants: { top: [], lead: [] },
 });
-const showNovel = ref(false);
+const noveltyLoaded = ref(false);
 const noveltyLoading = ref(false);
-const noveltyError = ref(false);
+const noveltyProgress = ref(null); // { processed, total } | null
 let abortCtrl = null;
 
 // Plot-shaped summary data and refs.
@@ -240,6 +220,14 @@ const probVariantsSpec = computed(() => buildSummaryProbDistSpec(variantsPlotRow
 const distSpec = computed(() => buildSummaryDistanceSpec(distances.value));
 const leadDistSpec = computed(() => buildSummaryLeadDistanceSpec(leadDistances.value));
 
+// Table row sources — index field required as DataTable dataKey.
+const genesTableRows = computed(() =>
+  (genesPlotRows.value || []).map((r, i) => ({ ...r, index: i }))
+);
+const variantsTableRows = computed(() =>
+  (variantsPlotRows.value || []).map((r, i) => ({ ...r, index: i }))
+);
+
 watch(
   () => [
     store.datasets.genes.isLoaded,
@@ -261,7 +249,7 @@ function recompute() {
   });
   summary.value = s;
 
-  // Plot-shaped rows. `isNovel` starts null per original behaviour.
+  // Plot-shaped rows — isNovel/traits read from cache if warm.
   const genes = computeSummaryRowsForPlots('genes');
   const variants = computeSummaryRowsForPlots('variants');
   genesPlotRows.value = genes.results;
@@ -275,12 +263,6 @@ function recompute() {
 
 function mountPlot(el, spec) {
   if (!el || !spec) return;
-  if (spec.empty) {
-    // Still mount so Plotly can draw an empty axis frame; the overlay in
-    // the template shows the placeholder text.
-    mount(el, spec);
-    return;
-  }
   mount(el, spec);
 }
 
@@ -309,32 +291,29 @@ onBeforeUnmount(async () => {
   }
 });
 
-async function toggleNovelty() {
-  // If we are turning OFF, just flip the flag — don't touch cached traits.
-  if (showNovel.value) {
-    showNovel.value = false;
-    return;
-  }
-
-  // Turn ON: fetch novelty for every gene row in either gene section.
+async function loadNovelty() {
+  if (noveltyLoaded.value || noveltyLoading.value) return;
   if (abortCtrl) abortCtrl.abort();
   abortCtrl = new AbortController();
   noveltyLoading.value = true;
-  noveltyError.value = false;
+  noveltyProgress.value = { processed: 0, total: 0 };
   const all = [
     ...(summary.value.genes.top || []),
     ...(summary.value.genes.lead || []),
   ];
   try {
-    await attachNoveltyFlags(all, abortCtrl.signal);
-    showNovel.value = true;
+    await attachNoveltyFlags(all, abortCtrl.signal, ({ processed, total }) => {
+      noveltyProgress.value = { processed, total };
+    });
+    noveltyLoaded.value = true;
+    recompute(); // re-derive rows now that the cache is warm
   } catch (err) {
     if (err.name !== 'AbortError') {
       console.error('[ExecutiveSummaryTab] novelty fetch failed', err);
-      noveltyError.value = true;
     }
   } finally {
     noveltyLoading.value = false;
+    noveltyProgress.value = null;
   }
 }
 
@@ -354,151 +333,305 @@ async function onTrialsFile(e) {
 }
 
 // ---------------------------------------------------------------------------
-// Inline section component: per-section search + role filter + paginator,
-// porting SummaryModule.buildInteractiveTable filtering UX (PEGS app.js:1350+).
-// Inline rather than a separate file to keep the variant-A blast radius small.
+// Filter constants (module scope within script setup).
 // ---------------------------------------------------------------------------
 const ROLE_OPTIONS = [
   { value: 'all', label: 'All Roles' },
-  { value: 'top', label: 'Top Only' },
-  { value: 'lead', label: 'Lead Only' },
-  { value: 'both', label: 'Top & Lead' },
+  { value: 'top', label: '🏆 Top Only' },
+  { value: 'lead', label: '⭐ Lead Only' },
+  { value: 'both', label: '🏆 Top & ⭐ Lead' },
+];
+const NOVEL_OPTIONS = [
+  { value: 'all', label: 'All Novel Status' },
+  { value: 'true', label: 'Novel: True' },
+  { value: 'false', label: 'Novel: False' },
+];
+const TRIALS_OPTIONS = [
+  { value: 'all', label: 'All Trials Status' },
+  { value: 'yes', label: 'Has Trials' },
+  { value: 'no', label: 'No Trials' },
 ];
 
-const SummarySection = {
+// ---------------------------------------------------------------------------
+// filterRows — port of app.js:1459-1479.
+// ---------------------------------------------------------------------------
+function filterRows(rows, filters, showNoveltyCols) {
+  const q = (filters.search || '').trim().toLowerCase();
+  return rows.filter((row) => {
+    // Role filter
+    if (filters.role === 'top' && row.role !== '🏆 Top') return false;
+    if (filters.role === 'lead' && row.role !== '⭐ Lead') return false;
+    if (filters.role === 'both' && row.role !== '🏆 Top & ⭐ Lead') return false;
+
+    // Novelty + trials filters only when columns are shown
+    if (showNoveltyCols) {
+      if (filters.novel === 'true' && row.isNovel !== true) return false;
+      if (filters.novel === 'false' && row.isNovel !== false) return false;
+      if (filters.trials === 'yes' && row.hasClinicalTrials !== true) return false;
+      if (filters.trials === 'no' && row.hasClinicalTrials !== false) return false;
+    }
+
+    // Text search
+    if (q) {
+      const hay = `${row.name || ''} ${row.clump || ''} ${row.role || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// SignalTable — inline h()-based component (runtime compiler is OFF).
+// ---------------------------------------------------------------------------
+const SignalTable = {
+  name: 'SignalTable',
   props: {
     title: { type: String, required: true },
+    dataset: { type: String, required: true },
     rows: { type: Array, required: true },
-    showNovelty: { type: Boolean, default: false },
-    showNovelFilter: { type: Boolean, default: false },
+    showNoveltyCols: { type: Boolean, default: false },
   },
   setup(props) {
-    const search = ref('');
-    const roleFilter = ref('all');
-    const page = ref(1);
-    const pageSize = 10;
+    const filters = reactive({ role: 'all', novel: 'all', trials: 'all', search: '' });
+    const expandedRows = ref({});
 
-    // The shape coming out of useFalconSummary doesn't carry an explicit
-    // "role" — top rows live in .top, leads in .lead. The same gene can
-    // appear in both. Detect "both" by intersecting names within this list.
-    const filtered = computed(() => {
-      const list = props.rows || [];
-      const q = search.value.trim().toLowerCase();
-      return list.filter((row) => {
-        if (roleFilter.value === 'top' && row.isLead) return false;
-        if (roleFilter.value === 'lead' && !row.isLead) return false;
-        // "both" is approximate without cross-list info — treat as "isLead".
-        if (roleFilter.value === 'both' && !row.isLead) return false;
+    const filteredRows = computed(() => filterRows(props.rows, filters, props.showNoveltyCols));
 
-        if (props.showNovelFilter) {
-          if (row.isNovel === null || row.isNovel === undefined) return false;
-          if (row.isNovel !== true) return false;
-        }
+    return () => {
+      const Card = resolveComponent('Card');
+      const DataTable = resolveComponent('DataTable');
+      const Column = resolveComponent('Column');
+      const Select = resolveComponent('Select');
+      const InputText = resolveComponent('InputText');
+      const Tag = resolveComponent('Tag');
 
-        if (q) {
-          const hay =
-            `${row.name || ''} ${row.clumpId || ''} ${row.chr || ''}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
-      });
-    });
+      const total = props.rows.length;
+      const filtered = filteredRows.value;
 
-    const totalPages = computed(() =>
-      Math.max(1, Math.ceil(filtered.value.length / pageSize)),
-    );
-    const pageRows = computed(() => {
-      const start = (page.value - 1) * pageSize;
-      return filtered.value.slice(start, start + pageSize);
-    });
+      // ── toolbar dropdowns ──────────────────────────────────────────────
+      const toolbarChildren = [
+        h(Select, {
+          modelValue: filters.role,
+          options: ROLE_OPTIONS,
+          optionLabel: 'label',
+          optionValue: 'value',
+          placeholder: 'All Roles',
+          class: 'w-44',
+          'onUpdate:modelValue': (v) => { filters.role = v; },
+        }),
+      ];
 
-    // Reset to page 1 if filters narrow the list past current page.
-    watch([search, roleFilter, () => props.rows.length, () => props.showNovelFilter], () => {
-      if (page.value > totalPages.value) page.value = totalPages.value;
-      if (page.value < 1) page.value = 1;
-    });
-
-    return () =>
-      h('section', {}, [
-        h(
-          'div',
-          { class: 'flex items-end gap-3 flex-wrap mb-2' },
-          [
-            h(
-              'h3',
-              { class: 'text-lg font-semibold mr-auto' },
-              `${props.title} (${filtered.value.length})`,
-            ),
-            h(
-              'select',
-              {
-                class:
-                  'border rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 dark:border-gray-700',
-                value: roleFilter.value,
-                onChange: (e) => {
-                  roleFilter.value = e.target.value;
-                  page.value = 1;
-                },
-              },
-              ROLE_OPTIONS.map((o) =>
-                h('option', { value: o.value, key: o.value }, o.label),
-              ),
-            ),
-            h('input', {
-              type: 'text',
-              placeholder: 'Search…',
-              class:
-                'border rounded px-2 py-1 text-sm w-48 bg-white dark:bg-gray-900 dark:border-gray-700',
-              value: search.value,
-              onInput: (e) => {
-                search.value = e.target.value;
-                page.value = 1;
-              },
-            }),
-          ],
-        ),
-        ...pageRows.value.map((row) =>
-          h(TraitCard, {
-            key: `${props.title}-${row.index}`,
-            row,
+      if (props.showNoveltyCols) {
+        toolbarChildren.push(
+          h(Select, {
+            modelValue: filters.novel,
+            options: NOVEL_OPTIONS,
+            optionLabel: 'label',
+            optionValue: 'value',
+            placeholder: 'All Novel Status',
+            class: 'w-48',
+            'onUpdate:modelValue': (v) => { filters.novel = v; },
           }),
-        ),
-        filtered.value.length === 0
-          ? h(
-              'p',
-              { class: 'text-sm text-gray-500 dark:text-gray-400 py-2' },
-              'No matching rows.',
-            )
-          : null,
-        h(
-          'div',
-          { class: 'flex items-center gap-2 mt-2 text-sm' },
-          [
-            h(
-              'button',
-              {
-                class:
-                  'px-2 py-1 border rounded disabled:opacity-50 dark:border-gray-700',
-                disabled: page.value <= 1,
-                onClick: () => (page.value = Math.max(1, page.value - 1)),
-              },
-              'Previous',
-            ),
-            h('span', {}, `Page ${page.value} of ${totalPages.value}`),
-            h(
-              'button',
-              {
-                class:
-                  'px-2 py-1 border rounded disabled:opacity-50 dark:border-gray-700',
-                disabled: page.value >= totalPages.value,
-                onClick: () =>
-                  (page.value = Math.min(totalPages.value, page.value + 1)),
-              },
-              'Next',
-            ),
-          ],
-        ),
-      ]);
+          h(Select, {
+            modelValue: filters.trials,
+            options: TRIALS_OPTIONS,
+            optionLabel: 'label',
+            optionValue: 'value',
+            placeholder: 'All Trials Status',
+            class: 'w-48',
+            'onUpdate:modelValue': (v) => { filters.trials = v; },
+          }),
+        );
+      }
+
+      toolbarChildren.push(
+        h(InputText, {
+          modelValue: filters.search,
+          placeholder: 'Search…',
+          class: 'w-48',
+          'onUpdate:modelValue': (v) => { filters.search = v; },
+        }),
+        h('span', { class: 'text-sm text-gray-600 dark:text-gray-400 ml-2 whitespace-nowrap' },
+          `${filtered.length} / ${total}`),
+      );
+
+      const toolbar = h('div', { class: 'flex flex-wrap items-center gap-2 mb-3' }, toolbarChildren);
+
+      // ── columns ────────────────────────────────────────────────────────
+
+      // Clump column: colored dot + clump id
+      const clumpCol = h(Column, {
+        field: 'clump',
+        header: 'Clump',
+        sortable: true,
+      }, {
+        body: ({ data }) => h('span', { class: 'flex items-center gap-1' }, [
+          h('span', {
+            style: `display:inline-block;width:10px;height:10px;border-radius:50%;background:${data.color || '#888'};flex-shrink:0`,
+          }),
+          h('span', {}, data.clump),
+        ]),
+      });
+
+      // Probability column
+      const probCol = h(Column, {
+        field: 'rawProb',
+        header: 'Probability',
+        sortable: true,
+      }, {
+        body: ({ data }) => h('span', {}, data.prob),
+      });
+
+      // Significance column
+      const sigHeader = props.dataset === 'genes' ? '−log₁₀(P)' : 'P-value';
+      const sigCol = h(Column, {
+        field: 'rawSig',
+        header: sigHeader,
+        sortable: true,
+      }, {
+        body: ({ data }) => h('span', {}, data.significance),
+      });
+
+      const columns = [
+        h(Column, { expander: true, headerStyle: 'width: 3rem' }),
+        h(Column, { field: 'name', header: props.dataset === 'genes' ? 'Gene' : 'Variant', sortable: true }),
+        clumpCol,
+        h(Column, { field: 'role', header: 'Role', sortable: true }),
+        probCol,
+        sigCol,
+      ];
+
+      if (props.showNoveltyCols) {
+        // Trials column
+        columns.push(h(Column, {
+          field: 'hasClinicalTrials',
+          header: 'Trials',
+          sortable: true,
+        }, {
+          body: ({ data }) => {
+            if (data.hasClinicalTrials === true) {
+              return h(Tag, { value: 'Yes', severity: 'success' });
+            }
+            if (data.hasClinicalTrials === false) {
+              return h('span', { class: 'text-gray-400' }, '—');
+            }
+            return h('span', { class: 'text-gray-400' }, '—');
+          },
+        }));
+
+        // Novel column
+        columns.push(h(Column, {
+          field: 'isNovel',
+          header: 'Novel',
+          sortable: true,
+        }, {
+          body: ({ data }) => {
+            if (data.isNovel === null || data.isNovel === undefined) {
+              return h('span', { title: 'Not yet loaded' }, '⏳');
+            }
+            if (data.isNovel === true) {
+              return h(Tag, { value: 'Novel', severity: 'success' });
+            }
+            return h(Tag, { value: 'Known', severity: 'secondary' });
+          },
+        }));
+      }
+
+      // ── expansion slot ─────────────────────────────────────────────────
+      const expansionSlot = {
+        expansion: ({ data }) => {
+          const children = [];
+
+          // Trials sub-table
+          if (data.hasClinicalTrials && data.clinicalTrials?.length) {
+            children.push(
+              h('div', { class: 'mb-3' }, [
+                h('h4', { class: 'text-sm font-semibold mb-1' }, 'Clinical Trials'),
+                h('table', { class: 'text-xs w-full border-collapse' }, [
+                  h('thead', {}, [
+                    h('tr', {}, [
+                      h('th', { class: 'border border-gray-200 dark:border-gray-700 px-2 py-1 text-left bg-gray-50 dark:bg-gray-800' }, 'Drug ID'),
+                      h('th', { class: 'border border-gray-200 dark:border-gray-700 px-2 py-1 text-left bg-gray-50 dark:bg-gray-800' }, 'Indication'),
+                      h('th', { class: 'border border-gray-200 dark:border-gray-700 px-2 py-1 text-left bg-gray-50 dark:bg-gray-800' }, 'Phase'),
+                    ]),
+                  ]),
+                  h('tbody', {},
+                    data.clinicalTrials.map((t, ti) =>
+                      h('tr', { key: ti }, [
+                        h('td', { class: 'border border-gray-200 dark:border-gray-700 px-2 py-1 font-mono' }, t.drugId),
+                        h('td', { class: 'border border-gray-200 dark:border-gray-700 px-2 py-1' }, t.indication),
+                        h('td', { class: 'border border-gray-200 dark:border-gray-700 px-2 py-1' }, t.phase),
+                      ])
+                    )
+                  ),
+                ]),
+              ])
+            );
+          }
+
+          // Trait cards (when known — isNovel === false and traits available)
+          if (data.isNovel === false && data.traits?.length) {
+            children.push(
+              h('div', {}, [
+                h('h4', { class: 'text-sm font-semibold mb-1' }, 'Associated Traits'),
+                h('div', { class: 'space-y-1' },
+                  data.traits.map((t, ti) =>
+                    h('div', {
+                      key: ti,
+                      class: 'border rounded p-2 text-xs dark:border-gray-700',
+                    }, [
+                      h('div', {}, [h('strong', {}, 'Trait: '), t.trait || '—']),
+                      h('div', {}, [h('strong', {}, 'Authors: '), t.authors || '—']),
+                      h('div', {}, [h('strong', {}, 'Citation: '), t.citation || '—']),
+                      h('div', {}, [
+                        h('strong', {}, 'PMID: '),
+                        t.pmid && t.pmid !== 'N/A'
+                          ? h('a', {
+                              href: `https://pubmed.ncbi.nlm.nih.gov/${t.pmid}`,
+                              target: '_blank',
+                              rel: 'noopener noreferrer',
+                              class: 'text-blue-600 dark:text-blue-400 underline',
+                            }, t.pmid)
+                          : h('span', {}, t.pmid || '—'),
+                      ]),
+                    ])
+                  )
+                ),
+              ])
+            );
+          }
+
+          if (children.length === 0) {
+            children.push(h('span', { class: 'text-xs text-gray-500 dark:text-gray-400' }, 'No expansion data.'));
+          }
+
+          return h('div', { class: 'p-3' }, children);
+        },
+      };
+
+      // ── DataTable ──────────────────────────────────────────────────────
+      const table = h(DataTable, {
+        value: filtered,
+        dataKey: 'index',
+        paginator: true,
+        rows: 10,
+        sortMode: 'single',
+        removableSort: true,
+        stripedRows: true,
+        expandedRows: expandedRows.value,
+        'onUpdate:expandedRows': (v) => { expandedRows.value = v; },
+        rowsPerPageOptions: [10, 25, 50],
+        class: 'p-datatable-sm',
+      }, {
+        default: () => columns,
+        ...expansionSlot,
+      });
+
+      return h(Card, {}, {
+        title: () => props.title,
+        content: () => h('div', {}, [toolbar, table]),
+      });
+    };
   },
 };
 </script>

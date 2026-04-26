@@ -90,12 +90,12 @@ export function useFalconSummary(store) {
     });
   }
 
-  async function attachNoveltyFlags(rows, signal) {
+  async function attachNoveltyFlags(rows, signal, onProgress) {
     const { useGeneTraitFetcher } = await import("~/composables/useGeneTraitFetcher");
     const fetcher = useGeneTraitFetcher(store);
     const targets = rows.filter((r) => r.isNovel == null).map((r) => r.name);
     if (targets.length === 0) return;
-    await fetcher.fetchTraits(targets, signal);
+    await fetcher.fetchTraits(targets, signal, { onProgress });
     rows.forEach((row) => {
       const key = row.name?.toUpperCase?.() || "";
       const traits = store.caches.traitLookup[key] || [];
@@ -181,6 +181,7 @@ export function useFalconSummary(store) {
       const trials = !isVariants && store.clinicalTrials.isLoaded
         ? store.clinicalTrials.byGene[itemName?.toUpperCase?.()] || []
         : [];
+      const cachedTraits = store.caches.traitLookup[itemName?.toUpperCase?.()];
 
       results.push({
         clump: clumpId,
@@ -193,7 +194,8 @@ export function useFalconSummary(store) {
         role,
         hasClinicalTrials: trials.length > 0,
         clinicalTrials: trials,
-        isNovel: null,
+        isNovel: cachedTraits ? cachedTraits.length === 0 : null,
+        traits: cachedTraits || null,
       });
     });
 
