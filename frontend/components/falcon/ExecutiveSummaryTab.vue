@@ -19,12 +19,6 @@
         :disabled="noveltyLoading || noveltyLoaded"
         @click="loadNovelty"
       />
-      <span
-        v-if="noveltyLoading && noveltyProgress"
-        class="text-xs text-gray-600 dark:text-gray-400"
-      >
-        {{ noveltyProgress.processed }} of {{ noveltyProgress.total }} genes
-      </span>
       <input
         ref="trialsInput"
         type="file"
@@ -196,7 +190,6 @@ const summary = ref({
 });
 const noveltyLoaded = ref(false);
 const noveltyLoading = ref(false);
-const noveltyProgress = ref(null); // { processed, total } | null
 let abortCtrl = null;
 
 // Plot-shaped summary data and refs.
@@ -296,15 +289,12 @@ async function loadNovelty() {
   if (abortCtrl) abortCtrl.abort();
   abortCtrl = new AbortController();
   noveltyLoading.value = true;
-  noveltyProgress.value = { processed: 0, total: 0 };
   const all = [
     ...(summary.value.genes.top || []),
     ...(summary.value.genes.lead || []),
   ];
   try {
-    await attachNoveltyFlags(all, abortCtrl.signal, ({ processed, total }) => {
-      noveltyProgress.value = { processed, total };
-    });
+    await attachNoveltyFlags(all, abortCtrl.signal);
     noveltyLoaded.value = true;
     recompute(); // re-derive rows now that the cache is warm
   } catch (err) {
@@ -313,7 +303,6 @@ async function loadNovelty() {
     }
   } finally {
     noveltyLoading.value = false;
-    noveltyProgress.value = null;
   }
 }
 
