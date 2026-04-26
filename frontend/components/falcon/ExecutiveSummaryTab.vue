@@ -190,7 +190,7 @@ import { useFalconStore } from '~/stores/FalconStore';
 import { useFalconSummary } from '~/composables/useFalconSummary';
 import { useFalconPlots } from '~/composables/useFalconPlots';
 import { usePlotly } from '~/composables/usePlotly';
-import TraitCard from '~/components/falcon-a/TraitCard.vue';
+import TraitCard from '~/components/falcon/TraitCard.vue';
 
 const store = useFalconStore();
 const {
