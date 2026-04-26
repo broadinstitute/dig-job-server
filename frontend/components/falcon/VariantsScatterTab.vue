@@ -1,5 +1,6 @@
 <template>
   <div class="space-y-4">
+    <GenomicRegionFilter dataset="variants" />
     <div class="flex items-center gap-4 text-xs text-gray-700 dark:text-gray-300">
       <span class="inline-flex items-center gap-1">
         <span class="inline-block w-3 h-3 rounded-full" style="background: #6b7280" /> Other

@@ -79,20 +79,33 @@
 import { computed, ref, watch } from 'vue';
 import { useFalconStore } from '~/stores/FalconStore';
 
+const props = defineProps({
+  dataset: { type: String, default: 'genes' }, // 'genes' | 'variants'
+});
+
 const store = useFalconStore();
 
-// Derive per-chromosome bounds from the loaded genes dataset.
+// Derive per-chromosome bounds from the loaded dataset.
+// Genes use START/END (interval); variants use POS (single point).
 const chrBounds = computed(() => {
   const bounds = new Map();
-  for (const row of store.datasets.genes.data) {
+  const isVariants = props.dataset === 'variants';
+  for (const row of store.datasets[props.dataset].data) {
     const chr = row.CHR ? String(row.CHR).trim() : '';
     if (!chr) continue;
-    const s = parseFloat(row.START);
-    const e = parseFloat(row.END);
-    if (isNaN(s) && isNaN(e)) continue;
     const b = bounds.get(chr) || { min: Infinity, max: -Infinity };
-    if (!isNaN(s)) b.min = Math.min(b.min, s);
-    if (!isNaN(e)) b.max = Math.max(b.max, e);
+    if (isVariants) {
+      const p = parseFloat(row.POS);
+      if (isNaN(p)) continue;
+      b.min = Math.min(b.min, p);
+      b.max = Math.max(b.max, p);
+    } else {
+      const s = parseFloat(row.START);
+      const e = parseFloat(row.END);
+      if (isNaN(s) && isNaN(e)) continue;
+      if (!isNaN(s)) b.min = Math.min(b.min, s);
+      if (!isNaN(e)) b.max = Math.max(b.max, e);
+    }
     bounds.set(chr, b);
   }
   return bounds;
@@ -111,7 +124,7 @@ const chrOptions = computed(() => {
   ];
 });
 
-const selectedChr = ref(store.plotFilters.genes.chr || 'All');
+const selectedChr = ref(store.plotFilters[props.dataset].chr || 'All');
 const currentBounds = computed(() =>
   selectedChr.value === 'All' ? null : chrBounds.value.get(selectedChr.value),
 );
@@ -134,17 +147,17 @@ watch(
 );
 
 watch(selectedChr, (chr) => {
-  store.plotFilters.genes.chr = chr;
+  store.plotFilters[props.dataset].chr = chr;
   if (chr === 'All') {
-    store.plotFilters.genes.minStart = null;
-    store.plotFilters.genes.maxEnd = null;
+    store.plotFilters[props.dataset].minStart = null;
+    store.plotFilters[props.dataset].maxEnd = null;
   }
 });
 
 function applyRange() {
   if (!currentBounds.value) return;
-  store.plotFilters.genes.minStart = bpRange.value[0];
-  store.plotFilters.genes.maxEnd = bpRange.value[1];
+  store.plotFilters[props.dataset].minStart = bpRange.value[0];
+  store.plotFilters[props.dataset].maxEnd = bpRange.value[1];
 }
 
 function reset() {

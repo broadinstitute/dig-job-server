@@ -24,7 +24,25 @@ export function useFalconPlots(store) {
     const isVariants = name === "variants";
     const keyName = isVariants ? "VARIANT" : "GENE";
     const keyLead = isVariants ? "LEAD_SNP" : "NEAREST_TO_LEAD";
-    const region = name === "genes" ? store.plotFilters.genes : { chr: "All" };
+    const region = store.plotFilters[name];
+
+    function passesRegion(row) {
+      if (region.chr === "All") return true;
+      const rChr = row["CHR"] ? row["CHR"].toString().trim() : "";
+      if (rChr !== region.chr) return false;
+      if (isVariants) {
+        const p = parseFloat(row["POS"]);
+        if (isNaN(p)) return true;
+        if (region.minStart != null && p < region.minStart) return false;
+        if (region.maxEnd != null && p > region.maxEnd) return false;
+        return true;
+      }
+      const rS = parseFloat(row["START"]);
+      const rE = parseFloat(row["END"]);
+      if (region.maxEnd != null && !isNaN(rS) && rS > region.maxEnd) return false;
+      if (region.minStart != null && !isNaN(rE) && rE < region.minStart) return false;
+      return true;
+    }
 
     // Pass 1: top-per-clump under STRICT criteria (independent from user filter).
     const topPerClump = new Map();
@@ -33,14 +51,7 @@ export function useFalconPlots(store) {
       const negP = getNegP(row, isVariants);
       if (isNaN(prob) || prob < STRICT_TOP_MIN_PROB) return;
       if (isNaN(negP) || negP < STRICT_TOP_MIN_NEGP) return;
-      if (!isVariants && region.chr !== "All") {
-        const rChr = row["CHR"] ? row["CHR"].toString().trim() : "";
-        if (rChr !== region.chr) return;
-        const rS = parseFloat(row["START"]);
-        const rE = parseFloat(row["END"]);
-        if (!isNaN(rS) && rS > region.maxEnd) return;
-        if (!isNaN(rE) && rE < region.minStart) return;
-      }
+      if (!passesRegion(row)) return;
       const clumpId = normalizedClumpId(row);
       if (!topPerClump.has(clumpId) || prob > topPerClump.get(clumpId).prob) {
         topPerClump.set(clumpId, { index: idx, prob });
@@ -59,14 +70,7 @@ export function useFalconPlots(store) {
         if (isNaN(prob) || prob < store.globalFilter.minProb) return;
         if (isNaN(negP) || negP < store.globalFilter.minNegP) return;
       }
-      if (!isVariants && region.chr !== "All") {
-        const rChr = row["CHR"] ? row["CHR"].toString().trim() : "";
-        if (rChr !== region.chr) return;
-        const rS = parseFloat(row["START"]);
-        const rE = parseFloat(row["END"]);
-        if (!isNaN(rS) && rS > region.maxEnd) return;
-        if (!isNaN(rE) && rE < region.minStart) return;
-      }
+      if (!passesRegion(row)) return;
       if (isNaN(prob) || isNaN(negP)) return;
 
       const clumpId = normalizedClumpId(row);
