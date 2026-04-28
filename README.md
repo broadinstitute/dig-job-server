@@ -52,7 +52,7 @@ curl -X PUT --upload-file <local-file-to-upload> $PRESIGNED_URL
 If you'd like to use the deployed API server and not have to concern yourself with a db or python setup,
 you can edit frontend/.env to point to the deployed API server and run the front end locally. 
 ```bash
-echo "NUXT_PUBLIC_API_BASE_URL=http://ec2-98-83-154-159.compute-1.amazonaws.com:5000" > frontend/.env
+echo "NUXT_PUBLIC_API_BASE_URL=http://ec2-54-172-189-93.compute-1.amazonaws.com:5000" > frontend/.env
 ```
 You'll need to use credentials that are in the API's db.  Talk to another dev that has worked on this project 
 if you need help with this.
