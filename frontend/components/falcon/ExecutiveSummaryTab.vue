@@ -2,14 +2,11 @@
   <div class="space-y-6">
     <div class="flex items-center gap-3 flex-wrap">
       <Button
-        icon="pi pi-database"
-        :label="
-          clinicalTrials.isLoaded
-            ? 'Clinical Trials Loaded'
-            : 'Load Clinical Trials CSV'
-        "
+        :icon="trialsLoading ? 'pi pi-spin pi-spinner' : clinicalTrials.isLoaded ? 'pi pi-check' : 'pi pi-database'"
+        :label="trialsLoading ? 'Loading trials…' : clinicalTrials.isLoaded ? 'Trials Loaded' : 'Load Clinical Trials'"
         :severity="clinicalTrials.isLoaded ? 'success' : 'primary'"
-        @click="triggerTrialsUpload"
+        :disabled="trialsLoading || clinicalTrials.isLoaded"
+        @click="loadClinicalTrialsAsync"
       />
       <Button
         :icon="noveltyLoading ? 'pi pi-spin pi-spinner' : noveltyLoaded ? 'pi pi-check' : 'pi pi-download'"
@@ -19,16 +16,8 @@
         :disabled="noveltyLoading || noveltyLoaded"
         @click="loadNovelty"
       />
-      <input
-        ref="trialsInput"
-        type="file"
-        accept=".csv"
-        class="hidden"
-        @change="onTrialsFile"
-      />
-    </div>
+      </div>
 
-    <!-- ─── Executive Summary Plots (row 1: upset + venn) ─── -->
     <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
       <Card>
         <template #title>🧬 Gene Intersection: Top, Lead, and Novel</template>
@@ -66,7 +55,6 @@
       </Card>
     </div>
 
-    <!-- ─── row 2: probability distributions ─── -->
     <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <Card>
         <template #title>📊 Gene Probability Distribution</template>
@@ -105,7 +93,6 @@
       </Card>
     </div>
 
-    <!-- ─── row 3: distance plots ─── -->
     <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <Card>
         <template #title>📏 Distance to Nearest Gene</template>
@@ -170,6 +157,7 @@ const store = useFalconStore();
 const {
   computeTopAndLeadSignals,
   attachClinicalTrials,
+  fetchAndAttachTrials, // NEW: Imported the new fetcher
   attachNoveltyFlags,
   computeSummaryRowsForPlots,
   computeDistances,
@@ -188,9 +176,14 @@ const summary = ref({
   genes: { top: [], lead: [] },
   variants: { top: [], lead: [] },
 });
+
+// Loading states
 const noveltyLoaded = ref(false);
 const noveltyLoading = ref(false);
 let abortCtrl = null;
+
+const trialsLoading = ref(false);
+let trialsAbortCtrl = null;
 
 // Plot-shaped summary data and refs.
 const genesPlotRows = ref([]);
@@ -238,7 +231,6 @@ function recompute() {
   const s = computeTopAndLeadSignals();
   ['top', 'lead'].forEach((k) => {
     attachClinicalTrials(s.genes[k]);
-    attachClinicalTrials(s.variants[k]);
   });
   summary.value = s;
 
@@ -259,30 +251,20 @@ function mountPlot(el, spec) {
   mount(el, spec);
 }
 
-watchEffect(() => {
-  mountPlot(upsetEl.value, upsetSpec.value);
-});
-watchEffect(() => {
-  mountPlot(vennEl.value, vennSpec.value);
-});
-watchEffect(() => {
-  mountPlot(probGenesEl.value, probGenesSpec.value);
-});
-watchEffect(() => {
-  mountPlot(probVariantsEl.value, probVariantsSpec.value);
-});
-watchEffect(() => {
-  mountPlot(distEl.value, distSpec.value);
-});
-watchEffect(() => {
-  mountPlot(leadDistEl.value, leadDistSpec.value);
-});
+watchEffect(() => { mountPlot(upsetEl.value, upsetSpec.value); });
+watchEffect(() => { mountPlot(vennEl.value, vennSpec.value); });
+watchEffect(() => { mountPlot(probGenesEl.value, probGenesSpec.value); });
+watchEffect(() => { mountPlot(probVariantsEl.value, probVariantsSpec.value); });
+watchEffect(() => { mountPlot(distEl.value, distSpec.value); });
+watchEffect(() => { mountPlot(leadDistEl.value, leadDistSpec.value); });
 
 onBeforeUnmount(async () => {
   for (const el of [upsetEl, vennEl, probGenesEl, probVariantsEl, distEl, leadDistEl]) {
     if (el.value) await unmount(el.value);
   }
 });
+
+// ─── API Fetch Handlers ───
 
 async function loadNovelty() {
   if (noveltyLoaded.value || noveltyLoading.value) return;
@@ -296,7 +278,7 @@ async function loadNovelty() {
   try {
     await attachNoveltyFlags(all, abortCtrl.signal);
     noveltyLoaded.value = true;
-    recompute(); // re-derive rows now that the cache is warm
+    recompute();
   } catch (err) {
     if (err.name !== 'AbortError') {
       console.error('[ExecutiveSummaryTab] novelty fetch failed', err);
@@ -306,18 +288,22 @@ async function loadNovelty() {
   }
 }
 
-const trialsInput = ref(null);
-function triggerTrialsUpload() {
-  trialsInput.value?.click();
-}
-async function onTrialsFile(e) {
-  const f = e.target.files?.[0];
-  if (!f) return;
+async function loadClinicalTrialsAsync() {
+  if (clinicalTrials.isLoaded || trialsLoading.value) return;
+  if (trialsAbortCtrl) trialsAbortCtrl.abort();
+  trialsAbortCtrl = new AbortController();
+  
+  trialsLoading.value = true;
+  
   try {
-    await store.loadClinicalTrialsCsv(f);
-    recompute();
+    await fetchAndAttachTrials(trialsAbortCtrl.signal);
+    recompute(); 
   } catch (err) {
-    console.error('clinical trials load failed', err);
+    if (err.name !== 'AbortError') {
+      console.error('[ExecutiveSummaryTab] clinical trials fetch failed', err);
+    }
+  } finally {
+    trialsLoading.value = false;
   }
 }
 
@@ -558,7 +544,7 @@ const SignalTable = {
             );
           }
 
-          // Trait cards (when known — isNovel === false and traits available)
+          // Trait cards
           if (data.isNovel === false && data.traits?.length) {
             children.push(
               h('div', {}, [

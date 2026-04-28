@@ -83,11 +83,40 @@ export function useFalconSummary(store) {
   }
 
   function attachClinicalTrials(rows) {
-    if (!store.clinicalTrials.isLoaded) return;
+    if (!store.clinicalTrials.isLoaded) {
+      console.warn("[attachClinicalTrials] Aborted: Store says clinical trials are not loaded.");
+      return;
+    }
+
+    const availableKeys = Object.keys(store.clinicalTrials.byGene);
+
     rows.forEach((row) => {
-      const hits = store.clinicalTrials.byGene[row.name?.toUpperCase?.()] || [];
+      const lookupKey = row.name?.toUpperCase?.().trim() || "";
+      
+      const hits = store.clinicalTrials.byGene[lookupKey] || [];
+
       row.clinicalTrials = hits;
+      row.hasClinicalTrials = hits.length > 0;
     });
+  }
+
+  // NEW ASYNC FETCHER: Downloads CSV over the network and reuses your parsing logic
+  async function fetchAndAttachTrials(signal) {
+    // 1. Fetch the file
+    const response = await fetch('/data/clinical_trials.csv', { signal });
+    if (!response.ok) {
+        throw new Error('Failed to fetch clinical trials CSV from server.');
+    }
+    
+    // 2. Extract the raw text directly
+    const rawText = await response.text();
+
+    // 3. Import the parser
+    const { useClinicalTrials } = await import("~/composables/useClinicalTrials");
+    const { loadCsv } = useClinicalTrials(store);
+    
+    // 4. Pass the raw string to PapaParse (it supports strings perfectly!)
+    await loadCsv(rawText);
   }
 
   async function attachNoveltyFlags(rows, signal, onProgress) {
@@ -104,13 +133,6 @@ export function useFalconSummary(store) {
     });
   }
 
-  // ---------------------------------------------------------------------
-  // Plot-shaped rows (matches SummaryModule.processDataset in original
-  // PEGS app.js:749-845). Each row has
-  //   { clump, color, name, prob, rawProb, rawSig, significance, role,
-  //     hasClinicalTrials, clinicalTrials, isNovel }
-  // plus `stats = { topOnly, leadOnly, both }` returned alongside.
-  // ---------------------------------------------------------------------
   function computeSummaryRowsForPlots(name /* 'genes' | 'variants' */) {
     const dataset = store.datasets[name];
     if (!dataset || !dataset.isLoaded) {
@@ -206,12 +228,6 @@ export function useFalconSummary(store) {
     return computeSummaryRowsForPlots(name).stats;
   }
 
-  // ---------------------------------------------------------------------
-  // Replicates the PEGS "Distance Data Extraction" block (app.js:853-921).
-  // Returns { distances, leadDistances }:
-  //   distances = [{ dist, gene, variant }]
-  //   leadDistances = [{ dist, chr, v1, v2 }]
-  // ---------------------------------------------------------------------
   function computeDistances() {
     const distances = [];
     const leadDistances = [];
@@ -238,7 +254,6 @@ export function useFalconSummary(store) {
       const isLead = leadRaw === "true" || leadRaw === "1" || leadRaw === "yes";
       if (!isLead) return;
 
-      // Distance to nearest gene.
       const nearestGene = row["NEAREST_GENE"];
       if (nearestGene && leadGenes.has(nearestGene)) {
         const distStr = row["NEAREST_DISTANCE"];
@@ -254,7 +269,6 @@ export function useFalconSummary(store) {
         }
       }
 
-      // Collect leads grouped by chromosome.
       const chr = row["CHR"] != null ? String(row["CHR"]).trim() : "";
       const posStr = row["POS"];
       if (chr && posStr !== undefined && posStr !== "") {
@@ -288,6 +302,7 @@ export function useFalconSummary(store) {
   return {
     computeTopAndLeadSignals,
     attachClinicalTrials,
+    fetchAndAttachTrials,
     attachNoveltyFlags,
     computeSummaryRowsForPlots,
     computeOverlapStats,
