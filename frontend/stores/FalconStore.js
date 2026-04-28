@@ -21,13 +21,10 @@ export const useFalconStore = defineStore("falcon", () => {
   });
 
   const folderName = ref("");
-  // Raw File[] from the main folder picker — retained so TDP can
-  // discover per-chromosome trait files (.variants, .v2g, .genes)
-  // without re-reading the whole folder. Populated by the data source.
   const rawFiles = ref([]);
   const status = ref("");
 
-  // ─── global filters (affect plots; Summary table preserves original quirk) ───
+  // ─── global filters ───
   const globalFilter = reactive({
     active: true,
     minProb: 0.1,
@@ -83,17 +80,12 @@ export const useFalconStore = defineStore("falcon", () => {
     rawFiles.value = [];
   }
 
-  // ─── actions: stubs; wired in subsequent tasks ───
   async function loadFolder(files) {
     const { useFalconDataSource } = await import("~/composables/useFalconDataSource");
     const source = useFalconDataSource(useFalconStore());
     await source.loadFromLocalFiles(files);
   }
-  async function loadClinicalTrialsCsv(file) {
-    const { useClinicalTrials } = await import("~/composables/useClinicalTrials");
-    const { loadCsv } = useClinicalTrials(useFalconStore());
-    await loadCsv(file);
-  }
+
   async function loadLdFolder(files) {
     const arr = Array.from(files);
     tdp.ldFiles = arr;
@@ -114,7 +106,6 @@ export const useFalconStore = defineStore("falcon", () => {
     resetCaches,
     resetDatasets,
     loadFolder,
-    loadClinicalTrialsCsv,
     loadLdFolder,
   };
 });
