@@ -11,6 +11,34 @@
       />
     </div>
 
+    <Message
+      v-if="!store.folderName"
+      severity="info"
+      :closable="false"
+      class="!my-0"
+    >
+      <div class="space-y-1">
+        <p class="font-semibold">Getting started</p>
+        <ol class="list-decimal list-inside text-sm space-y-1">
+          <li>
+            Run FALCON locally to produce your results — see the
+            <!-- TODO: replace sagehen03 with the team namespace when set up -->
+            <a
+              href="https://hub.docker.com/r/sagehen03/falcon"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="underline font-medium"
+            >FALCON image on Docker Hub</a>
+            for setup and a worked example.
+          </li>
+          <li>
+            When the run finishes, click <b>Choose Folder</b> below and select
+            your <code>results/</code> directory.
+          </li>
+        </ol>
+      </div>
+    </Message>
+
     <FolderPicker />
     <GlobalFilterBar />
 
