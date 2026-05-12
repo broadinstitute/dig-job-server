@@ -4,6 +4,28 @@
 import { useFalconFileLoader } from "~/composables/useFalconFileLoader";
 import { useFalconLogParser }  from "~/composables/useFalconLogParser";
 
+// Prefer the whole-genome combined file when present; otherwise fall back to
+// every per-chromosome file of that kind. FALCON may emit either layout
+// depending on how it was invoked (e.g. a single-chromosome run produces only
+// `<trait>-chr22.22.genes`, never `.wg.genes`).
+function pickKind(files, kind) {
+  const wg = files.find((f) => f.name.endsWith(`.wg.${kind}`));
+  if (wg) return [wg];
+  return files.filter((f) => f.name.endsWith(`.${kind}`));
+}
+
+async function loadKind(files, parseOne) {
+  if (files.length === 1) return parseOne(files[0]);
+  const parts = await Promise.all(files.map(parseOne));
+  const data = [];
+  const cols = new Set();
+  for (const p of parts) {
+    if (p?.data) data.push(...p.data);
+    if (p?.columns) for (const c of p.columns) cols.add(c);
+  }
+  return { data, columns: Array.from(cols) };
+}
+
 export function useFalconDataSource(store) {
   const { parseGenesFile, parseVariantsFile } = useFalconFileLoader();
   const { parseLog }                           = useFalconLogParser();
@@ -18,19 +40,19 @@ export function useFalconDataSource(store) {
     store.rawFiles = files;
     store.folderName = files[0]?.webkitRelativePath?.split("/")[0] || "(unknown folder)";
 
-    const geneFile    = files.find((f) => f.name.endsWith(".wg.genes"));
-    const variantFile = files.find((f) => f.name.endsWith(".wg.variants"));
-    const logFile     = files.find((f) => f.name.endsWith(".wg.log"));
+    const geneFiles    = pickKind(files, "genes");
+    const variantFiles = pickKind(files, "variants");
+    const logFiles     = pickKind(files, "log");
 
-    store.status = (!geneFile && !variantFile)
-      ? "Notice: Missing standard .wg files. FALCON Zoom will still work if trait files exist."
+    store.status = (geneFiles.length === 0 && variantFiles.length === 0)
+      ? "Notice: No .genes or .variants files found in this folder."
       : "Loading datasets...";
 
     const jobs = [];
 
-    if (geneFile) {
+    if (geneFiles.length > 0) {
       jobs.push(
-        parseGenesFile(geneFile)
+        loadKind(geneFiles, parseGenesFile)
           .then(({ data, columns }) => {
             store.datasets.genes.data = data;
             store.datasets.genes.columns = columns;
@@ -38,13 +60,13 @@ export function useFalconDataSource(store) {
           })
           .catch((err) => {
             console.error("genes parse error:", err);
-            store.status = "Error parsing .wg.genes";
+            store.status = "Error parsing genes file(s)";
           }),
       );
     }
-    if (variantFile) {
+    if (variantFiles.length > 0) {
       jobs.push(
-        parseVariantsFile(variantFile)
+        loadKind(variantFiles, parseVariantsFile)
           .then(({ data, columns }) => {
             store.datasets.variants.data = data;
             store.datasets.variants.columns = columns;
@@ -52,13 +74,13 @@ export function useFalconDataSource(store) {
           })
           .catch((err) => {
             console.error("variants parse error:", err);
-            store.status = "Error parsing .wg.variants";
+            store.status = "Error parsing variants file(s)";
           }),
       );
     }
-    if (logFile) {
+    if (logFiles.length > 0) {
       jobs.push(
-        parseLog(logFile)
+        parseLog(logFiles[0])
           .then((logData) => {
             store.datasets.log.data        = logData.data;
             store.datasets.log.preProcess  = logData.preProcess;
