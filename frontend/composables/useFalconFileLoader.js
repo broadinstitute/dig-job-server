@@ -4,20 +4,17 @@
 import Papa from "papaparse";
 
 function parseTsv(file) {
+  // Read the whole file via `complete` rather than `chunk`. PapaParse 5.x's
+  // chunked-streaming path for File inputs uses a hidden helper node that can
+  // be torn down mid-parse and throw `DOMException: Node was not found`.
+  // FALCON output files are MBs at most — streaming buys nothing here.
   return new Promise((resolve, reject) => {
-    const rows = [];
-    let columns = [];
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       delimiter: "\t",
-      chunk: (results) => {
-        rows.push(...results.data);
-        if (columns.length === 0 && results.meta.fields) {
-          columns = results.meta.fields;
-        }
-      },
-      complete: () => resolve({ data: rows, columns }),
+      complete: ({ data, meta }) =>
+        resolve({ data, columns: meta.fields || [] }),
       error: (err) => reject(err),
     });
   });
