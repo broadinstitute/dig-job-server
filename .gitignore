@@ -4,7 +4,6 @@
 # Agent / AI assistant artifacts
 docs/superpowers/
 CLAUDE.md
-AGENTS.md
 GEMINI.md
 WARP.md
 .claude/
