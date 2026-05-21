@@ -1,8 +1,11 @@
 import boto3
+import hashlib
 import json
 import os
+from botocore.config import Config
 
 BUCKET_NAME = os.getenv('JOB_SERVER_BUCKET', 'dig-ldsc-server')
+_S3_CONFIG = Config(signature_version='s3v4')
 
 
 def get_bucket_path(path: str, file_name: str) -> str:
@@ -25,7 +28,7 @@ def get_datasets(user_name: str) -> list[str]:
 
 
 def generate_presigned_url(param, params, expires_in):
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client('s3', config=_S3_CONFIG)
     return s3_client.generate_presigned_url(param, Params=params, ExpiresIn=expires_in)
 
 
@@ -69,26 +72,55 @@ def get_bed_s3_path(user: str, dataset_name: str, filename: str = None) -> str:
 
 def upload_bed_metadata(user: str, dataset_name: str, filename: str):
     """Upload BED metadata file to S3.
-    
+
     Args:
-        user: Username 
+        user: Username
         dataset_name: Name of the dataset
         filename: Name of the BED file
     """
     s3_client = boto3.client('s3')
-    
+
     # Create metadata object
     metadata = {
         "file": filename,
         "file_type": "bed",
         "ancestry": "EUR"
     }
-    
+
     # Upload metadata file
     metadata_path = get_bed_s3_path(user, dataset_name, "metadata")
     s3_client.put_object(
-        Bucket=BUCKET_NAME, 
-        Key=metadata_path, 
+        Bucket=BUCKET_NAME,
+        Key=metadata_path,
         Body=json.dumps(metadata).encode('utf-8'),
         ContentType='application/json'
     )
+
+
+_CHUNK_BYTES = 8 * 1024 * 1024  # 8 MB; matches the PEGS docker hasher
+
+
+def compute_object_sha256(key: str) -> str:
+    """Stream-hash an S3 object and return its hex SHA256.
+
+    Mirrors the PEGS docker entrypoint's hasher (`manifest.sha256_of_file`)
+    so the bytes we hash on the server are exactly the bytes a user gets
+    from the presigned download URL. That equivalence is what allows
+    FALCON's manifest input_sha256 to match this server-computed value.
+    """
+    s3_client = boto3.client('s3')
+    obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)
+    h = hashlib.sha256()
+    for chunk in obj['Body'].iter_chunks(chunk_size=_CHUNK_BYTES):
+        h.update(chunk)
+    return h.hexdigest()
+
+
+def get_falcon_s3_prefix(user: str, dataset: str, filename: str = None) -> str:
+    """S3 prefix (or full key when filename given) for FALCON result objects.
+
+    Lives under the dataset's genetic prefix so the same dataset's GWAS and
+    FALCON results share a tree. Mirrors get_s3_path / get_bed_s3_path.
+    """
+    base = f"userdata/{user}/genetic/{dataset}/falcon"
+    return f"{base}/{filename}" if filename else base

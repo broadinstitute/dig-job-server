@@ -1,7 +1,9 @@
 import asyncio
+import boto3
 import gzip
 import io
 import json
+import logging
 import numpy as np
 import os
 import re
@@ -14,6 +16,7 @@ import httpx
 import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
+from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
@@ -389,6 +392,15 @@ async def delete_bed_file_endpoint(dataset_name: str, user: User = Depends(get_c
         raise fastapi.HTTPException(status_code=500, detail=f"Failed to delete BED file: {str(e)}")
 
 
+class FalconUploadFile(BaseModel):
+    name: str
+    size: int
+
+
+class FalconUploadUrlsRequest(BaseModel):
+    files: list[FalconUploadFile]
+
+
 def get_s3_path(dataset: str, user: User, filename: str=None) -> str:
     if filename:
         return f"userdata/{user.username}/genetic/{dataset}/raw/{filename}"
@@ -414,6 +426,24 @@ async def finalize_upload(request: DatasetInfo, background_tasks: BackgroundTask
     s3.upload_metadata(request, s3_path)
     if not database_utils.insert_dataset(get_db(), user.username, request):
         raise fastapi.HTTPException(status_code=409, detail="Failed to insert dataset")
+
+    # Capture the GWAS file's SHA256 for FALCON cryptographic binding.
+    # Synchronous — typical GWAS files are tens to a few hundred MB and
+    # hash in seconds. Larger files can be moved to a background task later.
+    gwas_key = get_s3_path(request.name, user, request.file)
+    try:
+        gwas_sha256 = s3.compute_object_sha256(gwas_key)
+        database_utils.set_dataset_gwas_sha256(
+            get_db(), user.username, request.name, gwas_sha256,
+        )
+    except ClientError:
+        # The dataset row is in; we just don't have a hash. FALCON for this
+        # dataset will be gated with a "re-upload to enable" banner per spec.
+        # Logging only — do not fail the upload.
+        logging.warning(
+            "could not hash uploaded GWAS at %s; gwas_sha256 left NULL", gwas_key,
+        )
+
     return Response(status_code=200)
 
 @router.delete("/delete-dataset/{dataset}")
@@ -422,6 +452,161 @@ async def delete_dataset(dataset: str, user: User = Depends(get_current_user)):
     s3.clear_dir(s3_path)
     database_utils.delete_dataset(get_db(), user.username, dataset)
     return Response(status_code=200)
+
+
+def _require_owned_dataset(user: User, dataset: str) -> None:
+    """Raise 404 if the user does not own a dataset with this name."""
+    from sqlalchemy import text
+    with get_db() as conn:
+        row = conn.execute(text(
+            "SELECT 1 FROM datasets WHERE id=:id AND uploaded_by=:user"
+        ), {
+            "id": database_utils.get_dataset_hash(dataset, user.username),
+            "user": user.username,
+        }).fetchone()
+    if row is None:
+        raise fastapi.HTTPException(
+            status_code=404, detail=f"dataset {dataset!r} not found for this user",
+        )
+
+
+@router.post("/falcon/{dataset}/upload-urls")
+async def falcon_upload_urls(
+    dataset: str,
+    request: FalconUploadUrlsRequest,
+    user: User = Depends(get_current_user),
+):
+    """Return one presigned PUT URL per filename for FALCON result objects."""
+    _require_owned_dataset(user, dataset)
+    uploads = []
+    for f in request.files:
+        key = s3.get_falcon_s3_prefix(user.username, dataset, f.name)
+        try:
+            url = s3.generate_presigned_url(
+                'put_object',
+                params={'Bucket': s3.BUCKET_NAME, 'Key': key},
+                expires_in=7200,
+            )
+        except ClientError as e:
+            raise fastapi.HTTPException(
+                status_code=500, detail="Failed to generate presigned URL",
+            ) from e
+        uploads.append({"name": f.name, "url": url})
+    return {"uploads": uploads}
+
+
+@router.post("/falcon/{dataset}/finalize")
+async def falcon_finalize(
+    dataset: str,
+    user: User = Depends(get_current_user),
+):
+    """Validate the uploaded FALCON manifest and mark FALCON SUCCEEDED.
+
+    Reads the manifest from s3://.../falcon/manifest.json, validates it
+    against the dataset's gwas_sha256, then writes a workflow_jobs row
+    with method='falcon', status='SUCCEEDED'. On validation failure,
+    deletes the uploaded falcon/ prefix and returns a structured 409.
+    """
+    from job_server import falcon as falcon_mod
+
+    _require_owned_dataset(user, dataset)
+
+    manifest_key = s3.get_falcon_s3_prefix(user.username, dataset, "manifest.json")
+    s3_client = boto3.client("s3")
+    try:
+        obj = s3_client.get_object(Bucket=s3.BUCKET_NAME, Key=manifest_key)
+        manifest = json.loads(obj["Body"].read().decode("utf-8"))
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "NoSuchKey":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "missing_manifest",
+                    "detail": (
+                        "No manifest.json found at the falcon prefix. Your "
+                        "FALCON image may be too old; pull sagehen03/falcon:latest."
+                    ),
+                },
+            )
+        raise fastapi.HTTPException(
+            status_code=500, detail="Failed to read manifest",
+        ) from e
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_manifest_json", "detail": str(e)},
+        )
+
+    gwas_sha = database_utils.get_dataset_gwas_sha256(get_db(), user.username, dataset)
+    try:
+        falcon_mod.validate_manifest(manifest, dataset, gwas_sha)
+    except falcon_mod.FalconManifestError as e:
+        # Validation failed — clean up the uploaded falcon/ objects so
+        # they don't accumulate as orphans. The dataset's GWAS at
+        # raw/<file> is untouched (different prefix).
+        falcon_prefix = s3.get_falcon_s3_prefix(user.username, dataset)
+        try:
+            s3.clear_dir(falcon_prefix)
+        except ClientError:
+            logging.warning(
+                "failed to clean up falcon/ prefix after validation error",
+                exc_info=True,
+            )
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": e.code,
+                "detail": str(e),
+                "expected": e.expected,
+                "got": e.got,
+            },
+        )
+
+    database_utils.record_falcon_success(get_db(), user.username, dataset)
+    return {"status": "SUCCEEDED"}
+
+
+@router.get("/falcon/{dataset}/result-urls")
+async def falcon_result_urls(
+    dataset: str,
+    user: User = Depends(get_current_user),
+):
+    """Return a map of filename → presigned GET URL + ETag + size for each
+    FALCON result object stored for this dataset.
+
+    The ETag lets the frontend cache parsed `.wg.*` data in IndexedDB keyed
+    by (dataset, file, etag) and skip the network round-trip when nothing
+    has changed.
+    """
+    _require_owned_dataset(user, dataset)
+
+    prefix = s3.get_falcon_s3_prefix(user.username, dataset) + "/"
+    s3_client = boto3.client("s3")
+    files: dict = {}
+    try:
+        paginator = s3_client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=s3.BUCKET_NAME, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                name = obj["Key"][len(prefix):]
+                if not name:
+                    continue
+                url = s3.generate_presigned_url(
+                    "get_object",
+                    params={"Bucket": s3.BUCKET_NAME, "Key": obj["Key"]},
+                    expires_in=7200,
+                )
+                files[name] = {
+                    "url": url,
+                    "etag": obj.get("ETag", "").strip('"'),
+                    "size": obj.get("Size", 0),
+                }
+    except ClientError as e:
+        raise fastapi.HTTPException(
+            status_code=500, detail="Failed to list FALCON results",
+        ) from e
+
+    return {"files": files}
+
 
 job_queues: Dict[str, Queue] = {}
 

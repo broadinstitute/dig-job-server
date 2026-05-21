@@ -263,3 +263,61 @@ def delete_bed_file(db, username: str, dataset_name: str) -> bool:
             return result.rowcount > 0
     except Exception:
         return False
+
+
+def set_dataset_gwas_sha256(db, username: str, dataset: str, sha256_hex: str) -> None:
+    """Persist the SHA256 of the uploaded GWAS into the dataset row.
+
+    Called from finalize-upload once the file is in S3. The hash is the
+    binding key for FALCON result uploads: PEGS computes the same hash
+    inside the docker container and records it in its manifest, which the
+    finalize endpoint validates against this column.
+    """
+    with db as connection:
+        query = text(
+            "UPDATE datasets SET gwas_sha256 = :sha256 "
+            "WHERE id = :id AND uploaded_by = :username"
+        )
+        connection.execute(query, {
+            "sha256": sha256_hex,
+            "id": get_dataset_hash(dataset, username),
+            "username": username,
+        })
+        connection.commit()
+
+
+def get_dataset_gwas_sha256(db, username: str, dataset: str) -> "str | None":
+    """Return the dataset's stored gwas_sha256, or None if not set / no row."""
+    with db as connection:
+        query = text(
+            "SELECT gwas_sha256 FROM datasets "
+            "WHERE id = :id AND uploaded_by = :username"
+        )
+        row = connection.execute(query, {
+            "id": get_dataset_hash(dataset, username),
+            "username": username,
+        }).fetchone()
+    if row is None:
+        return None
+    return row[0]
+
+
+def record_falcon_success(db, username: str, dataset: str) -> None:
+    """Insert/upsert a SUCCEEDED workflow_jobs row for method='falcon'.
+
+    FALCON differs from the other methods in that there's no batch job to
+    track — the user runs it locally and the success signal is the manifest
+    upload finalize. We just record the terminal state directly.
+    """
+    with db as connection:
+        query = text(
+            "INSERT INTO workflow_jobs "
+            "  (id, user, method, status, started_at, updated_at) "
+            "VALUES (:id, :username, 'falcon', 'SUCCEEDED', NOW(), NOW()) "
+            "ON DUPLICATE KEY UPDATE status='SUCCEEDED', updated_at=NOW(), job_log=NULL"
+        )
+        connection.execute(query, {
+            "id": get_dataset_hash(dataset, username),
+            "username": username,
+        })
+        connection.commit()
