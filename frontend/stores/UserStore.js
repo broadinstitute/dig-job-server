@@ -278,6 +278,32 @@ export const useUserStore = defineStore("UserStore", {
                 throw error;
             }
         },
+        async getFalconUploadUrls(dataset, files) {
+            // files: Array<{ name: string, size: number }>
+            // Returns: { uploads: [{ name, url }] }
+            const { data } = await this.axios.post(
+                `/api/falcon/${encodeURIComponent(dataset)}/upload-urls`,
+                { files },
+            );
+            return data;
+        },
+        async finalizeFalconUpload(dataset) {
+            // Server reads manifest.json from the falcon prefix and validates.
+            // Returns { status: "SUCCEEDED" } on 200. On 4xx, the axios call
+            // throws — the caller reads err.response.data to extract structured
+            // error code (e.g. "input_sha256_mismatch") for friendly UI copy.
+            const { data } = await this.axios.post(
+                `/api/falcon/${encodeURIComponent(dataset)}/finalize`,
+            );
+            return data;
+        },
+        async getFalconResultUrls(dataset) {
+            // Returns: { files: { [name]: { url, etag, size } } }
+            const { data } = await this.axios.get(
+                `/api/falcon/${encodeURIComponent(dataset)}/result-urls`,
+            );
+            return data;
+        },
     },
 });
 

@@ -80,10 +80,10 @@ export const useFalconStore = defineStore("falcon", () => {
     rawFiles.value = [];
   }
 
-  async function loadFolder(files) {
+  async function loadFromDataset(dataset) {
     const { useFalconDataSource } = await import("~/composables/useFalconDataSource");
     const source = useFalconDataSource(useFalconStore());
-    await source.loadFromLocalFiles(files);
+    await source.loadFromServer(dataset);
   }
 
   async function loadLdFolder(files) {
@@ -105,7 +105,7 @@ export const useFalconStore = defineStore("falcon", () => {
     caches,
     resetCaches,
     resetDatasets,
-    loadFolder,
+    loadFromDataset,
     loadLdFolder,
   };
 });

@@ -103,6 +103,12 @@
                             @click="() => onTabChange('pigean')"
                             >{{ pigeanTabHeader }}</Tab
                         >
+                        <Tab
+                            v-if="shouldShowFalconTab"
+                            value="falcon"
+                            @click="() => onTabChange('falcon')"
+                            >FALCON</Tab
+                        >
                     </TabList>
                     <TabPanels>
                         <TabPanel v-if="shouldShowSldscTab" value="sldsc">
@@ -149,6 +155,10 @@
                                 ref="pigeanTab"
                             />
                         </TabPanel>
+
+                        <TabPanel v-if="shouldShowFalconTab" value="falcon">
+                            <FalconResultsTab :dataset="dataset" />
+                        </TabPanel>
                     </TabPanels>
                 </Tabs>
             </template>
@@ -158,6 +168,7 @@
 
 <script setup>
 import { useResultsStore } from "~/stores/ResultsStore.js";
+import FalconResultsTab from "~/components/results/FalconResultsTab.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -224,6 +235,11 @@ const shouldShowPigeanTab = computed(() => {
         return status === "SUCCEEDED" || hasPigeanResults.value;
     }
     return hasPigeanResults.value;
+});
+
+const shouldShowFalconTab = computed(() => {
+    const status = workflowStatus.value.falcon?.falcon?.status;
+    return status === "SUCCEEDED";
 });
 
 // Tab headers
@@ -314,7 +330,8 @@ const onTabChange = (event) => {
     if (
         (newValue === "sldsc" && !shouldShowSldscTab.value) ||
         (newValue === "magma" && !shouldShowMagmaTab.value) ||
-        (newValue === "pigean" && !shouldShowPigeanTab.value)
+        (newValue === "pigean" && !shouldShowPigeanTab.value) ||
+        (newValue === "falcon" && !shouldShowFalconTab.value)
     ) {
         return;
     }
@@ -453,6 +470,7 @@ const selectFirstAvailableTab = () => {
     if (activeTab.value === "sldsc" && shouldShowSldscTab.value) return;
     if (activeTab.value === "magma" && shouldShowMagmaTab.value) return;
     if (activeTab.value === "pigean" && shouldShowPigeanTab.value) return;
+    if (activeTab.value === "falcon" && shouldShowFalconTab.value) return;
 
     if (shouldShowSldscTab.value) {
         activeTab.value = "sldsc";
@@ -460,6 +478,8 @@ const selectFirstAvailableTab = () => {
         activeTab.value = "magma";
     } else if (shouldShowPigeanTab.value) {
         activeTab.value = "pigean";
+    } else if (shouldShowFalconTab.value) {
+        activeTab.value = "falcon";
     }
 };
 

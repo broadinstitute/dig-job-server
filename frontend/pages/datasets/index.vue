@@ -1,6 +1,8 @@
 <script setup>
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
+import FalconInstructionsPanel from "~/components/falcon/FalconInstructionsPanel.vue";
+import FalconResultsUpload from "~/components/falcon/FalconResultsUpload.vue";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -14,6 +16,31 @@ const totalBedFiles = ref(0);
 const config = useRuntimeConfig();
 const eventSources = ref({});
 const helpPopover = ref(null);
+const falconPanelOpen = ref(false);
+const falconPanelDataset = ref("");
+const falconPanelFilename = ref("gwas.tsv");
+const falconUploadOpen = ref(false);
+const falconUploadDataset = ref("");
+
+function runFalcon(data) {
+    // Open the local instructions panel. The Docker Hub page is linked from
+    // inside the panel — opening it automatically would steal focus from
+    // the user, who'll spend most of their time copying from the panel.
+    falconPanelDataset.value = data.dataset;
+    falconPanelFilename.value = data.file_name || "gwas.tsv";
+    falconPanelOpen.value = true;
+}
+
+function onOpenUploadFromPanel() {
+    falconPanelOpen.value = false;
+    falconUploadDataset.value = falconPanelDataset.value;
+    falconUploadOpen.value = true;
+}
+
+async function onFalconUploaded() {
+    // Refresh the dataset list so the falcon SUCCEEDED row appears.
+    datasets.value = await userStore.retrieveDatasets();
+}
 const toggleHelp = (event) => {
     helpPopover.value.toggle(event);
 };
@@ -109,6 +136,12 @@ onMounted(async () => {
 
     // Fetch phenotypes data
     await phenotypeStore.fetchPhenotypes();
+
+    // Open the FALCON upload modal if the user landed here from the docker banner.
+    if (route.query["falcon-upload"]) {
+        falconUploadDataset.value = String(route.query["falcon-upload"]);
+        falconUploadOpen.value = true;
+    }
 
     // Fetch BED annotation files
     await fetchBedFiles();
@@ -383,6 +416,33 @@ function getAllWorkflowOptions(data) {
         });
     }
 
+    // Check FALCON (two-state: not run / SUCCEEDED).
+    const falconStatus = getJobStatus(data, "falcon");
+    const falconWorkflow = data.workflows?.falcon?.falcon;
+
+    if (!falconStatus) {
+        options.push({
+            label: "Run FALCON",
+            icon: "pi pi-cog",
+            method: "falcon",
+            status: "available",
+            severity: "secondary",
+            command: () => runFalcon(data),
+            disabled: false,
+        });
+    } else if (falconStatus === "SUCCEEDED") {
+        options.push({
+            label: "FALCON (Completed)",
+            icon: "pi pi-check-circle",
+            method: "falcon",
+            status: "succeeded",
+            severity: "success",
+            command: () =>
+                showWorkflowDialog(data, "falcon", "succeeded", falconWorkflow),
+            disabled: false,
+        });
+    }
+
     return options;
 }
 
@@ -448,11 +508,19 @@ function getSuccessfulWorkflows(data) {
         });
     }
 
+    if (getJobStatus(data, "falcon") === "SUCCEEDED") {
+        workflows.push({
+            label: "View FALCON",
+            icon: "pi pi-eye",
+            method: "falcon",
+        });
+    }
+
     return workflows;
 }
 
 function getResultButtonConfig(data) {
-    const hasSuccessfulWorkflow = ["sldsc", "magma", "pigean"].some(
+    const hasSuccessfulWorkflow = ["sldsc", "magma", "pigean", "falcon"].some(
         (method) => getJobStatus(data, method) === "SUCCEEDED",
     );
 
@@ -1472,10 +1540,15 @@ function openBedResultsInNewTab(dataset) {
                                                         event.value.status ===
                                                         'available'
                                                     ) {
-                                                        confirmAndRunWorkflow(
-                                                            data,
-                                                            event.value,
-                                                        );
+                                                        if (event.value.method === 'falcon') {
+                                                            // FALCON has no batch job — open the instructions panel directly.
+                                                            event.value.command();
+                                                        } else {
+                                                            confirmAndRunWorkflow(
+                                                                data,
+                                                                event.value,
+                                                            );
+                                                        }
                                                     } else {
                                                         event.value.command();
                                                     }
@@ -2105,6 +2178,17 @@ function openBedResultsInNewTab(dataset) {
             </Card>
         </div>
     </div>
+        <FalconInstructionsPanel
+            v-model:visible="falconPanelOpen"
+            :dataset="falconPanelDataset"
+            :filename="falconPanelFilename"
+            @openUpload="onOpenUploadFromPanel"
+        />
+        <FalconResultsUpload
+            v-model:visible="falconUploadOpen"
+            :dataset="falconUploadDataset"
+            @uploaded="onFalconUploaded"
+        />
 </template>
 <style scoped>
 /* Timeline styling */
