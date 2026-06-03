@@ -35,6 +35,12 @@ jobs:
           sh docker_db/docker_db.sh start 3308
 
       - name: Test with pytest with coverage
+        env:
+          # CI runs MySQL on :3308 (see "Start MySQL") with a dedicated test DB
+          # created by local-mysql-init.sql. Point the suite there explicitly;
+          # otherwise conftest falls back to :3305 (the local-dev port) and the
+          # connection is refused.
+          TEST_DIG_JOB_SERVER_DB: mysql+pymysql://job_server:job_server@localhost:3308/job_server_test
         run: |
           pytest --cov=. --cov-report=json
 
