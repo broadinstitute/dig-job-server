@@ -10,3 +10,7 @@ build-LDSLambdaFunction:
 falcon-egl-index:
 	python3 scripts/build_falcon_egl_index.py
 .PHONY: falcon-egl-index
+
+sync-local-db:
+	python3 -m job_server.sync_from_s3
+.PHONY: sync-local-db

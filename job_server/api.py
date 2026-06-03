@@ -9,6 +9,7 @@ import os
 import re
 from asyncio import Queue
 from functools import lru_cache
+from pathlib import Path
 from typing import Dict, Optional, TextIO
 
 import fastapi
@@ -21,9 +22,10 @@ from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from job_server import s3, file_utils, batch, database_utils
+from job_server import s3, file_utils, batch, database_utils, falcon_tokens
 from job_server.auth_backend import AuthBackend
 from job_server.database import get_db
+from job_server.falcon_tokens import FalconPrincipal
 from job_server.jwt_utils import create_access_token, get_decoded_jwt_data
 from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod
 
@@ -401,11 +403,28 @@ class FalconUploadUrlsRequest(BaseModel):
     files: list[FalconUploadFile]
 
 
-def get_s3_path(dataset: str, user: User, filename: str=None) -> str:
-    if filename:
-        return f"userdata/{user.username}/genetic/{dataset}/raw/{filename}"
-    else:
-        return f"userdata/{user.username}/genetic/{dataset}/raw"
+class FalconRunTokenRequest(BaseModel):
+    dataset_name: str
+
+
+_RUN_SH_TMPL = Path(__file__).parent.parent / "static" / "run.sh.tmpl"
+
+# Mounted at the application root (not under /api), so it lives on its own
+# router. The auth-injection loop in create_app() iterates `router.routes`
+# and does not touch this one, so no exclusion-set bookkeeping is needed.
+top_router = fastapi.APIRouter()
+
+
+@top_router.get("/run.sh", include_in_schema=False)
+async def serve_run_sh(request: Request):
+    body = _RUN_SH_TMPL.read_text().replace(
+        "{{GWAS_CE_BASE_URL}}", str(request.base_url).rstrip("/")
+    )
+    return Response(content=body, media_type="text/x-shellscript")
+
+
+def get_s3_path(dataset: str, user: User, filename: str = None) -> str:
+    return s3.get_gwas_s3_key(user.username, dataset, filename)
 
 @router.get("/get-pre-signed-url/{dataset}")
 async def get_hermes_pre_signed_url(dataset: str, filename: str = Query(None), user: User = Depends(get_current_user)):
@@ -470,17 +489,159 @@ def _require_owned_dataset(user: User, dataset: str) -> None:
         )
 
 
+def _lookup_user_id(username: str) -> int:
+    """Return the users.id for a given user_name, or raise 401 if missing."""
+    from sqlalchemy import text
+    with get_db() as conn:
+        row = conn.execute(
+            text("SELECT id FROM users WHERE user_name = :u"),
+            {"u": username},
+        ).fetchone()
+    if row is None:
+        raise fastapi.HTTPException(status_code=401, detail="user not found")
+    return int(row[0])
+
+
+def _username_for(user_id: int) -> str:
+    """Return the user_name for a given users.id, or raise 404 if missing."""
+    from sqlalchemy import text
+    with get_db() as conn:
+        row = conn.execute(
+            text("SELECT user_name FROM users WHERE id = :u"),
+            {"u": user_id},
+        ).first()
+    if not row:
+        raise fastapi.HTTPException(status_code=404, detail="user not found")
+    return row.user_name
+
+
+async def get_falcon_token_principal(request: Request) -> FalconPrincipal:
+    """Token-only auth dependency for FALCON CLI endpoints with no dataset
+    path param (e.g. `GET /api/falcon/dataset`).
+
+    Unlike `get_falcon_principal`, this rejects session JWTs outright — the
+    token's bound dataset is the only way to identify the dataset, so a
+    bearer JWT carries no useful binding here.
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.lower().startswith("bearer "):
+        raise fastapi.HTTPException(status_code=401, detail="missing bearer token")
+    raw = auth.split(" ", 1)[1].strip()
+    if not raw.startswith(falcon_tokens.PREFIX):
+        raise fastapi.HTTPException(status_code=401, detail="expected falcon token")
+    principal = falcon_tokens.lookup(raw)
+    if principal is None:
+        raise fastapi.HTTPException(status_code=401, detail="invalid or expired token")
+    return principal
+
+
+async def get_falcon_principal(
+    dataset: str,
+    request: Request,
+) -> FalconPrincipal:
+    """Auth dependency that accepts either a session JWT or a `dft_` CLI token.
+
+    Both paths enforce dataset ownership: the token path requires the token's
+    bound dataset to match the path param, and the JWT path requires the
+    authenticated user to own the dataset (via `_require_owned_dataset`).
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.lower().startswith("bearer "):
+        raise fastapi.HTTPException(status_code=401, detail="missing bearer token")
+    raw = auth.split(" ", 1)[1].strip()
+
+    if raw.startswith(falcon_tokens.PREFIX):
+        principal = falcon_tokens.lookup(raw)
+        if principal is None:
+            raise fastapi.HTTPException(status_code=401, detail="invalid or expired token")
+        if principal.dataset_name != dataset:
+            raise fastapi.HTTPException(status_code=403, detail="token not valid for this dataset")
+        return principal
+
+    # JWT path — reuse existing session auth.
+    # get_current_user is a FastAPI dependency that accepts the Authorization
+    # header value (Optional[str]); call it directly with the same value.
+    user = await get_current_user(authorization=auth)
+    _require_owned_dataset(user, dataset)
+    return FalconPrincipal(user_id=_lookup_user_id(user.username), dataset_name=dataset)
+
+
+# Test-only probe route — exists only to exercise the dependency in tests.
+if os.environ.get("TEST_MODE") == "true":
+    @router.get("/_falcon_principal_probe/{dataset}")
+    async def _falcon_principal_probe(
+        dataset: str,
+        principal: FalconPrincipal = Depends(get_falcon_principal),
+    ):
+        return {"user_id": principal.user_id, "dataset_name": principal.dataset_name}
+
+
+@router.post("/falcon/run-token")
+async def falcon_run_token(
+    request: FalconRunTokenRequest,
+    user: User = Depends(get_current_user),
+):
+    """Mint a dataset-scoped CLI token for the FALCON installer.
+
+    Ownership of the dataset is enforced.
+    """
+    _require_owned_dataset(user, request.dataset_name)
+    user_id = _lookup_user_id(user.username)
+    token, expires_at = falcon_tokens.mint(user_id, request.dataset_name)
+    # expires_at is tz-aware (UTC); isoformat() yields "...+00:00"
+    return {"token": token, "expires_at": expires_at.isoformat()}
+
+
+@router.get("/falcon/dataset")
+async def falcon_dataset(
+    request: Request,
+    principal: FalconPrincipal = Depends(get_falcon_token_principal),
+):
+    """Return the metadata `run.sh` needs for a FALCON installer run.
+
+    Token-auth only — the bound token identifies both user and dataset.
+    v1 ships hardcoded constants for `sample_size`, `inf_heritability`,
+    and `chr_to_update`; these were previously hardcoded in the Vue
+    panel that the CLI installer replaces.
+    """
+    username = _username_for(principal.user_id)
+    sha, gwas_filename, col_map = database_utils.get_dataset_falcon_meta(
+        get_db(), username=username, name=principal.dataset_name,
+    )
+    base_url = str(request.base_url).rstrip("/")
+    gwas_key = s3.get_gwas_s3_key(username, principal.dataset_name, gwas_filename or "gwas.tsv")
+    try:
+        gwas_download_url = s3.generate_presigned_url(
+            "get_object", {"Bucket": s3.BUCKET_NAME, "Key": gwas_key}, 7200,
+        )
+    except ClientError:
+        gwas_download_url = None
+    from job_server import falcon as falcon_mod
+    return {
+        "dataset_name": principal.dataset_name,
+        "gwas_filename": gwas_filename or "gwas.tsv",
+        "expected_gwas_sha256": sha,
+        "gwas_download_url": gwas_download_url,
+        "sumstats_columns": falcon_mod.col_map_to_sumstats_columns(col_map),
+        "sample_size": 625000,
+        "inf_heritability": 0.1212,
+        "chr_to_update": "1-22",
+        "image": "sagehen03/falcon:latest",
+        "web_app_base_url": base_url,
+    }
+
+
 @router.post("/falcon/{dataset}/upload-urls")
 async def falcon_upload_urls(
     dataset: str,
     request: FalconUploadUrlsRequest,
-    user: User = Depends(get_current_user),
+    principal: FalconPrincipal = Depends(get_falcon_principal),
 ):
     """Return one presigned PUT URL per filename for FALCON result objects."""
-    _require_owned_dataset(user, dataset)
     uploads = []
     for f in request.files:
-        key = s3.get_falcon_s3_prefix(user.username, dataset, f.name)
+        key = s3.get_falcon_s3_prefix(_username_for(principal.user_id),
+                                       principal.dataset_name, f.name)
         try:
             url = s3.generate_presigned_url(
                 'put_object',
@@ -498,7 +659,7 @@ async def falcon_upload_urls(
 @router.post("/falcon/{dataset}/finalize")
 async def falcon_finalize(
     dataset: str,
-    user: User = Depends(get_current_user),
+    principal: FalconPrincipal = Depends(get_falcon_principal),
 ):
     """Validate the uploaded FALCON manifest and mark FALCON SUCCEEDED.
 
@@ -508,10 +669,9 @@ async def falcon_finalize(
     deletes the uploaded falcon/ prefix and returns a structured 409.
     """
     from job_server import falcon as falcon_mod
+    username = _username_for(principal.user_id)
 
-    _require_owned_dataset(user, dataset)
-
-    manifest_key = s3.get_falcon_s3_prefix(user.username, dataset, "manifest.json")
+    manifest_key = s3.get_falcon_s3_prefix(username, dataset, "manifest.json")
     s3_client = boto3.client("s3")
     try:
         obj = s3_client.get_object(Bucket=s3.BUCKET_NAME, Key=manifest_key)
@@ -537,14 +697,14 @@ async def falcon_finalize(
             content={"error": "invalid_manifest_json", "detail": str(e)},
         )
 
-    gwas_sha = database_utils.get_dataset_gwas_sha256(get_db(), user.username, dataset)
+    gwas_sha = database_utils.get_dataset_gwas_sha256(get_db(), username, dataset)
     try:
         falcon_mod.validate_manifest(manifest, dataset, gwas_sha)
     except falcon_mod.FalconManifestError as e:
         # Validation failed — clean up the uploaded falcon/ objects so
         # they don't accumulate as orphans. The dataset's GWAS at
         # raw/<file> is untouched (different prefix).
-        falcon_prefix = s3.get_falcon_s3_prefix(user.username, dataset)
+        falcon_prefix = s3.get_falcon_s3_prefix(username, dataset)
         try:
             s3.clear_dir(falcon_prefix)
         except ClientError:
@@ -562,7 +722,7 @@ async def falcon_finalize(
             },
         )
 
-    database_utils.record_falcon_success(get_db(), user.username, dataset)
+    database_utils.record_falcon_success(get_db(), username, dataset)
     return {"status": "SUCCEEDED"}
 
 

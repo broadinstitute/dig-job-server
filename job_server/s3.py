@@ -116,6 +116,17 @@ def compute_object_sha256(key: str) -> str:
     return h.hexdigest()
 
 
+def get_gwas_s3_key(user: str, dataset: str, filename: str | None = None) -> str:
+    """S3 prefix (or full key when filename given) for a dataset's raw GWAS upload.
+
+    Single source of truth for the `userdata/{user}/genetic/{dataset}/raw`
+    convention used by both the upload path (api.get_s3_path) and the
+    local-dev sync tool.
+    """
+    base = f"userdata/{user}/genetic/{dataset}/raw"
+    return f"{base}/{filename}" if filename else base
+
+
 def get_falcon_s3_prefix(user: str, dataset: str, filename: str = None) -> str:
     """S3 prefix (or full key when filename given) for FALCON result objects.
 

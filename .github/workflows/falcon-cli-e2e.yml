@@ -1,0 +1,49 @@
+name: FALCON CLI E2E
+
+on:
+  pull_request:
+    paths:
+      - 'static/run.sh.tmpl'
+      - 'tests/run-sh/**'
+      - 'job_server/api.py'
+      - 'job_server/falcon_tokens.py'
+
+jobs:
+  bats:
+    name: bats run.sh tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats-core (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bats-core
+      - name: Install bats-core (Ubuntu)
+        if: runner.os == 'Linux'
+        run: npm install -g bats
+      - name: Run bats
+        run: bats tests/run-sh/
+
+  pytest:
+    name: pytest endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Start MySQL
+        run: sh docker_db/docker_db.sh start 3308
+      - name: Run pytest
+        run: pytest -q
+      - name: Stop MySQL
+        if: always()
+        run: sh docker_db/docker_db.sh stop

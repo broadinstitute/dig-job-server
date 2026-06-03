@@ -302,6 +302,26 @@ def get_dataset_gwas_sha256(db, username: str, dataset: str) -> "str | None":
     return row[0]
 
 
+def get_dataset_falcon_meta(db, username: str, name: str) -> "tuple[str | None, str | None, dict]":
+    """Return (gwas_sha256, gwas_filename, col_map) for the named dataset.
+
+    gwas_filename and col_map both live inside the datasets.metadata JSON
+    (keys 'file' and 'col_map'). col_map maps standard field names to the
+    user's GWAS column names and drives FALCON's sumstats config. Returns
+    (None, None, {}) when the dataset row is absent.
+    """
+    with db as connection:
+        row = connection.execute(text(
+            "SELECT gwas_sha256, metadata->>'$.file' AS file_name, "
+            "metadata->>'$.col_map' AS col_map "
+            "FROM datasets WHERE id = :id AND uploaded_by = :u"
+        ), {"id": get_dataset_hash(name, username), "u": username}).fetchone()
+    if row is None:
+        return None, None, {}
+    col_map = json.loads(row[2]) if row[2] else {}
+    return row[0], row[1], col_map
+
+
 def record_falcon_success(db, username: str, dataset: str) -> None:
     """Insert/upsert a SUCCEEDED workflow_jobs row for method='falcon'.
 

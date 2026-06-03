@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Load environment variables by default
 load_dotenv()
 
-from job_server.api import router
+from job_server.api import router, top_router
 from job_server.api import get_current_user
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -17,10 +17,14 @@ def create_app():
     app = fastapi.FastAPI(title='Dig Job Server', redoc_url=None)
 
     for route in router.routes:
-        if route.name not in {'login', 'job_status'}:
+        if route.name not in {
+            'login', 'job_status', '_falcon_principal_probe',
+            'falcon_dataset', 'falcon_upload_urls', 'falcon_finalize',
+        }:
             route.dependencies.append(Depends(get_current_user))
 
     app.include_router(router, prefix='/api', tags=['api'])
+    app.include_router(top_router, tags=['top'])
 
     return app
 

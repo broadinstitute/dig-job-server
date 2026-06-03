@@ -432,19 +432,23 @@ const ancestryOptions = [
 const colOptions = [
     { name: "chromosome", value: "chromosome" },
     { name: "position", value: "position" },
+    { name: "rsID", value: "rsid" },
     { name: "other_allele", value: "reference" },
     { name: "effect_allele", value: "alt" },
     { name: "pValue", value: "pValue" },
     { name: "beta", value: "beta" },
     { name: "oddsRatio", value: "oddsRatio" },
+    { name: "se", value: "se" },
     { name: "n", value: "n" },
 ];
 const requiredFields = [
     { name: "chromosome", value: "chromosome" },
     { name: "position", value: "position" },
+    { name: "rsID", value: "rsid" },
     { name: "other_allele", value: "reference" },
     { name: "effect_allele", value: "alt" },
     { name: "pValue", value: "pValue" },
+    { name: "se", value: "se" },
 ];
 
 const tableRows = computed(() => {
@@ -565,7 +569,7 @@ async function uploadData() {
             col_map,
         });
         console.log("File uploaded successfully");
-        await route.push("/");
+        await route.push("/datasets");
     } catch (error) {
         if (error.response.status === 409) {
             toast.add({
