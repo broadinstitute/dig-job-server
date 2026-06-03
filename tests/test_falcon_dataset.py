@@ -1,3 +1,4 @@
+from moto import mock_aws
 from sqlalchemy import text
 
 from job_server.database import get_db
@@ -6,6 +7,11 @@ from tests.fixtures import seed_dataset
 from tests.test_api import get_token
 
 
+# /api/falcon/dataset generates a presigned GWAS URL; without AWS creds
+# botocore raises NoCredentialsError (not ClientError, so the endpoint's
+# except doesn't swallow it). @mock_aws supplies fake creds like every
+# other S3-touching test in this suite.
+@mock_aws
 def test_returns_metadata_for_valid_token(api_client):
     seed_dataset("ds1", username="testuser", gwas_sha256="a" * 64, gwas_filename="gwas.tsv")
     token, _ = falcon_tokens.mint(1, "ds1")
@@ -47,6 +53,7 @@ def test_rejects_expired_token(api_client):
     assert res.status_code in (401, 410)
 
 
+@mock_aws
 def test_returns_sumstats_columns_from_col_map(api_client):
     seed_dataset(
         "ds1", username="testuser", gwas_sha256="a" * 64,
