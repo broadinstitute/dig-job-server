@@ -1,5 +1,11 @@
 from fabric import task
 
+# The Python the service runs under. Must be installed on the host
+# (e.g. `sudo dnf install -y python3.12` on Amazon Linux 2023). The venv
+# is (re)built against this by ensure_venv below.
+PYTHON_BIN = "python3.12"
+VENV_VERSION = "3.12"
+
 
 @task
 def deploy(c, commit=None):
@@ -12,8 +18,36 @@ def deploy(c, commit=None):
     """
     c.forward_agent = True
     update_source(c, commit)
+    ensure_venv(c)
     migrate(c)
     restart(c)
+
+
+@task
+def ensure_venv(c):
+    """
+    Ensure ./venv exists and runs the target Python, rebuilding it otherwise.
+
+    Idempotent: the first deploy after bumping PYTHON_BIN rebuilds the venv
+    on the new interpreter; later deploys see the right version and no-op.
+    """
+    directory = get_checkout_directory()
+    with c.cd(directory):
+        # Fail fast (without touching the working venv) if the target
+        # interpreter isn't installed on the host.
+        c.run(
+            f"command -v {PYTHON_BIN} >/dev/null 2>&1 || "
+            f'{{ echo "{PYTHON_BIN} not found; run: sudo dnf install -y {PYTHON_BIN}"; exit 1; }}'
+        )
+        # Rebuild only when the venv is missing or on the wrong Python.
+        # Build into venv.new and swap, so a failed build never destroys a
+        # working venv.
+        c.run(
+            "if [ ! -x venv/bin/python ] || "
+            f'! venv/bin/python --version 2>&1 | grep -q "Python {VENV_VERSION}"; then '
+            f"rm -rf venv.new && {PYTHON_BIN} -m venv venv.new && rm -rf venv && mv venv.new venv; fi"
+        )
+        c.run("./venv/bin/python -m pip install --upgrade pip")
 
 
 @task
