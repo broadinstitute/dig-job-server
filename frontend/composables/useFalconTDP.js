@@ -8,11 +8,12 @@
 // - No DOM touched; returns spec for the component to mount
 // - Respects store.globalFilter at run-analysis time only (spec §11 preserved quirk)
 //
-// Dual-source file model (mirrors the original TDPModule):
-// - Per-chromosome trait files (.variants, .v2g, .genes) come from store.rawFiles,
-//   which holds the File[] from the main folder the user selected.
+// Data-source model:
+// - Per-chromosome trait data (variants, v2g, genes) is read from the
+//   S3-loaded store (store.datasets.*) and filtered by region in memory —
+//   the dashboard no longer relies on a locally-selected results folder.
 // - LD chunk files (.ld / .ld.gz / .sorted) come from store.tdp.ldFiles,
-//   which holds the File[] from the separate LD folder (loadLdFolder()).
+//   which holds the File[] from the separate (optional) LD folder picker.
 // - LD chunk cache: original used TDPModule.ldCache (a plain object keyed by
 //   `chr${chr}_${bin}`). Port uses store.caches.ldBinCache (a Map, same keys).
 import Papa from "papaparse";
@@ -21,32 +22,6 @@ import { getColorForClump, FALCON_PALETTE } from "~/utils/falcon/colorPalette";
 
 export function useFalconTDP(store) {
   // ----- helpers (inside closure, as original did) -----
-
-  // Parse a .variants / .v2g tab-delimited trait file, optionally filtered row-by-row.
-  // Mirrors TDPModule.parseSpecificFile (app.js:1854-1873).
-  function parseSpecificFile(file, filterFn = null) {
-    return new Promise((resolve, reject) => {
-      if (!file) {
-        resolve([]);
-        return;
-      }
-      const data = [];
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        delimiter: "\t",
-        step: function (row) {
-          if (row && row.data) {
-            if (!filterFn || filterFn(row.data)) {
-              data.push(row.data);
-            }
-          }
-        },
-        complete: () => resolve(data),
-        error: (err) => reject(err),
-      });
-    });
-  }
 
   // Parse an LD chunk file (optionally gzipped). Mirrors TDPModule.loadLDChunk
   // (app.js:1875-1915). Results cached in store.caches.ldBinCache by chunkKey.
@@ -153,7 +128,7 @@ export function useFalconTDP(store) {
 
       const allGenes = store.datasets.genes.data || [];
       if (!allGenes || allGenes.length === 0) {
-        setStatus("Error: Genes dataset not loaded. Please select your folder again.");
+        setStatus("Error: Genes not loaded for this dataset.");
         return null;
       }
 
@@ -223,65 +198,47 @@ export function useFalconTDP(store) {
 
       setStatus(`Scanning region Chr ${chr}:${plotStart}-${plotEnd}...`);
 
-      // Per-chromosome trait file discovery from the main folder (same regex
-      // logic as original, app.js:2044-2055). Try chr-specific match first,
-      // fall back to .wg.<ext> / .<ext>.
-      const traitFiles = store.rawFiles || [];
-      if (traitFiles.length === 0) {
-        setStatus(
-          `Error: Main folder files lost from memory. Please select the folder again.`,
-        );
+      // Source per-chromosome trait data from the S3-loaded store instead of
+      // re-reading local files. The dashboard loads FALCON results from S3
+      // into store.datasets, so filter those already-parsed rows by region.
+      const allVariants = store.datasets.variants.data || [];
+      if (!store.datasets.variants.isLoaded || allVariants.length === 0) {
+        setStatus(`Error: Variants not loaded for this dataset.`);
         return null;
       }
 
-      const getFile = (ext, exactChr) => {
-        let f = traitFiles.find((file) => {
-          const n = file.name;
-          if (exactChr) {
-            const chrRegex = new RegExp(
-              `(^|[^a-zA-Z0-9])(chr)?${chr}([^a-zA-Z0-9]|$)`,
-              "i",
-            );
-            if (!chrRegex.test(n)) return false;
-          }
-          return n.endsWith(ext);
-        });
-        if (!f)
-          f = traitFiles.find(
-            (file) =>
-              file.name.endsWith(`.wg.${ext}`) || file.name.endsWith(`.${ext}`),
-          );
-        return f;
-      };
+      const targetChr = chr.replace(/^chr/i, "");
+      const rawVars = allVariants.filter((row) => {
+        const rChr = row["CHR"]
+          ? row["CHR"].toString().trim().replace(/^chr/i, "")
+          : "";
+        if (rChr && rChr !== targetChr) return false;
+        const pos = parseInt(row["POS"]);
+        return pos >= plotStart && pos <= plotEnd;
+      });
 
-      const fVars = getFile("variants", true) || getFile("variants", false);
-      const fV2G = getFile("v2g", true) || getFile("v2g", false);
-      if (!fVars) {
-        setStatus(`Error: Could not find variants file for Chr ${chr}.`);
-        return null;
-      }
+      // v2g (cS2G) is large, so it's fetched lazily the first time the zoom
+      // runs. It's optional and emitted with header `rsID\tGene\tValue`; keep
+      // only rows whose gene is in the plotted set, accepting upper/lower-case
+      // column names so the linkage works regardless of file casing.
+      setStatus(`Loading variant–gene links…`);
+      await store.ensureV2gLoaded();
+      const rawV2G = (store.datasets.v2g.data || []).filter((row) => {
+        const gName = row["Gene"] || row["GENE"] || "";
+        return genesToPlot.some((g) => (g["GENE"] || g["ID"]) === gName);
+      });
 
-      const processTrait = async (fVars, fV2G) => {
-        if (!fVars) return null;
-
-        const rawV2G = fV2G
-          ? await parseSpecificFile(fV2G, (row) => {
-              return genesToPlot.some(
-                (g) => (g["GENE"] || g["ID"]) === row["GENE"],
-              );
-            })
-          : [];
-
+      const processTrait = (rawVars, rawV2G) => {
         const linkedToGene = {};
         genesToPlot.forEach((g) => {
           linkedToGene[g["GENE"] || g["ID"]] = new Set();
         });
 
         rawV2G.forEach((row) => {
-          const gName = row["GENE"] || "";
+          const gName = row["Gene"] || row["GENE"] || "";
           if (linkedToGene[gName]) {
             linkedToGene[gName].add(
-              row["VARIANT"] || row["SNP"] || row["RSID"],
+              row["rsID"] || row["RSID"] || row["VARIANT"] || row["SNP"],
             );
           }
         });
@@ -302,16 +259,6 @@ export function useFalconTDP(store) {
             symbols: [],
             sizes: [],
           };
-        });
-
-        const rawVars = await parseSpecificFile(fVars, (row) => {
-          const rChr = row["CHR"]
-            ? row["CHR"].toString().trim().replace(/^chr/i, "")
-            : "";
-          const targetChr = chr.replace(/^chr/i, "");
-          if (rChr && rChr !== targetChr) return false;
-          const pos = parseInt(row["POS"]);
-          return pos >= plotStart && pos <= plotEnd;
         });
 
         rawVars.forEach((row) => {
@@ -434,7 +381,7 @@ export function useFalconTDP(store) {
         return tracesData;
       };
 
-      const tData = await processTrait(fVars, fV2G);
+      const tData = processTrait(rawVars, rawV2G);
 
       let overlapWarning = "";
       if (tData && tData.clumps.size > 0) {

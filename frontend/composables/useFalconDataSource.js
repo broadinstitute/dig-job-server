@@ -11,33 +11,21 @@ import { useFalconFileLoader } from "~/composables/useFalconFileLoader";
 import { useFalconLogParser }  from "~/composables/useFalconLogParser";
 
 export function useFalconDataSource(store) {
-  const { parseGenesFile, parseVariantsFile } = useFalconFileLoader();
+  const { parseGenesFile, parseVariantsFile, parseV2gFile } = useFalconFileLoader();
   const { parseLog }                           = useFalconLogParser();
 
-  async function loadFromServer(dataset) {
-    // Driven by /api/falcon/<dataset>/result-urls. Each file is keyed in
-    // IndexedDB by (dataset, filename, etag); ETag is stable per S3 object
-    // version so a hit means the parsed JS arrays in cache are still good.
+  // Fetch the result-url listing for a dataset and return cache-first helpers
+  // for picking + loading file kinds. Shared by the eager load and the lazy
+  // v2g load. Each file is keyed in IndexedDB by (dataset, filename, etag);
+  // ETag is stable per S3 object version so a hit means the cached parsed
+  // arrays are still good.
+  async function makeLoader(dataset) {
     const { useUserStore } = await import("~/stores/UserStore");
     const { useIndexedDBCache } = await import("~/composables/useIndexedDBCache");
-
     const userStore = useUserStore();
     const cache = useIndexedDBCache();
 
-    store.resetCaches();
-    store.resetDatasets();
-    store.folderName = dataset;
-    store.status = "Loading FALCON results...";
-
-    let urls;
-    try {
-      urls = await userStore.getFalconResultUrls(dataset);
-    } catch (err) {
-      console.error("getFalconResultUrls failed:", err);
-      store.status = "Error: could not list FALCON results";
-      return;
-    }
-
+    const urls = await userStore.getFalconResultUrls(dataset);
     const filesMap = urls.files || {};
 
     // Prefer `.wg.<kind>` if present; fall back to all per-chr `.<kind>` files.
@@ -45,15 +33,6 @@ export function useFalconDataSource(store) {
       const wg = Object.keys(filesMap).find((n) => n.endsWith(`.wg.${kind}`));
       if (wg) return [wg];
       return Object.keys(filesMap).filter((n) => n.endsWith(`.${kind}`));
-    }
-
-    const genesNames = pickNames("genes");
-    const variantsNames = pickNames("variants");
-    const logNames = pickNames("log");
-
-    if (genesNames.length === 0 && variantsNames.length === 0 && logNames.length === 0) {
-      store.status = "No FALCON outputs found for this dataset";
-      return;
     }
 
     // Per-file helper: try the cache first; on miss fetch + parse + cache.
@@ -99,11 +78,38 @@ export function useFalconDataSource(store) {
       return { data, columns: Array.from(cols) };
     }
 
+    return { filesMap, pickNames, loadFile, loadKind };
+  }
+
+  async function loadFromServer(dataset) {
+    store.resetCaches();
+    store.resetDatasets();
+    store.folderName = dataset;
+    store.status = "Loading FALCON results...";
+
+    let loader;
+    try {
+      loader = await makeLoader(dataset);
+    } catch (err) {
+      console.error("getFalconResultUrls failed:", err);
+      store.status = "Error: could not list FALCON results";
+      return;
+    }
+
+    const genesNames = loader.pickNames("genes");
+    const variantsNames = loader.pickNames("variants");
+    const logNames = loader.pickNames("log");
+
+    if (genesNames.length === 0 && variantsNames.length === 0 && logNames.length === 0) {
+      store.status = "No FALCON outputs found for this dataset";
+      return;
+    }
+
     const jobs = [];
 
     if (genesNames.length > 0) {
       jobs.push(
-        loadKind(genesNames, parseGenesFile)
+        loader.loadKind(genesNames, parseGenesFile)
           .then((res) => {
             if (!res) return;
             store.datasets.genes.data = res.data;
@@ -118,7 +124,7 @@ export function useFalconDataSource(store) {
     }
     if (variantsNames.length > 0) {
       jobs.push(
-        loadKind(variantsNames, parseVariantsFile)
+        loader.loadKind(variantsNames, parseVariantsFile)
           .then((res) => {
             if (!res) return;
             store.datasets.variants.data = res.data;
@@ -133,7 +139,7 @@ export function useFalconDataSource(store) {
     }
     if (logNames.length > 0) {
       jobs.push(
-        loadFile(logNames[0], parseLog)
+        loader.loadFile(logNames[0], parseLog)
           .then((res) => {
             if (!res) return;
             store.datasets.log.data = res.data;
@@ -145,10 +151,46 @@ export function useFalconDataSource(store) {
           .catch((err) => console.error("log load error:", err)),
       );
     }
+    // v2g is intentionally NOT loaded here — it's large (~100k rows) and only
+    // the TDP zoom needs it. It's fetched lazily on first Run Analysis via
+    // loadV2g() below.
 
     await Promise.all(jobs);
     if (!store.status.startsWith("Error")) store.status = "";
   }
 
-  return { loadFromServer };
+  // Lazy v2g (cS2G variant→gene evidence): fetched on demand the first time
+  // the zoom runs. Idempotent — marks isLoaded even when the dataset has no
+  // v2g, so we don't re-list the bucket on every Run Analysis.
+  async function loadV2g(dataset) {
+    if (store.datasets.v2g.isLoaded || !dataset) return;
+
+    let loader;
+    try {
+      loader = await makeLoader(dataset);
+    } catch (err) {
+      console.error("v2g load error (listing):", err);
+      return;
+    }
+
+    // v2g is emitted per-chromosome only (no `.wg.v2g` aggregate) and is
+    // optional — some datasets predate it.
+    const v2gNames = loader.pickNames("v2g");
+    if (v2gNames.length === 0) {
+      store.datasets.v2g.isLoaded = true;
+      return;
+    }
+    try {
+      const res = await loader.loadKind(v2gNames, parseV2gFile);
+      if (res) {
+        store.datasets.v2g.data = res.data;
+        store.datasets.v2g.columns = res.columns;
+      }
+      store.datasets.v2g.isLoaded = true;
+    } catch (err) {
+      console.error("v2g load error:", err);
+    }
+  }
+
+  return { loadFromServer, loadV2g };
 }

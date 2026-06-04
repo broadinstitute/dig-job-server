@@ -24,5 +24,7 @@ export function useFalconFileLoader() {
   return {
     parseGenesFile: (file) => parseTsv(file),
     parseVariantsFile: (file) => parseTsv(file),
+    // v2g (cS2G) files are tab-delimited with header `rsID\tGene\tValue`.
+    parseV2gFile: (file) => parseTsv(file),
   };
 }

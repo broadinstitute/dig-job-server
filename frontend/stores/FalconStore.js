@@ -11,6 +11,9 @@ export const useFalconStore = defineStore("falcon", () => {
   const datasets = reactive({
     genes: { data: [], columns: [], isLoaded: false },
     variants: { data: [], columns: [], isLoaded: false },
+    // cS2G variant→gene evidence (per-chromosome `<base>.<chr>.v2g`), loaded
+    // from S3 alongside genes/variants and consumed by the TDP zoom.
+    v2g: { data: [], columns: [], isLoaded: false },
     log: {
       data: {}, // Record<chr, Record<component, number[]>>
       preProcess: {}, // Record<chr, Record<step, number>>
@@ -21,7 +24,6 @@ export const useFalconStore = defineStore("falcon", () => {
   });
 
   const folderName = ref("");
-  const rawFiles = ref([]);
   const status = ref("");
 
   // ─── global filters ───
@@ -72,12 +74,14 @@ export const useFalconStore = defineStore("falcon", () => {
     datasets.variants.data = [];
     datasets.variants.columns = [];
     datasets.variants.isLoaded = false;
+    datasets.v2g.data = [];
+    datasets.v2g.columns = [];
+    datasets.v2g.isLoaded = false;
     datasets.log.data = {};
     datasets.log.preProcess = {};
     datasets.log.chromosomes = new Set();
     datasets.log.totalTime = "Not Found / Incomplete Run";
     datasets.log.isLoaded = false;
-    rawFiles.value = [];
   }
 
   async function loadFromDataset(dataset) {
@@ -92,10 +96,18 @@ export const useFalconStore = defineStore("falcon", () => {
     tdp.ldFolderName = arr[0]?.webkitRelativePath?.split("/")[0] || "(ld folder)";
   }
 
+  // Lazily fetch the (large) v2g dataset the first time the TDP zoom needs it.
+  // No-op once loaded, or when no dataset has been loaded from S3.
+  async function ensureV2gLoaded() {
+    if (datasets.v2g.isLoaded || !folderName.value) return;
+    const { useFalconDataSource } = await import("~/composables/useFalconDataSource");
+    const source = useFalconDataSource(useFalconStore());
+    await source.loadV2g(folderName.value);
+  }
+
   return {
     datasets,
     folderName,
-    rawFiles,
     status,
     globalFilter,
     tableStates,
@@ -107,5 +119,6 @@ export const useFalconStore = defineStore("falcon", () => {
     resetDatasets,
     loadFromDataset,
     loadLdFolder,
+    ensureV2gLoaded,
   };
 });
