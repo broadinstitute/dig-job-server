@@ -47,7 +47,7 @@ const props = defineProps({
   dataset: { type: String, required: true },
   filename: { type: String, default: "gwas.tsv" },
 });
-const emit = defineEmits(["update:visible", "openUpload"]);
+const emit = defineEmits(["update:visible"]);
 
 const visibleModel = computed({
   get: () => props.visible,

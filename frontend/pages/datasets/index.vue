@@ -2,7 +2,6 @@
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 import FalconInstructionsPanel from "~/components/falcon/FalconInstructionsPanel.vue";
-import FalconResultsUpload from "~/components/falcon/FalconResultsUpload.vue";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -19,8 +18,6 @@ const helpPopover = ref(null);
 const falconPanelOpen = ref(false);
 const falconPanelDataset = ref("");
 const falconPanelFilename = ref("gwas.tsv");
-const falconUploadOpen = ref(false);
-const falconUploadDataset = ref("");
 
 function runFalcon(data) {
     // Open the local instructions panel. The Docker Hub page is linked from
@@ -31,16 +28,6 @@ function runFalcon(data) {
     falconPanelOpen.value = true;
 }
 
-function onOpenUploadFromPanel() {
-    falconPanelOpen.value = false;
-    falconUploadDataset.value = falconPanelDataset.value;
-    falconUploadOpen.value = true;
-}
-
-async function onFalconUploaded() {
-    // Refresh the dataset list so the falcon SUCCEEDED row appears.
-    datasets.value = await userStore.retrieveDatasets();
-}
 const toggleHelp = (event) => {
     helpPopover.value.toggle(event);
 };
@@ -136,12 +123,6 @@ onMounted(async () => {
 
     // Fetch phenotypes data
     await phenotypeStore.fetchPhenotypes();
-
-    // Open the FALCON upload modal if the user landed here from the docker banner.
-    if (route.query["falcon-upload"]) {
-        falconUploadDataset.value = String(route.query["falcon-upload"]);
-        falconUploadOpen.value = true;
-    }
 
     // Fetch BED annotation files
     await fetchBedFiles();
@@ -2182,12 +2163,6 @@ function openBedResultsInNewTab(dataset) {
             v-model:visible="falconPanelOpen"
             :dataset="falconPanelDataset"
             :filename="falconPanelFilename"
-            @openUpload="onOpenUploadFromPanel"
-        />
-        <FalconResultsUpload
-            v-model:visible="falconUploadOpen"
-            :dataset="falconUploadDataset"
-            @uploaded="onFalconUploaded"
         />
 </template>
 <style scoped>
