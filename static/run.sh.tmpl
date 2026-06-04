@@ -154,9 +154,18 @@ setup_dirs() {
 }
 
 ensure_image() {
-  if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-    echo "pulling docker image ${IMAGE} (one-time, ~1 GB)…"
-    docker pull "$IMAGE"
+  # The server pins the mutable :latest tag, so always pull to pick up new
+  # builds. A previously-cached :latest would otherwise be reused forever,
+  # leaving users on stale code (e.g. before a config-handling fix). Fall
+  # back to a cached copy if the pull fails (offline) so re-runs still work.
+  echo "checking for the latest docker image ${IMAGE}…"
+  if ! docker pull "$IMAGE"; then
+    if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+      echo "warning: could not pull ${IMAGE}; using cached local image" >&2
+    else
+      echo "error: could not pull ${IMAGE} and no local copy exists" >&2
+      exit 1
+    fi
   fi
 }
 

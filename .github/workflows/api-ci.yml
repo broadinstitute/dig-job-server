@@ -10,6 +10,9 @@ on:
       - 'requirements.txt'
       # Tests gate the API, so changes to them must trigger CI too.
       - 'tests/**'
+      # run.sh.tmpl is served live by the API per request, so deploying it
+      # means redeploying the API. Trigger on static changes too.
+      - 'static/**'
       # Trigger on changes to this workflow too, so CI/deploy fixes land
       # without needing an unrelated job_server/ change. (Re-running an old
       # run only re-runs its pinned commit, which won't have the fix.)
