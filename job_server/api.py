@@ -22,7 +22,7 @@ from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from job_server import s3, file_utils, batch, database_utils, falcon_tokens
+from job_server import s3, file_utils, batch, database_utils, falcon_tokens, variant_sifter
 from job_server.auth_backend import AuthBackend
 from job_server.database import get_db
 from job_server.falcon_tokens import FalconPrincipal
@@ -827,6 +827,35 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
     if job_id not in job_queues:
         job_queues[job_id] = Queue()
     await start_job(user, request.dataset, request.method.value, background_tasks, prefix=prefix)
+    return {"job_id": job_id}
+
+
+async def start_sifter_job(user: User, dataset: str, background_tasks: BackgroundTasks):
+    """Kick off the variant-sifter prep pipeline for one dataset (Batch job).
+
+    Mirrors start_job: log RUNNING synchronously, then submit + await in the
+    background. Uses the unprefixed dataset hash as both the GUID and the
+    job_queues key, so the existing /job-status/{job_id} SSE streams progress.
+    """
+    database_utils.log_job_start(
+        get_db(), user.username, dataset, f"RUNNING {variant_sifter.SIFTER_METHOD}",
+    )
+    guid = database_utils.get_dataset_hash(dataset, user.username)
+    background_tasks.add_task(
+        batch.submit_and_await_job,
+        variant_sifter.sifter_job_config(user.username, dataset, guid),
+        user.username, dataset, variant_sifter.SIFTER_METHOD, job_queues, "",
+    )
+
+
+@router.post("/variant-sifter/run/{dataset}")
+async def run_variant_sifter(dataset: str, background_tasks: BackgroundTasks,
+                             user: User = Depends(get_current_user)):
+    _require_owned_dataset(user, dataset)
+    job_id = database_utils.get_dataset_hash(dataset, user.username)
+    if job_id not in job_queues:
+        job_queues[job_id] = Queue()
+    await start_sifter_job(user, dataset, background_tasks)
     return {"job_id": job_id}
 
 
