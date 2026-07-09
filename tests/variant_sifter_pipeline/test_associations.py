@@ -1,6 +1,6 @@
 import math
 
-from pipeline.variant_sifter.associations import build_associations
+from variant_sifter_pipeline.associations import build_associations
 
 
 def test_filters_by_pvalue_keys_by_guid_and_sorts_by_locus():

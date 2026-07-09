@@ -13,8 +13,8 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir "git+https://github.com/broadinstitute/dig-bioindex.git@master"
 
-COPY pipeline /app/pipeline
+COPY variant_sifter_pipeline /app/variant_sifter_pipeline
 
 # Batch supplies the args:  --username <u> --dataset <d> --guid <g>
 # Config comes from env: BIOINDEX_S3_BUCKET, BIOINDEX_RDS_SECRET, BIOINDEX_BIO_SCHEMA.
-ENTRYPOINT ["python", "-m", "pipeline.variant_sifter.run"]
+ENTRYPOINT ["python", "-m", "variant_sifter_pipeline.run"]

@@ -1,4 +1,4 @@
-from pipeline.variant_sifter.canonicalize import canonicalize
+from variant_sifter_pipeline.canonicalize import canonicalize
 
 
 def test_canonicalize_renames_via_col_map():

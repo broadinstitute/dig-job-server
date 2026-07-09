@@ -4,7 +4,7 @@ Reads one uploaded GWAS, builds the p-value-filtered `associations` records for
 that dataset, writes them to the gwas-ce bucket keyed by GUID, and indexes them
 in-process. Plan 1's API submits this via sifter_job_config:
 
-    python -m pipeline.variant_sifter.run --username U --dataset D --guid G
+    python -m variant_sifter_pipeline.run --username U --dataset D --guid G
 
 First slice = associations only. Harmonization/liftover and VEP annotation are
 deferred (see the design spec); this assumes the upload is already on the
@@ -13,6 +13,7 @@ reference build.
 
 import argparse
 import csv
+import gzip
 import io
 import json
 import os
@@ -44,7 +45,11 @@ def _read_metadata(s3, username: str, dataset: str) -> dict:
 def _iter_rows(s3, username: str, dataset: str, filename: str, sep: str):
     key = f"{_raw_prefix(username, dataset)}/{filename}"
     obj = s3.get_object(Bucket=USER_DATA_BUCKET, Key=key)
-    text = io.TextIOWrapper(obj["Body"], encoding="utf-8")
+    # Uploads are commonly gzipped (e.g. cIMT.for_ldsc.tsv.gz); decompress on the
+    # fly so we stream rows rather than buffering the whole file.
+    body = obj["Body"]
+    stream = gzip.GzipFile(fileobj=body) if filename.endswith(".gz") else body
+    text = io.TextIOWrapper(stream, encoding="utf-8")
     yield from csv.DictReader(text, delimiter=sep)
 
 

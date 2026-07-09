@@ -1,4 +1,4 @@
-from pipeline.variant_sifter.loci import chrom_rank, variant_key
+from variant_sifter_pipeline.loci import chrom_rank, variant_key
 
 
 def test_chrom_rank_orders_genomically_not_lexically():
