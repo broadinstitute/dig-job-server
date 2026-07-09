@@ -21,10 +21,15 @@ def build_sifter_url(base_url: str, guid: str, region: str | None = None) -> str
 
 
 def sifter_job_config(username: str, dataset: str, guid: str) -> dict:
-    """AWS Batch submit_job kwargs for the variant-sifter prep pipeline."""
+    """AWS Batch submit_job kwargs for the variant-sifter prep pipeline.
+
+    Submitted onto the shared `indexer-job-queue` (its compute env reaches the
+    aurora-giant-bioindex cluster); the job definition + IAM role are declared in
+    deploy/cloudformation/variant-sifter-batch.yaml.
+    """
     return {
         "jobName": "gwas-ce-variant-sifter",
-        "jobQueue": "gwas-ce-variant-sifter-job-queue",
+        "jobQueue": "indexer-job-queue",
         "jobDefinition": "gwas-ce-variant-sifter",
         "parameters": {
             "username": username,

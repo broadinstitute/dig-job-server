@@ -61,7 +61,7 @@ def test_build_sifter_url_with_region_and_trailing_slash():
 def test_sifter_job_config_shape():
     cfg = variant_sifter.sifter_job_config("testuser", "myds", "guid123")
     assert cfg["jobName"] == "gwas-ce-variant-sifter"
-    assert cfg["jobQueue"] == "gwas-ce-variant-sifter-job-queue"
+    assert cfg["jobQueue"] == "indexer-job-queue"
     assert cfg["jobDefinition"] == "gwas-ce-variant-sifter"
     assert cfg["parameters"] == {
         "username": "testuser", "dataset": "myds", "guid": "guid123",
