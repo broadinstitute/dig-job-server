@@ -36,12 +36,12 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
 import { useBioindex } from "~/composables/useBioindex";
 
 const route = useRoute();
-const dataset = route.query.dataset || "";
-const guid = route.query.guid || "";
+const dataset = computed(() => route.query.dataset || "");
+const guid = computed(() => route.query.guid || "");
 const { queryAssociations } = useBioindex();
 
 const regionInput = ref("");
@@ -50,6 +50,13 @@ const records = ref([]);
 const loading = ref(false);
 const error = ref("");
 const queried = ref(false);
+
+watch(guid, () => {
+  records.value = [];
+  queried.value = false;
+  error.value = "";
+  regionInput.value = "";
+});
 
 async function runQuery() {
   const r = regionInput.value.trim();
@@ -60,7 +67,7 @@ async function runQuery() {
   error.value = "";
   loading.value = true;
   try {
-    const raw = await queryAssociations({ guid, region: r });
+    const raw = await queryAssociations({ guid: guid.value, region: r });
     records.value = raw.map((rec, i) => ({ ...rec, id: i }));
     region.value = r;
     queried.value = true;
