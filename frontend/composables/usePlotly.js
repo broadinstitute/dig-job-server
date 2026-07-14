@@ -1,6 +1,6 @@
 // frontend/composables/usePlotly.js
-// Lazy-load Plotly only on /falcon. The import promise is cached so
-// subsequent mounts are immediate.
+// Lazy-load Plotly (used by /falcon and /sifter). The import promise is
+// cached so subsequent mounts are immediate.
 
 import { watch } from "vue";
 import { useTheme } from "~/composables/useTheme";

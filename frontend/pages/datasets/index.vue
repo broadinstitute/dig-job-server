@@ -438,7 +438,7 @@ function getAllWorkflowOptions(data) {
 
     // Variant Sifter (two-state: not run -> trigger prep / SUCCEEDED -> view).
     const sifterStatus = getJobStatus(data, "variant-sifter");
-    if (!sifterStatus) {
+    if (!sifterStatus || sifterStatus === "FAILED") {
         options.push({
             label: "Run Variant Sifter",
             icon: "pi pi-sliders-h",
@@ -457,7 +457,7 @@ function getAllWorkflowOptions(data) {
             severity: "success",
             command: () =>
                 router.push(
-                    `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${data.id}`,
+                    `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${encodeURIComponent(data.id)}`,
                 ),
             disabled: false,
         });
@@ -493,6 +493,14 @@ function getRunningWorkflows(data) {
             label: "PIGEAN Running",
             icon: "pi pi-spin pi-spinner",
             method: "pigean",
+        });
+    }
+
+    if (getJobStatus(data, "variant-sifter") === "RUNNING") {
+        workflows.push({
+            label: "Variant Sifter Running",
+            icon: "pi pi-spin pi-spinner",
+            method: "variant-sifter",
         });
     }
 

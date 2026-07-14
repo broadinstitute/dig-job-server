@@ -23,6 +23,10 @@ jobs:
               working-directory: ./frontend
               run: npm ci
 
+            - name: Test
+              working-directory: ./frontend
+              run: npm test
+
             - name: Create .env file
               working-directory: ./frontend
               run: |
