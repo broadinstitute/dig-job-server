@@ -212,6 +212,12 @@ export const useUserStore = defineStore("UserStore", {
             );
             return data;
         },
+        async startVariantSifter(dataset) {
+            const { data } = await this.axios.post(
+                `/api/variant-sifter/run/${encodeURIComponent(dataset)}`,
+            );
+            return data;
+        },
         async deleteDataset(dataset) {
             await this.axios.delete(`/api/delete-dataset/${dataset}`);
         },

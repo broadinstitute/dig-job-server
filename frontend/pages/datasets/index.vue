@@ -28,6 +28,18 @@ function runFalcon(data) {
     falconPanelOpen.value = true;
 }
 
+async function runVariantSifter(data) {
+    const { job_id } = await userStore.startVariantSifter(data.dataset);
+    data.status = "RUNNING variant-sifter";
+    listenForJobStatus(job_id, data);
+    toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Variant Sifter prep started",
+        life: 5000,
+    });
+}
+
 const toggleHelp = (event) => {
     helpPopover.value.toggle(event);
 };
@@ -420,6 +432,33 @@ function getAllWorkflowOptions(data) {
             severity: "success",
             command: () =>
                 showWorkflowDialog(data, "falcon", "succeeded", falconWorkflow),
+            disabled: false,
+        });
+    }
+
+    // Variant Sifter (two-state: not run -> trigger prep / SUCCEEDED -> view).
+    const sifterStatus = getJobStatus(data, "variant-sifter");
+    if (!sifterStatus) {
+        options.push({
+            label: "Run Variant Sifter",
+            icon: "pi pi-sliders-h",
+            method: "variant-sifter",
+            status: "available",
+            severity: "secondary",
+            command: () => runVariantSifter(data),
+            disabled: false,
+        });
+    } else if (sifterStatus === "SUCCEEDED") {
+        options.push({
+            label: "View in Sifter",
+            icon: "pi pi-eye",
+            method: "variant-sifter",
+            status: "succeeded",
+            severity: "success",
+            command: () =>
+                router.push(
+                    `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${data.id}`,
+                ),
             disabled: false,
         });
     }
