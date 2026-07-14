@@ -19,4 +19,20 @@ describe("buildAssociationsScatter", () => {
     ]);
     expect(data[0].x).toEqual([2]);
   });
+
+  it("drops records with missing/undefined pValue", () => {
+    const { data } = buildAssociationsScatter([
+      { position: 1 }, // undefined pValue
+      { position: 2, pValue: 1e-8 },
+    ]);
+    expect(data[0].x).toEqual([2]);
+  });
+
+  it("drops records with non-numeric string pValue", () => {
+    const { data } = buildAssociationsScatter([
+      { position: 1, pValue: "NA" },
+      { position: 2, pValue: 1e-8 },
+    ]);
+    expect(data[0].x).toEqual([2]);
+  });
 });
