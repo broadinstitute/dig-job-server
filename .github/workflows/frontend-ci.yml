@@ -28,6 +28,7 @@ jobs:
               run: |
                   echo "NUXT_PUBLIC_API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env
                   echo "NUXT_PUBLIC_PHENOTYPES_URL=${{ secrets.PHENOTYPES_URL }}" >> .env
+                  echo "NUXT_PUBLIC_BIOINDEX_URL=http://bioindex-qa.hugeampkpnbi.org/gwas-ce/api/bio/" >> .env
                   echo "NUXT_PUBLIC_DEFAULT_USERNAME=defaultuser" >> .env
                   echo "NUXT_PUBLIC_DEFAULT_PASSWORD=defaultpass" >> .env
                   echo "NUXT_PUBLIC_GITHUB_AUTH_REDIRECT_URI=https://users.kpndataregistry.org/gh-callback/" >> .env
