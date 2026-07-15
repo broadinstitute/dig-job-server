@@ -1,0 +1,4 @@
+# The pipeline image only COPYs variant_sifter_pipeline/, so keep the build
+# context to just that (excludes .git, node_modules, frontend, the app, etc.).
+*
+!variant_sifter_pipeline
