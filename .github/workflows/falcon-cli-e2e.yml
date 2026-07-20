@@ -7,23 +7,25 @@ on:
       - 'tests/run-sh/**'
       - 'job_server/api.py'
       - 'job_server/falcon_tokens.py'
+      # Trigger on changes to this workflow too, so CI fixes are validated
+      # without needing an unrelated code change (mirrors api-ci.yml).
+      - '.github/workflows/falcon-cli-e2e.yml'
 
 jobs:
   bats:
     name: bats run.sh tests
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    # Linux-only: all run.sh tests pass on Linux (verified locally). The GitHub
+    # macOS runner lacks Docker and the harness hangs there (~16 min then fails),
+    # unreproducible on Linux; low value given run.sh is slated for deprecation
+    # (FALCON moving to AWS Batch). Re-add a macos-latest leg if that changes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats-core (macOS)
-        if: runner.os == 'macOS'
-        run: brew install bats-core
-      - name: Install bats-core (Ubuntu)
-        if: runner.os == 'Linux'
-        run: npm install -g bats
+      # apt is reliable on the runner; `npm install -g bats` was failing in the
+      # runner's global-npm environment before the tests could run.
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
       - name: Run bats
         run: bats tests/run-sh/
 
