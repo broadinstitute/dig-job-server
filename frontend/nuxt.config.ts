@@ -72,6 +72,7 @@ export default defineNuxtConfig({
             apiBaseUrl: "",
             skipAuth: false,
             phenotypesUrl: process.env.NUXT_PUBLIC_PHENOTYPES_URL || "",
+            bioindexUrl: process.env.NUXT_PUBLIC_BIOINDEX_URL || "",
             defaultUsername: process.env.NUXT_PUBLIC_DEFAULT_USERNAME || "",
             defaultPassword: process.env.NUXT_PUBLIC_DEFAULT_PASSWORD || "",
             enableDefaultLogin:

@@ -1,0 +1,181 @@
+# GWAS-CE Variant Sifter Batch runtime.
+#
+# The job runs on the EXISTING shared `indexer-job-queue`; that queue's compute
+# environment is in security group sg-28485f53, which self-allows to the
+# aurora-giant-bioindex cluster, so no compute environment or queue is created
+# here. The queue name lives in job_server.variant_sifter.sifter_job_config.
+#
+# Deploy (manages the role + job def):
+#   aws cloudformation deploy \
+#     --template-file deploy/cloudformation/variant-sifter-batch.yaml \
+#     --stack-name gwas-ce-variant-sifter-batch \
+#     --capabilities CAPABILITY_IAM
+#
+# NOTE -- the ECR repo `gwas-ce-variant-sifter` was created out of band and
+# already holds the pushed image. CloudFormation will not create over it, so
+# adopt it into this stack once via a resource import before the first deploy:
+#   aws cloudformation create-change-set \
+#     --stack-name gwas-ce-variant-sifter-batch --change-set-type IMPORT \
+#     --change-set-name import-ecr \
+#     --template-file deploy/cloudformation/variant-sifter-batch.yaml \
+#     --capabilities CAPABILITY_IAM \
+#     --resources-to-import '[{"ResourceType":"AWS::ECR::Repository",
+#       "LogicalResourceId":"Repository",
+#       "ResourceIdentifier":{"RepositoryName":"gwas-ce-variant-sifter"}}]'
+#   aws cloudformation execute-change-set \
+#     --stack-name gwas-ce-variant-sifter-batch --change-set-name import-ecr
+# Then the `aws cloudformation deploy` above manages the role + job definition.
+# (Alternatively, delete the manual repo and let a plain `deploy` create the
+# whole stack, then re-push the image.)
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >-
+  GWAS-CE Variant Sifter Batch runtime: ECR repo, least-privilege task/execution
+  role, and the Fargate Batch job definition that builds + indexes one uploaded
+  GWAS's p-value-filtered associations into the gwas_ce bioindex.
+
+Parameters:
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Tag of the pipeline image in the ECR repo to run.
+  UploadBucket:
+    Type: String
+    Default: dig-ldsc-server
+    Description: Bucket holding user GWAS uploads (read only).
+  BioindexBucket:
+    Type: String
+    Default: dig-gwas-ce-bioindex
+    Description: gwas-ce bioindex bucket (read + write associations/<guid>.json).
+  BioindexSecret:
+    Type: String
+    Default: GIANT-bioindex
+    Description: Secrets Manager secret with the Aurora bioindex RDS credentials.
+  BioindexSchema:
+    Type: String
+    Default: gwas_ce
+    Description: MySQL schema on the Aurora cluster holding the bioindex tables.
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    # Retain so tearing the stack down never deletes the image.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: gwas-ce-variant-sifter
+
+  JobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        # Fargate execution: pull the image + ship container logs.
+        - PolicyName: ECSTaskExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+        # Read the upload + the objects we index.
+        - PolicyName: S3Read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${UploadBucket}'
+                  - !Sub 'arn:aws:s3:::${BioindexBucket}'
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${UploadBucket}/*'
+                  - !Sub 'arn:aws:s3:::${BioindexBucket}/*'
+        # Write the built associations/<guid>.json (only to the bioindex bucket).
+        - PolicyName: S3Write
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                  - s3:DeleteObject
+                Resource: !Sub 'arn:aws:s3:::${BioindexBucket}/*'
+        # Read the Aurora RDS credentials to index.
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${BioindexSecret}-*'
+
+  JobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: gwas-ce-variant-sifter
+      Type: container
+      PlatformCapabilities:
+        - FARGATE
+      ContainerProperties:
+        Image: !Sub '${Repository.RepositoryUri}:${ImageTag}'
+        JobRoleArn: !GetAtt JobRole.Arn
+        ExecutionRoleArn: !GetAtt JobRole.Arn
+        ResourceRequirements:
+          - Type: VCPU
+            Value: '2'
+          - Type: MEMORY
+            Value: '16384'
+        # ENTRYPOINT is baked into the image; these are the args after it.
+        # `Ref::name` are Batch parameter substitutions (NOT CloudFormation refs)
+        # supplied by job_server.variant_sifter.sifter_job_config.
+        Command:
+          - --username
+          - Ref::username
+          - --dataset
+          - Ref::dataset
+          - --guid
+          - Ref::guid
+        Environment:
+          - Name: JOB_SERVER_BUCKET
+            Value: !Ref UploadBucket
+          - Name: BIOINDEX_S3_BUCKET
+            Value: !Ref BioindexBucket
+          - Name: BIOINDEX_RDS_SECRET
+            Value: !Ref BioindexSecret
+          - Name: BIOINDEX_BIO_SCHEMA
+            Value: !Ref BioindexSchema
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        # Pin x86_64 so an arm-built image can't be silently registered.
+        RuntimePlatform:
+          CpuArchitecture: X86_64
+          OperatingSystemFamily: LINUX
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+
+Outputs:
+  RepositoryUri:
+    Description: ECR repo the pipeline image is pushed to.
+    Value: !GetAtt Repository.RepositoryUri
+  JobRoleArn:
+    Description: Task + execution role the job runs as.
+    Value: !GetAtt JobRole.Arn
+  JobDefinitionArn:
+    Description: Registered Batch job definition (submitted onto indexer-job-queue).
+    Value: !Ref JobDefinition

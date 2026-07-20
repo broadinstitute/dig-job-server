@@ -8,7 +8,8 @@
         "dev:dt": "cross-env NUXT_DEVTOOLS=true nuxt dev",
         "generate": "nuxt generate",
         "preview": "nuxt preview",
-        "postinstall": "nuxt prepare"
+        "postinstall": "nuxt prepare",
+        "test": "vitest run"
     },
     "dependencies": {
         "@pinia/nuxt": "^0.11.3",
@@ -43,6 +44,7 @@
         "prettier-plugin-tailwindcss": "^0.7.2",
         "sass": "^1.99.0",
         "sass-loader": "^16.0.7",
-        "tailwindcss": "^4.2.2"
+        "tailwindcss": "^4.2.2",
+        "vitest": "^4.1.10"
     }
 }
