@@ -152,6 +152,11 @@ Resources:
           - --guid
           - Ref::guid
         Environment:
+          # Python block-buffers stdout when it isn't a TTY, so without this the
+          # job's progress lines only reach CloudWatch when the process exits --
+          # a run that stalls or dies hard shows an empty log stream.
+          - Name: PYTHONUNBUFFERED
+            Value: '1'
           - Name: JOB_SERVER_BUCKET
             Value: !Ref UploadBucket
           - Name: BIOINDEX_S3_BUCKET

@@ -147,3 +147,8 @@ dmypy.json
 frontend/package-lock.json
 
 .github/prompts/
+
+# Local test aids: the synthetic-GWAS generator and the CSVs it emits.
+# Kept out of the repo deliberately (see the script's own docstring).
+scripts/gen_synthetic_gwas.py
+synthetic_*.csv
