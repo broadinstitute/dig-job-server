@@ -19,7 +19,7 @@ const regionZoom = ref(0);
 const searchRegion = ref(null);
 const rows = ref([]);
 const genes = ref([]);
-const recombination = ref([]);
+const recombination = ref(null);
 const refRow = ref(null);
 const status = ref(null);
 const busy = ref(false);
@@ -52,7 +52,7 @@ watch(guid, () => {
   searchRegion.value = null;
   rows.value = [];
   genes.value = [];
-  recombination.value = [];
+  recombination.value = null;
   refRow.value = null;
   status.value = null;
   error.value = "";
@@ -68,7 +68,9 @@ async function loadRegion(region, ldRefRow, seq) {
   rows.value = out.rows;
   genes.value = out.genes;
   recombination.value = out.recombination;
-  refRow.value = ldRefRow || out.refRow;
+  // The loader already resolves explicitRef || pickLeadVariantRow internally,
+  // so out.refRow already reflects ldRefRow when one was passed.
+  refRow.value = out.refRow;
   status.value = out.status;
 }
 
@@ -92,7 +94,7 @@ async function search() {
     searchRegion.value = null;
     rows.value = [];
     genes.value = [];
-    recombination.value = [];
+    recombination.value = null;
     refRow.value = null;
     status.value = null;
   } finally {

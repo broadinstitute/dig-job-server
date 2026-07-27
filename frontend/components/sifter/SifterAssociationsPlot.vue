@@ -29,7 +29,10 @@ function draw() {
   const canvas = canvasEl.value;
   const container = containerEl.value;
   if (!canvas || !container) return;
-  const width = container.clientWidth;
+  // setupPlotCanvas expects a 2x-internal-pixel canvas.width (retina sizing,
+  // matching internalHeight which is already VKS_PLOT_DISPLAY_HEIGHT * 2) —
+  // see setupPlotCanvas doc comment in plotShared.js.
+  const width = container.clientWidth * 2;
   const height = VKS_PLOT_DISPLAY_HEIGHT * 2;
   // setupPlotCanvas sizes the canvas, resets the transform and clears it.
   const ctx = setupPlotCanvas(canvas, width, height);
@@ -42,8 +45,13 @@ function draw() {
   points.value = buildPlotPoints(props.rows, props.visibleRegion, { width, height, margin });
   for (const p of points.value) renderPlotDot(ctx, p.x, p.y, p.color);
 
-  if (props.refRow) {
-    const refPoint = points.value.find((p) => p.row === props.refRow);
+  const refVariantId = props.refRow?.["Variant ID"];
+  if (refVariantId != null) {
+    // enrichAssociationRowsWithLdScoresForRef returns NEW row objects
+    // (rows.map(row => ({...row, LDS}))), so refRow is never identical
+    // (===) to any row in points.value once LD enrichment has run. Match
+    // on the decorated "Variant ID" field instead of object identity.
+    const refPoint = points.value.find((p) => p.row?.["Variant ID"] === refVariantId);
     if (refPoint) {
       renderStar(ctx, refPoint.x, refPoint.y, 5, 10, 6,
                  LD_REFERENCE_COLOR, LD_REFERENCE_COLOR);

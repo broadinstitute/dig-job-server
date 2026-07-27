@@ -16,7 +16,21 @@ export function createSifterRegionResolver({ fetchImpl = fetch } = {}) {
     if (!q) {
       throw new Error("Please enter a region or gene name.");
     }
-    const region = await resolveGeneOrVariantToRegion(q, { expandBp, fetchImpl });
+    let region;
+    try {
+      region = await resolveGeneOrVariantToRegion(q, { expandBp, fetchImpl });
+    } catch (e) {
+      // resolveGeneOrVariantToRegion already throws friendly, distinct
+      // messages for a non-ok response ("Gene lookup failed (HTTP ...)") and
+      // an empty result ("No gene or region found ..."); pass those through
+      // unchanged. Anything else (a rejected fetch itself — e.g. a network
+      // failure) surfaces as a raw `TypeError: Failed to fetch` if left
+      // unwrapped, so wrap it consistently with the other lookup failures.
+      if (/^(Gene lookup failed|No gene or region found)/.test(e?.message || "")) {
+        throw e;
+      }
+      throw new Error(`Gene lookup failed: ${e?.message || "network error"}`);
+    }
     if (region) {
       // Checked AFTER resolution and expand so a gene's bounds plus its
       // expand are measured as one span; a gene symbol has no span until

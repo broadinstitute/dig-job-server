@@ -37,6 +37,14 @@ describe("createSifterRegionResolver", () => {
     await expect(resolve("   ", 0)).rejects.toThrow(/region or gene/i);
   });
 
+  it("wraps a rejected fetch (network failure) in a friendly message instead of propagating it raw", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const { resolve } = createSifterRegionResolver({ fetchImpl });
+    await expect(resolve("TCF7L2", 0)).rejects.toThrow(/Gene lookup failed/);
+    // Distinct from the non-ok-status message, which names an HTTP status.
+    await expect(resolve("TCF7L2", 0)).rejects.not.toThrow(/HTTP/);
+  });
+
   describe("locus-scale span cap", () => {
     it("resolves a region comfortably within the cap", async () => {
       const fetchImpl = vi.fn();

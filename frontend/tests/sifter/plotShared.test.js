@@ -27,6 +27,17 @@ describe("getLdDotColor", () => {
   it("returns the 'no data' colour for out-of-range r2", () => {
     expect(getLdDotColor(1.5)).toBe("#00000030");
   });
+
+  it("bins exactly at r2 = 0.2/0.4/0.6/0.8 into the bin the edge value enters, per floor(r2 * 5)", () => {
+    // Binning is the entire colour contract; the bin edges are the values
+    // most likely to be off-by-one, so pin them down exactly rather than
+    // relying on the mid-bin cases above. floor(r2 * 5) puts each edge value
+    // into the bin it *starts*, not the one below it.
+    expect(getLdDotColor(0.2)).toBe(VKS_LD_DOT_COLORS[1]);
+    expect(getLdDotColor(0.4)).toBe(VKS_LD_DOT_COLORS[2]);
+    expect(getLdDotColor(0.6)).toBe(VKS_LD_DOT_COLORS[3]);
+    expect(getLdDotColor(0.8)).toBe(VKS_LD_DOT_COLORS[4]);
+  });
 });
 
 describe("normalizePlotMargin", () => {

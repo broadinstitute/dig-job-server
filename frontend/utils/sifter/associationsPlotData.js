@@ -4,6 +4,7 @@ import {
   VKS_LD_DOT_COLORS,
   VKS_LD_REFERENCE_COLOR,
 } from "./plotShared.js";
+import { computeRegionPlotWidth } from "./genesTrackRender.js";
 
 // Legend for the LD colour scale, mirroring the KP sifter: descending r2, then
 // "No data". getLdDotColor bins by Math.floor(r2 * 5), so index 5 is reached
@@ -26,7 +27,10 @@ export const LD_REFERENCE_COLOR = VKS_LD_REFERENCE_COLOR;
 // unit-testable without mounting anything.
 export function buildPlotPoints(rows, visibleRegion, { width, height, margin } = {}) {
   const m = normalizePlotMargin(margin);
-  const plotWidth = width - m.left - m.right;
+  // Share the genes track's x-scale (canvasWidth - margin.left * 2, asymmetric
+  // by upstream design) so the two stacked canvases agree on where a given
+  // position lands horizontally.
+  const plotWidth = computeRegionPlotWidth(width, m);
   const plotHeight = height - m.top - m.bottom;
   const span = visibleRegion.end - visibleRegion.start || 1;
 

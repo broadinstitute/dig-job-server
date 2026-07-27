@@ -27,7 +27,9 @@ function draw() {
   const canvas = canvasEl.value;
   const container = containerEl.value;
   if (!canvas || !container) return;
-  const width = container.clientWidth;
+  // setupPlotCanvas expects a 2x-internal-pixel canvas.width (retina sizing) —
+  // see setupPlotCanvas doc comment in plotShared.js.
+  const width = container.clientWidth * 2;
   const region = props.visibleRegion;
 
   // renderGenesTrack/computeGeneTrackHitRegions derive plot width from

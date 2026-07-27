@@ -4,6 +4,7 @@ import {
   LD_LEGEND_ENTRIES,
 } from "../../utils/sifter/associationsPlotData.js";
 import { VKS_LD_DOT_COLORS, getLdDotColor } from "../../utils/sifter/plotShared.js";
+import { computeRegionPlotWidth } from "../../utils/sifter/genesTrackRender.js";
 
 const REGION = { chr: "10", start: 0, end: 1000 };
 const LAYOUT = { width: 1000, height: 120, margin: { top: 10, right: 10, bottom: 20, left: 40 } };
@@ -74,5 +75,28 @@ describe("buildPlotPoints", () => {
     );
     expect(points).toHaveLength(1);
     expect(points[0].row.position).toBe(500);
+  });
+
+  it("shares its x-scale with the genes track (computeRegionPlotWidth), not width - left - right", () => {
+    // Regression guard for the two-stacked-canvases x-scale mismatch: the
+    // genes track's plot width is canvasWidth - margin.left * 2 (asymmetric
+    // by upstream design). buildPlotPoints must use the same formula so a
+    // variant renders under the gene it actually sits in. LAYOUT has
+    // right: 10 !== left: 40, so the two formulas diverge and this would
+    // fail under the old `width - left - right` computation.
+    const rows = [{ position: 500, pValue: 0.1 }];
+    const [p] = buildPlotPoints(rows, REGION, LAYOUT);
+    const plotWidth = computeRegionPlotWidth(LAYOUT.width, LAYOUT.margin);
+    const expectedX =
+      LAYOUT.margin.left +
+      ((500 - REGION.start) / (REGION.end - REGION.start)) * plotWidth;
+    expect(p.x).toBeCloseTo(expectedX);
+    // Sanity check that this actually pins down a formula, not a coincidence:
+    // the old, wrong formula would have produced a different x.
+    const oldPlotWidth = LAYOUT.width - LAYOUT.margin.left - LAYOUT.margin.right;
+    const oldX =
+      LAYOUT.margin.left +
+      ((500 - REGION.start) / (REGION.end - REGION.start)) * oldPlotWidth;
+    expect(p.x).not.toBeCloseTo(oldX);
   });
 });
