@@ -25,6 +25,13 @@ export const LD_REFERENCE_COLOR = VKS_LD_REFERENCE_COLOR;
 
 // Rows -> canvas points. Kept separate from the component so plot geometry is
 // unit-testable without mounting anything.
+//
+// Returns { points, yMin, yMax }: yMin/yMax are the SAME -log10(p) scale the
+// points are plotted against (yMin is always 0 — the plotted baseline — and
+// yMax is the largest -log10(p) among usable rows, floored at 1). The caller
+// (SifterAssociationsPlot.vue) must feed these straight into renderPlotAxis
+// rather than recomputing its own range, or the axis and the dots would show
+// different scales.
 export function buildPlotPoints(rows, visibleRegion, { width, height, margin } = {}) {
   const m = normalizePlotMargin(margin);
   // Share the genes track's x-scale (canvasWidth - margin.left * 2, asymmetric
@@ -40,16 +47,19 @@ export function buildPlotPoints(rows, visibleRegion, { width, height, margin } =
       r.position >= visibleRegion.start &&
       r.position <= visibleRegion.end,
   );
-  if (!usable.length) return [];
+  if (!usable.length) return { points: [], yMin: 0, yMax: 1 };
 
   const yValues = usable.map((r) => -Math.log10(Number(r.pValue)));
+  const yMin = 0;
   const yMax = Math.max(...yValues, 1);
 
-  return usable.map((row, i) => ({
+  const points = usable.map((row, i) => ({
     x: m.left + ((row.position - visibleRegion.start) / span) * plotWidth,
     y: m.top + (plotHeight - (yValues[i] / yMax) * plotHeight),
     // LD enrichment writes `LDS` (see enrichAssociationRowsWithLdScoresForRef).
     color: getLdDotColor(row.LDS ?? null),
     row,
   }));
+
+  return { points, yMin, yMax };
 }

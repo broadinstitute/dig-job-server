@@ -3,6 +3,11 @@
 // Pure data — do not prune "custom table" / "tool tips" / "column formatting"
 // even though we do not consume them yet; keeping them keeps this file
 // diffable against upstream.
+//
+// buildFilterModel/visibleColumns below are our own additions (not part of
+// the upstream port) — see their doc comments.
+import { FilterMatchMode } from "@primevue/core/api";
+
 /** GEM package table format for Variant Sifter associations. */
 export const ASSOCIATIONS_TABLE_FORMAT = {
     "custom table": {
@@ -125,4 +130,45 @@ export function visibleColumns(rows) {
     return SIFTER_TABLE_COLUMNS.filter((col) =>
         list.some((row) => row[col.field] !== undefined && row[col.field] !== null),
     );
+}
+
+// Spec §5: filter semantics per field. Decorated rows can hold a numeric
+// field as the STRING "0" (decorateRows.js coerces an exact 0 to "0" before
+// assigning, matching upstream's dataConvert "raw" rule) — PrimeVue's built-in
+// FilterMatchMode comparators (lte/gte/equals) use native <=/>=/== underneath,
+// which already coerce "0" and 0 to equal, so no custom Number()-aware
+// comparator is needed here. What *would* silently break this is classifying
+// a column as numeric by inspecting a sampled row's `typeof` value instead of
+// its field name — a column that happens to be all-zero would look like text
+// and lose numeric filtering. So classification below is by field name only,
+// never by inspecting row values.
+//
+// Directions mirror upstream (variantSifterAssociationsFilters.js) where a
+// field overlaps: P-Value <=, Beta/Z Score >=. MAF/Standard Error aren't
+// filterable upstream; MAF gets EAF's >= ("at least this frequency"), and
+// Standard Error gets P-Value's <= ("at most this uncertain").
+const NUMERIC_FILTER_MATCH_MODES = {
+    "P-Value": FilterMatchMode.LESS_THAN_OR_EQUAL_TO,
+    Beta: FilterMatchMode.GREATER_THAN_OR_EQUAL_TO,
+    MAF: FilterMatchMode.GREATER_THAN_OR_EQUAL_TO,
+    "Standard Error": FilterMatchMode.LESS_THAN_OR_EQUAL_TO,
+    "Z Score": FilterMatchMode.GREATER_THAN_OR_EQUAL_TO,
+};
+
+export const NUMERIC_FILTER_FIELDS = new Set(Object.keys(NUMERIC_FILTER_MATCH_MODES));
+
+/**
+ * PrimeVue DataTable `filters` model, built from visibleColumns(rows) so the
+ * filter set stays in lockstep with the column set (spec §5.1: both are
+ * driven by field presence in the data — a Consequence filter appears only
+ * once the deferred VEP join starts emitting `consequence`).
+ */
+export function buildFilterModel(rows) {
+    const model = {};
+    visibleColumns(rows).forEach((col) => {
+        model[col.field] = NUMERIC_FILTER_FIELDS.has(col.field)
+            ? { value: null, matchMode: NUMERIC_FILTER_MATCH_MODES[col.field] }
+            : { value: null, matchMode: FilterMatchMode.CONTAINS };
+    });
+    return model;
 }

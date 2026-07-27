@@ -34,14 +34,14 @@ describe("LD_LEGEND_ENTRIES", () => {
 describe("buildPlotPoints", () => {
   it("maps position to x and -log10(p) to y", () => {
     const rows = [{ position: 500, pValue: 0.1 }];
-    const [p] = buildPlotPoints(rows, REGION, LAYOUT);
+    const { points: [p] } = buildPlotPoints(rows, REGION, LAYOUT);
     expect(p.x).toBeGreaterThan(LAYOUT.margin.left);
     expect(p.x).toBeLessThan(LAYOUT.width - LAYOUT.margin.right);
     expect(p.y).toBeGreaterThan(0);
   });
 
   it("places a more significant variant higher on the canvas", () => {
-    const [weak, strong] = buildPlotPoints(
+    const { points: [weak, strong] } = buildPlotPoints(
       [{ position: 100, pValue: 0.05 }, { position: 200, pValue: 1e-20 }],
       REGION, LAYOUT,
     );
@@ -49,17 +49,17 @@ describe("buildPlotPoints", () => {
   });
 
   it("colours by LD score", () => {
-    const [p] = buildPlotPoints([{ position: 100, pValue: 0.01, LDS: 1 }], REGION, LAYOUT);
+    const { points: [p] } = buildPlotPoints([{ position: 100, pValue: 0.01, LDS: 1 }], REGION, LAYOUT);
     expect(p.color).toBe(VKS_LD_DOT_COLORS[5]);
   });
 
   it("uses the no-data colour when LD is absent", () => {
-    const [p] = buildPlotPoints([{ position: 100, pValue: 0.01 }], REGION, LAYOUT);
+    const { points: [p] } = buildPlotPoints([{ position: 100, pValue: 0.01 }], REGION, LAYOUT);
     expect(p.color).toBe("#00000030");
   });
 
   it("drops rows with a non-positive or missing pValue", () => {
-    const points = buildPlotPoints(
+    const { points } = buildPlotPoints(
       [{ position: 1, pValue: 0 }, { position: 2 }, { position: 3, pValue: -1 },
        { position: 4, pValue: 0.5 }],
       REGION, LAYOUT,
@@ -69,7 +69,7 @@ describe("buildPlotPoints", () => {
   });
 
   it("excludes rows outside the visible region", () => {
-    const points = buildPlotPoints(
+    const { points } = buildPlotPoints(
       [{ position: 5000, pValue: 0.01 }, { position: 500, pValue: 0.01 }],
       REGION, LAYOUT,
     );
@@ -85,7 +85,7 @@ describe("buildPlotPoints", () => {
     // right: 10 !== left: 40, so the two formulas diverge and this would
     // fail under the old `width - left - right` computation.
     const rows = [{ position: 500, pValue: 0.1 }];
-    const [p] = buildPlotPoints(rows, REGION, LAYOUT);
+    const { points: [p] } = buildPlotPoints(rows, REGION, LAYOUT);
     const plotWidth = computeRegionPlotWidth(LAYOUT.width, LAYOUT.margin);
     const expectedX =
       LAYOUT.margin.left +
@@ -98,5 +98,41 @@ describe("buildPlotPoints", () => {
       LAYOUT.margin.left +
       ((500 - REGION.start) / (REGION.end - REGION.start)) * oldPlotWidth;
     expect(p.x).not.toBeCloseTo(oldX);
+  });
+
+  describe("yMin/yMax (the axis scale)", () => {
+    // renderPlotAxis must be fed exactly this range or the axis and the dots
+    // it's supposed to describe would disagree.
+    it("exposes yMin 0 and yMax equal to the largest -log10(p) among usable rows", () => {
+      const rows = [{ position: 100, pValue: 0.1 }, { position: 200, pValue: 1e-20 }];
+      const { yMin, yMax } = buildPlotPoints(rows, REGION, LAYOUT);
+      expect(yMin).toBe(0);
+      expect(yMax).toBeCloseTo(20);
+    });
+
+    it("floors yMax at 1 even when every -log10(p) is below 1", () => {
+      // pValue 0.5 -> -log10(0.5) ≈ 0.301, well under 1.
+      const { yMax } = buildPlotPoints([{ position: 100, pValue: 0.5 }], REGION, LAYOUT);
+      expect(yMax).toBe(1);
+    });
+
+    it("matches the scale actually used to place a dot's y", () => {
+      const rows = [{ position: 100, pValue: 0.1 }, { position: 200, pValue: 1e-20 }];
+      const { points, yMin, yMax } = buildPlotPoints(rows, REGION, LAYOUT);
+      const m = LAYOUT.margin;
+      const plotHeight = LAYOUT.height - m.top - m.bottom;
+      points.forEach((p) => {
+        const negLog10 = -Math.log10(Number(p.row.pValue));
+        const expectedY = m.top + (plotHeight - ((negLog10 - yMin) / (yMax - yMin)) * plotHeight);
+        expect(p.y).toBeCloseTo(expectedY);
+      });
+    });
+
+    it("defaults to yMin 0 / yMax 1 when there are no usable rows", () => {
+      const { points, yMin, yMax } = buildPlotPoints([], REGION, LAYOUT);
+      expect(points).toEqual([]);
+      expect(yMin).toBe(0);
+      expect(yMax).toBe(1);
+    });
   });
 });
