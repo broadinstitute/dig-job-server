@@ -53,10 +53,19 @@ function draw() {
 }
 
 function onClick(event) {
-  const rect = canvasEl.value.getBoundingClientRect();
-  const hit = findGeneHitAtCanvasPoint(
-    hitRegions.value, event.clientX - rect.left, event.clientY - rect.top,
-  );
+  const canvas = canvasEl.value;
+  const rect = canvas.getBoundingClientRect();
+  // setupPlotCanvas renders at internal canvas coordinates that are twice the
+  // CSS display size (see plotShared.js), but getBoundingClientRect() reports
+  // CSS pixels. Scale client offsets into canvas-internal coordinates before
+  // hit-testing against hitRegions, which are expressed in those internal
+  // coordinates.
+  if (rect.width === 0 || rect.height === 0) return;
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (event.clientX - rect.left) * scaleX;
+  const y = (event.clientY - rect.top) * scaleY;
+  const hit = findGeneHitAtCanvasPoint(hitRegions.value, x, y);
   if (hit) emit("select-gene", hit.gene);
 }
 
