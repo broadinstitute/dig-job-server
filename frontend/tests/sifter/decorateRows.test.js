@@ -80,4 +80,9 @@ describe("decorateAssociationRows", () => {
     expect(decorateAssociationRows([])).toEqual([]);
     expect(decorateAssociationRows(null)).toEqual([]);
   });
+
+  it("stringifies undefined/null as literal text in join, matching upstream (regression: Array.join renders them as empty)", () => {
+    const [r] = decorateAssociationRows([{ ...RAW, reference: undefined }]);
+    expect(r["Ref/Alt"]).toBe("undefined/T");
+  });
 });

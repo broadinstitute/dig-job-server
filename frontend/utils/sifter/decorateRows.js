@@ -19,7 +19,12 @@ import { ASSOCIATIONS_TABLE_FORMAT } from "./associationsTableFormat.js";
 //   calculate  - only "-log10" is used: -Math.log10(value), assigned unguarded
 
 function joinValues(fields, joinBy, row) {
-  return fields.map((f) => row[f]).join(joinBy);
+  let out = "";
+  for (let i = 0; i < fields.length; i++) {
+    out += row[fields[i]];
+    if (i < fields.length - 1) out += joinBy;
+  }
+  return out;
 }
 
 function joinMultiValues(fields, joinBy, row) {
