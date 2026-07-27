@@ -146,12 +146,10 @@ function parseRegionLocation(query) {
  * Resolve a gene symbol, chr:start-end range, or chr:position location into a
  * `{ chr, start, end }` region; optional expandBp widens the result further.
  *
- * ADAPTED from upstream: upstream took a `regionUtils` collaborator and a
- * `lookupVariantPosition` branch that hit BioIndex `varIdLookup` for rsIDs /
- * variant IDs. Neither is ported here (rsID/variant-ID search is out of scope
- * for this task — see task-5-report.md), so anything that isn't a region
- * range or location falls through to a gene-symbol lookup against the KP
- * `gene` index; an unresolvable query throws rather than silently guessing.
+ * REWRITTEN (not ported): Upstream delegates region resolution to an unvendored
+ * `regionUtils.parseRegion` collaborator. This version reimplements the same
+ * resolution order (range → location → gene lookup) directly against an injectable
+ * `fetchImpl`, avoiding the need to vendor the upstream's `regionUtils` module.
  */
 export async function resolveGeneOrVariantToRegion(
     query,
@@ -210,7 +208,12 @@ export function parseRegionParam(regionParam) {
         if (!location) {
             return null;
         }
-        return regionAroundPosition(location.chr, location.position, 100000);
+        const region = regionAroundPosition(location.chr, location.position, 100000);
+        return {
+            ...region,
+            sourceQuery: text,
+            sourceType: "location",
+        };
     }
 
     const colonSplit = text.split(":");
@@ -233,5 +236,7 @@ export function parseRegionParam(regionParam) {
         chr: colonSplit[0].replace(/^chr/i, ""),
         start,
         end,
+        sourceQuery: text,
+        sourceType: "region",
     };
 }
