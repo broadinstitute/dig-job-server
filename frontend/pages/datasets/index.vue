@@ -457,7 +457,8 @@ function getAllWorkflowOptions(data) {
             severity: "success",
             command: () =>
                 router.push(
-                    `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${encodeURIComponent(data.id)}`,
+                    `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${encodeURIComponent(data.id)}` +
+                        (data.ancestry ? `&ancestry=${encodeURIComponent(data.ancestry)}` : ""),
                 ),
             disabled: false,
         });

@@ -1,41 +1,79 @@
+<script setup>
+import { computed, ref, watch } from "vue";
+import {
+  visibleColumns,
+  buildFilterModel,
+  NUMERIC_FILTER_FIELDS,
+} from "~/utils/sifter/associationsTableFormat";
+import { decorateAssociationRows } from "~/utils/sifter/decorateRows";
+
+const props = defineProps({ rows: { type: Array, default: () => [] } });
+
+const decorated = computed(() => decorateAssociationRows(props.rows));
+const columns = computed(() => visibleColumns(decorated.value));
+
+// Filters model, kept in lockstep with `columns` (spec §5.1: both are driven
+// by field presence in the data). Rebuilt whenever the visible field set
+// changes, but merged onto the existing model rather than replaced outright
+// so an in-progress filter isn't wiped out by an unrelated data refresh.
+// (populated by the immediate watcher below, not here, so buildFilterModel
+// isn't run twice on mount)
+const filters = ref({});
+watch(
+  decorated,
+  (rows) => {
+    const fresh = buildFilterModel(rows);
+    const next = {};
+    for (const field of Object.keys(fresh)) {
+      next[field] = filters.value[field] ?? fresh[field];
+    }
+    filters.value = next;
+  },
+  { immediate: true },
+);
+</script>
+
 <template>
   <DataTable
-    :value="records"
-    dataKey="id"
-    :rows="20"
-    :rowsPerPageOptions="[10, 20, 50, 100]"
+    v-model:filters="filters"
+    :value="decorated"
+    :rows="10"
     paginator
-    sortField="pValue"
-    :sortOrder="1"
-    stripedRows
-    class="p-datatable-sm"
+    sort-mode="multiple"
+    filter-display="menu"
+    striped-rows
+    size="small"
   >
-    <Column field="chromosome" header="Chr" sortable />
-    <Column field="position" header="Position" sortable />
-    <Column header="Variant">
-      <template #body="{ data }">{{ data.reference }}/{{ data.alt }}</template>
+    <Column
+      v-for="col in columns"
+      :key="col.field"
+      :field="col.field"
+      :header="col.header"
+      sortable
+      :show-filter-match-modes="false"
+    >
+      <template #filter="{ filterModel, filterCallback }">
+        <InputNumber
+          v-if="NUMERIC_FILTER_FIELDS.has(col.field)"
+          v-model="filterModel.value"
+          class="p-column-filter w-full"
+          mode="decimal"
+          :min-fraction-digits="0"
+          :max-fraction-digits="10"
+          placeholder="Filter value"
+          @input="filterCallback()"
+          @keydown.enter="filterCallback()"
+        />
+        <InputText
+          v-else
+          v-model="filterModel.value"
+          class="p-column-filter w-full"
+          placeholder="Filter"
+          @input="filterCallback()"
+          @keydown.enter="filterCallback()"
+        />
+      </template>
     </Column>
-    <Column field="dbSNP" header="rsID" sortable />
-    <Column field="pValue" header="P-Value" sortable>
-      <template #body="{ data }">{{ formatP(data.pValue) }}</template>
-    </Column>
-    <Column field="beta" header="Beta" sortable>
-      <template #body="{ data }">{{ data.beta != null ? Number(data.beta).toFixed(4) : "—" }}</template>
-    </Column>
-    <template #empty>
-      <div class="text-center p-4">No variants in this region.</div>
-    </template>
+    <template #empty>No variants in this region.</template>
   </DataTable>
 </template>
-
-<script setup>
-defineProps({
-  records: { type: Array, default: () => [] },
-});
-
-function formatP(v) {
-  const n = Number(v);
-  if (!(n >= 0)) return "—";
-  return n < 0.001 ? n.toExponential(2) : n.toFixed(4);
-}
-</script>
