@@ -22,7 +22,7 @@ defineEmits(["update:modelValue", "update:expandBp", "update:regionZoom", "searc
         placeholder="e.g. 10:114700000-114800000 or TCF7L2"
         class="w-full"
         @update:model-value="$emit('update:modelValue', $event)"
-        @keyup.enter="$emit('search')"
+        @keyup.enter="!busy && $emit('search')"
       />
     </div>
     <div>

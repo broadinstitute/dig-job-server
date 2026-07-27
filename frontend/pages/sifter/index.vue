@@ -33,7 +33,22 @@ const visibleRegion = computed(() =>
   searchRegion.value ? computeVisibleRegion(searchRegion.value, regionZoom.value, 0) : null,
 );
 
+// UX heuristic only — NOT a hard limit. The LD service itself caps at 100,000
+// variants; this is just the point past which the browser visibly struggles,
+// so we warn (without throttling, truncating, or blocking rendering).
+const LARGE_REGION_ROW_WARNING = 5000;
+const largeRegionWarning = computed(() => rows.value.length > LARGE_REGION_ROW_WARNING);
+
+// Request-sequence token: guards against overlapping searches/LD-reference
+// changes resolving out of order. Every call that mutates view state via
+// loadRegion() captures the counter's value *before* its own async work
+// starts; if the counter has moved on by the time that work resolves, a
+// newer call has already started (or finished) and this result is stale, so
+// it's discarded instead of overwriting the newer state.
+let requestSeq = 0;
+
 watch(guid, () => {
+  requestSeq++; // invalidate any in-flight load from the previous dataset
   searchRegion.value = null;
   rows.value = [];
   genes.value = [];
@@ -43,12 +58,13 @@ watch(guid, () => {
   error.value = "";
 });
 
-async function loadRegion(region, ldRefRow = null) {
+async function loadRegion(region, ldRefRow, seq) {
   const baseUrl = config.public.bioindexUrl;
   if (!baseUrl) throw new Error("NUXT_PUBLIC_BIOINDEX_URL is not configured");
   const out = await loader.load({
     baseUrl, guid: guid.value, region, ancestry: ancestry.value, refRow: ldRefRow,
   });
+  if (seq !== requestSeq) return; // superseded by a newer load; discard stale result
   rows.value = out.rows;
   genes.value = out.genes;
   recombination.value = out.recombination;
@@ -57,28 +73,41 @@ async function loadRegion(region, ldRefRow = null) {
 }
 
 async function search() {
+  const seq = ++requestSeq;
   error.value = "";
   busy.value = true;
   try {
     const region = await resolver.resolve(regionInput.value, expandBp.value);
+    if (seq !== requestSeq) return; // superseded while resolving the region
     searchRegion.value = region;
     regionZoom.value = 0;
-    await loadRegion(region);
+    await loadRegion(region, null, seq);
   } catch (e) {
+    if (seq !== requestSeq) return; // superseded; don't clobber a newer search's state
     error.value = e.message;
+    // Clear all view state, not just rows — otherwise the header/plot/table
+    // context left over from a previous successful search (searchRegion,
+    // genes, recombination, refRow, status) keeps describing the OLD region
+    // while the error banner describes the NEW, failed one.
+    searchRegion.value = null;
     rows.value = [];
+    genes.value = [];
+    recombination.value = [];
+    refRow.value = null;
+    status.value = null;
   } finally {
-    busy.value = false;
+    if (seq === requestSeq) busy.value = false;
   }
 }
 
 async function setLdReference(row) {
   selectedRow.value = null;
+  const seq = ++requestSeq;
   busy.value = true;
   try {
-    await loadRegion(searchRegion.value, row);
+    await loadRegion(searchRegion.value, row, seq);
   } finally {
-    busy.value = false;
+    if (seq === requestSeq) busy.value = false;
   }
 }
 </script>
@@ -104,6 +133,10 @@ async function setLdReference(row) {
 
     <Message v-if="status && status.ld === 'failed'" severity="warn" class="mb-3">
       LD scores unavailable — variants are shown without LD colouring.
+    </Message>
+    <Message v-if="largeRegionWarning" severity="warn" class="mb-3">
+      This region returned a very large number of variants ({{ rows.length }}). Narrowing the region
+      will be faster.
     </Message>
     <!--
       Deliberately NO "gene track unavailable" banner. fetchGenesTrackData
