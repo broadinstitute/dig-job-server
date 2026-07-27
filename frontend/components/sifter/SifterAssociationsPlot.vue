@@ -7,7 +7,7 @@ import {
 } from "~/utils/sifter/associationsPlotData";
 import {
   renderPlotDot, setupPlotCanvas, normalizePlotMargin, VKS_PLOT_DISPLAY_HEIGHT,
-  renderRecombinationLine,
+  renderRecombinationLine, canvasPointerPosition,
 } from "~/utils/sifter/plotShared";
 import { renderStar } from "~/utils/sifter/_portal/plotUtils";
 
@@ -54,16 +54,11 @@ function draw() {
 function onClick(event) {
   const canvas = canvasEl.value;
   const rect = canvas.getBoundingClientRect();
-  // setupPlotCanvas renders at internal canvas coordinates that are twice the
-  // CSS display size (see plotShared.js), but getBoundingClientRect() reports
-  // CSS pixels. Scale client offsets into canvas-internal coordinates before
-  // comparing against point geometry, which is expressed in those internal
-  // coordinates.
+  // Guard against a zero-sized rect (before layout settles, or while hidden):
+  // canvasPointerPosition divides by rect.width/height and would return
+  // Infinity/NaN in that case.
   if (rect.width === 0 || rect.height === 0) return;
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (event.clientX - rect.left) * scaleX;
-  const y = (event.clientY - rect.top) * scaleY;
+  const { x, y } = canvasPointerPosition(event, canvas);
   let best = null;
   let bestDist = Infinity;
   for (const p of points.value) {

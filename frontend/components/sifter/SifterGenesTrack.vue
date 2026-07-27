@@ -2,9 +2,9 @@
 import { ref, watch, onMounted, onBeforeUnmount } from "vue";
 import {
   layoutGenesInLanes, renderGenesTrack, computeGenesTrackCanvasHeight,
-  computeGeneTrackHitRegions, findGeneHitAtCanvasPoint,
+  computeGeneTrackHitRegions, findGeneHitAtCanvasPoint, computeRegionPlotWidth,
 } from "~/utils/sifter/genesTrackRender";
-import { normalizePlotMargin, setupPlotCanvas } from "~/utils/sifter/plotShared";
+import { normalizePlotMargin, setupPlotCanvas, canvasPointerPosition } from "~/utils/sifter/plotShared";
 
 const props = defineProps({
   genes: { type: Array, default: () => [] },
@@ -30,15 +30,20 @@ function draw() {
   const width = container.clientWidth;
   const region = props.visibleRegion;
 
+  // renderGenesTrack/computeGeneTrackHitRegions derive plot width from
+  // computeRegionPlotWidth (canvasWidth - margin.left * 2, asymmetric by
+  // upstream design). Share that formula here so the lane layout used to
+  // size the canvas agrees with what actually gets drawn and hit-tested.
+  const plotWidth = computeRegionPlotWidth(width, margin);
+
   // layoutGenesInLanes returns { layouts, laneCount } — NOT an array.
   const { laneCount } = layoutGenesInLanes(
     props.genes, region.start, region.end, margin.left,
-    pixelsPerBp(region, width - margin.left - margin.right),
+    pixelsPerBp(region, plotWidth),
   );
   const height = computeGenesTrackCanvasHeight(margin, Math.max(laneCount, 1));
   const ctx = setupPlotCanvas(canvas, width, height);
   if (!ctx) return;
-  ctx.clearRect(0, 0, width, height);
 
   // renderGenesTrack takes visibleRegion, not xMin/xMax, and needs canvasHeight.
   renderGenesTrack(ctx, {
@@ -55,16 +60,11 @@ function draw() {
 function onClick(event) {
   const canvas = canvasEl.value;
   const rect = canvas.getBoundingClientRect();
-  // setupPlotCanvas renders at internal canvas coordinates that are twice the
-  // CSS display size (see plotShared.js), but getBoundingClientRect() reports
-  // CSS pixels. Scale client offsets into canvas-internal coordinates before
-  // hit-testing against hitRegions, which are expressed in those internal
-  // coordinates.
+  // Guard against a zero-sized rect (before layout settles, or while hidden):
+  // canvasPointerPosition divides by rect.width/height and would return
+  // Infinity/NaN in that case.
   if (rect.width === 0 || rect.height === 0) return;
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (event.clientX - rect.left) * scaleX;
-  const y = (event.clientY - rect.top) * scaleY;
+  const { x, y } = canvasPointerPosition(event, canvas);
   const hit = findGeneHitAtCanvasPoint(hitRegions.value, x, y);
   if (hit) emit("select-gene", hit.gene);
 }
