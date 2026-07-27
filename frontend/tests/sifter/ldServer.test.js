@@ -75,6 +75,29 @@ describe("buildLdScoresUrl", () => {
     expect(url).toContain("correlation=rsquare");
   });
 
+  it("maps the reference variant, region bounds, and default limit into their own query params", () => {
+    // Guards against a regression that drops variant/region/limit params, or
+    // maps region.start/region.end onto the wrong (or the same) key, while
+    // still passing the substring assertions above.
+    const url = buildLdScoresUrl({
+      population: "EUR",
+      refVariant: "10:114758349_C/T",
+      region: { chr: "10", start: 114700000, end: 114800000 },
+    });
+
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("variant")).toBe("10:114758349_C/T");
+    expect(parsed.searchParams.get("chrom")).toBe("10");
+    // start and end use distinct values so a swap or duplicated bound fails.
+    expect(parsed.searchParams.get("start")).toBe("114700000");
+    expect(parsed.searchParams.get("stop")).toBe("114800000");
+    expect(parsed.searchParams.get("limit")).toBe(String(LD_SERVER_DEFAULTS.limit));
+    // Path segments (population + genome build) still correct via the URL parser.
+    expect(parsed.pathname).toBe(
+      "/ld/genome_builds/GRCh37/references/1000G/populations/EUR/variants"
+    );
+  });
+
   it("defaults the genome build to GRCh37 - GWAS-CE uploads are hg19", () => {
     expect(LD_SERVER_DEFAULTS.genomeBuild).toBe("GRCh37");
   });
