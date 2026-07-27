@@ -117,4 +117,19 @@ describe("resolveGeneOrVariantToRegion", () => {
     await expect(resolveGeneOrVariantToRegion("NOTAGENE", { fetchImpl }))
       .rejects.toThrow(/NOTAGENE/);
   });
+
+  it("throws an error naming the HTTP failure when lookup returns non-ok response", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 503 });
+    await expect(resolveGeneOrVariantToRegion("TCF7L2", { fetchImpl }))
+      .rejects.toThrow(/HTTP 503/);
+    // Ensure it does NOT throw the "No gene or region found" message
+    await expect(resolveGeneOrVariantToRegion("TCF7L2", { fetchImpl }))
+      .rejects.not.toThrow(/No gene or region found/);
+  });
+
+  it("throws 'No gene or region found' when lookup succeeds but data is empty", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) });
+    await expect(resolveGeneOrVariantToRegion("NOTAGENE", { fetchImpl }))
+      .rejects.toThrow(/No gene or region found for "NOTAGENE"/);
+  });
 });

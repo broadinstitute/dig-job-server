@@ -177,7 +177,10 @@ export async function resolveGeneOrVariantToRegion(
     const response = await fetchImpl(
         `${host}/api/bio/query/gene?q=${encodeURIComponent(trimmed)}&fmt=row&limit=1`
     );
-    const json = response?.ok === false ? { data: [] } : await response.json();
+    if (!response.ok) {
+        throw new Error(`Gene lookup failed (HTTP ${response.status})`);
+    }
+    const json = await response.json();
     const row = json?.data?.[0];
     if (!row) {
         throw new Error(`No gene or region found for "${query}"`);
