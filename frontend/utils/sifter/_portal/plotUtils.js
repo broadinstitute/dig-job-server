@@ -1,6 +1,6 @@
 // Ported verbatim from dig-dug-portal@5619cbfe1 src/utils/plotUtils.js
 // Only the three functions the Variant Sifter renderers actually call.
-export function renderDot(CTX, XPOS, YPOS, DOT_COLOR, WIDTH) {
+let renderDot = function (CTX, XPOS, YPOS, DOT_COLOR, WIDTH) {
     CTX.fillStyle = DOT_COLOR;
     CTX.lineWidth = 0;
     CTX.beginPath();
@@ -9,7 +9,7 @@ export function renderDot(CTX, XPOS, YPOS, DOT_COLOR, WIDTH) {
     CTX.fill();
 }
 
-export function renderDashedLine(CTX, X1, Y1, X2, Y2, WIDTH, COLOR, DASH) {
+let renderDashedLine = function (CTX, X1, Y1, X2, Y2, WIDTH, COLOR, DASH) {
 
     CTX.beginPath();
     CTX.lineWidth = !!WIDTH ? WIDTH : 2;
@@ -23,7 +23,7 @@ export function renderDashedLine(CTX, X1, Y1, X2, Y2, WIDTH, COLOR, DASH) {
     CTX.setLineDash([]);
 }
 
-export function renderStar(CTX, CX, CY, SPIKES, OR, IR, SCOLOR, FCOLOR) {
+const renderStar = function (CTX, CX, CY, SPIKES, OR, IR, SCOLOR, FCOLOR) {
     let rot = Math.PI / 2 * 3;
     let x = CX;
     let y = CY;
@@ -51,4 +51,5 @@ export function renderStar(CTX, CX, CY, SPIKES, OR, IR, SCOLOR, FCOLOR) {
     CTX.fill();
 }
 
+export { renderDot, renderDashedLine, renderStar };
 export default { renderDot, renderDashedLine, renderStar };
