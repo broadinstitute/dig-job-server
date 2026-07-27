@@ -22,34 +22,75 @@ const REGION = { chr: "10", start: 0, end: 100000 };
 const MARGIN = { top: 10, right: 20, bottom: 10, left: 0 };
 
 describe("fetchGenesTrackData", () => {
-  it("queries the region-keyed KP genes index", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [{ name: "TCF7L2", start: 1, end: 2, chromosome: "10" }] }),
+  // TWO-STAGE fetch. Stage 1: KP bioindex `genes` index -> gene NAMES (rows are
+  // duplicated per alias and carry no strand/exons). Stage 2: PortalDev
+  // annotation/genes -> the real gene records, deduped by gene_name and sorted
+  // by start. Both stages must be mocked, and upstream reads .text() then
+  // JSON.parse -- NOT .json().
+  function twoStageFetch(bioRows, annotationRows) {
+    return vi.fn().mockImplementation((url) => {
+      const body = String(url).includes("bioindex.hugeamp.org")
+        ? { data: bioRows }
+        : { data: annotationRows };
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify(body) });
     });
-    const genes = await fetchGenesTrackData(
-      { chr: "10", start: 114700000, end: 114800000 },
-      "GRCh37",
-      null,
-      fetchImpl,
+  }
+
+  const REGION_Q = { chr: "10", start: 114700000, end: 114800000 };
+
+  it("queries the KP genes index for the region, then annotates the names", async () => {
+    const fetchImpl = twoStageFetch(
+      [{ name: "TCF7L2" }, { name: "TCF7L2" }],
+      [{ gene_name: "TCF7L2", start: 114710009, end: 114927437, strand: "+", exons: [] }],
     );
-    expect(genes).toHaveLength(1);
+    const genes = await fetchGenesTrackData(REGION_Q, "GRCh37", null, fetchImpl);
+
     expect(fetchImpl.mock.calls[0][0]).toContain("query/genes?q=");
     expect(fetchImpl.mock.calls[0][0]).toContain("10%3A114700000-114800000");
+    // GRCh37 uses PortalDev source 3 (GRCh38 would be source 1).
+    expect(fetchImpl.mock.calls[1][0]).toContain("annotation/genes");
+    expect(fetchImpl.mock.calls[1][0]).toContain("source in 3");
+    expect(fetchImpl.mock.calls[1][0]).toContain("TCF7L2");
+    expect(genes).toHaveLength(1);
+    expect(genes[0].gene_name).toBe("TCF7L2");
   });
 
-  it("returns an empty array when the genes source fails, never throws", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 503 });
+  it("dedupes annotated genes by gene_name and sorts them by start", async () => {
+    const fetchImpl = twoStageFetch(
+      [{ name: "B" }, { name: "A" }, { name: "A" }],
+      [
+        { gene_name: "B", start: 500 },
+        { gene_name: "A", start: 100 },
+        { gene_name: "A", start: 999 },
+      ],
+    );
+    const genes = await fetchGenesTrackData(REGION_Q, "GRCh37", null, fetchImpl);
+    expect(genes.map((g) => g.gene_name)).toEqual(["A", "B"]);
+    expect(genes.map((g) => g.start)).toEqual([100, 500]);
+  });
+
+  it("returns an empty array when the region query returns an error payload", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true, text: async () => JSON.stringify({ error: "boom" }),
+    });
     await expect(
-      fetchGenesTrackData({ chr: "10", start: 1, end: 2 }, "GRCh37", null, fetchImpl),
+      fetchGenesTrackData(REGION_Q, "GRCh37", null, fetchImpl),
     ).resolves.toEqual([]);
   });
 
-  it("returns an empty array when the fetch rejects outright", async () => {
+  it("returns an empty array when the fetch rejects, never throws", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("network"));
     await expect(
-      fetchGenesTrackData({ chr: "10", start: 1, end: 2 }, "GRCh37", null, fetchImpl),
+      fetchGenesTrackData(REGION_Q, "GRCh37", null, fetchImpl),
     ).resolves.toEqual([]);
+  });
+
+  it("skips the annotation stage when the region has no genes", async () => {
+    const fetchImpl = twoStageFetch([], []);
+    await expect(
+      fetchGenesTrackData(REGION_Q, "GRCh37", null, fetchImpl),
+    ).resolves.toEqual([]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
