@@ -152,3 +152,6 @@ frontend/package-lock.json
 # Kept out of the repo deliberately (see the script's own docstring).
 scripts/gen_synthetic_gwas.py
 synthetic_*.csv
+
+# Playwright MCP session artifacts
+.playwright-mcp/
