@@ -106,3 +106,23 @@ export const ASSOCIATIONS_TABLE_FORMAT = {
         },
     },
 };
+
+// Column order comes straight from upstream's "top rows" — do not maintain a
+// second list here. Rows arriving at the table are already decorated (Task 3B),
+// so these are display names, not raw bioindex field names.
+//
+// Columns render only when the data actually carries the field, so datasets
+// whose col_map omits se/rsid show no blank columns — and the deferred VEP
+// join's MAF/Consequence appear automatically once the pipeline emits them,
+// with no frontend change.
+export const SIFTER_TABLE_COLUMNS = ASSOCIATIONS_TABLE_FORMAT["top rows"]
+    // Ancestry is a single value per GWAS-CE dataset, so the column is noise here.
+    .filter((field) => field !== "Ancestry")
+    .map((field) => ({ field, header: field }));
+
+export function visibleColumns(rows) {
+    const list = rows || [];
+    return SIFTER_TABLE_COLUMNS.filter((col) =>
+        list.some((row) => row[col.field] !== undefined && row[col.field] !== null),
+    );
+}
