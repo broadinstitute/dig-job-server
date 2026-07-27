@@ -7,6 +7,7 @@ import {
 } from "~/utils/sifter/associationsPlotData";
 import {
   renderPlotDot, setupPlotCanvas, normalizePlotMargin, VKS_PLOT_DISPLAY_HEIGHT,
+  renderRecombinationLine,
 } from "~/utils/sifter/plotShared";
 import { renderStar } from "~/utils/sifter/_portal/plotUtils";
 
@@ -14,7 +15,7 @@ const props = defineProps({
   rows: { type: Array, default: () => [] },
   visibleRegion: { type: Object, required: true },
   refRow: { type: Object, default: null },
-  recombination: { type: Array, default: () => [] },
+  recombination: { type: Object, default: null },
 });
 const emit = defineEmits(["select-variant"]);
 
@@ -33,6 +34,10 @@ function draw() {
   // setupPlotCanvas sizes the canvas, resets the transform and clears it.
   const ctx = setupPlotCanvas(canvas, width, height);
   if (!ctx) return;
+
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  renderRecombinationLine(ctx, margin, plotWidth, plotHeight, props.visibleRegion, props.recombination);
 
   points.value = buildPlotPoints(props.rows, props.visibleRegion, { width, height, margin });
   for (const p of points.value) renderPlotDot(ctx, p.x, p.y, p.color);
@@ -65,7 +70,7 @@ onMounted(() => {
   if (containerEl.value) observer.observe(containerEl.value);
 });
 onBeforeUnmount(() => observer?.disconnect());
-watch(() => [props.rows, props.visibleRegion, props.refRow], draw, { deep: true });
+watch(() => [props.rows, props.visibleRegion, props.refRow, props.recombination], draw, { deep: true });
 </script>
 
 <template>
