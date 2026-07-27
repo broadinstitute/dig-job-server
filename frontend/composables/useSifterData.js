@@ -64,6 +64,12 @@ export function createSifterLoader(deps = {}) {
     if (refRow) {
       try {
         rows = await enrichWithLd(rows, session, refRow, region);
+        // The ported LD helpers swallow their own errors and return rows
+        // unchanged, so a resolved promise is not evidence LD worked. Whether
+        // any row carries a score is the observable truth.
+        if (!rows.some((row) => row.LDS != null)) {
+          status.ld = "failed";
+        }
       } catch {
         status.ld = "failed";
       }
