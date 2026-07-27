@@ -1,6 +1,7 @@
 // Ported verbatim from dig-dug-portal@5619cbfe1 src/utils/variantUtils.js
-const DBSNP_REGEXP = /^rs\d+$/i;
-const VARID_REGEXP = /^(\d+|X|Y|MT):(\d+)[:_]([ACGT]+)[:/]([ACGT]+)$/i;
+// matches a string to a variant ID string (same as used in BioIndex)
+const VARID_REGEXP = /^(?:chr)?(1\d?|2[0-2]?|[3-9]|x|y|xy|mt?)[:_\-](\d+)[:_\-]([agct]+)[:_/\-]([agct]+)$/i;
+const DBSNP_REGEXP = /^rs\d+$/;
 
 export function parseVariant(variantID) {
     let isDBSNP = variantID.trim().match(DBSNP_REGEXP);
@@ -10,18 +11,26 @@ export function parseVariant(variantID) {
         return variantID;
     }
 
+    // variant ID matched, return chr:position:ref:alt
     if (!!isVarId) {
         let chr = isVarId[1].toUpperCase();
         let pos = parseInt(isVarId[2]);
         let ref = isVarId[3].toUpperCase();
         let alt = isVarId[4].toUpperCase();
-        return `${chr}:${pos}:${ref}:${alt}`;
+        let variant = `${chr}:${pos}:${ref}:${alt}`;
+
+        return variant;
     }
 }
 
+//until LD server can use above input, we have to format it
 export function gaitVariant(variantID) {
+    //assume varID is already in the above format
     let split = variantID.split(":");
     return `${split[0]}:${split[1]}_${split[2]}/${split[3]}`;
 }
 
-export default { parseVariant, gaitVariant };
+export default {
+    parseVariant,
+    gaitVariant
+};

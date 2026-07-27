@@ -66,4 +66,25 @@ describe("variant id conversion", () => {
   it("passes an rsID through untouched", () => {
     expect(parseVariant("rs7903146")).toBe("rs7903146");
   });
+
+  // Guards on the upstream regex, which is easy to "simplify" incorrectly.
+  it("accepts an optional chr prefix and hyphen/underscore separators", () => {
+    expect(parseVariant("chr10:114758349:C:T")).toBe("10:114758349:C:T");
+    expect(parseVariant("10-114758349-C-T")).toBe("10:114758349:C:T");
+    expect(parseVariant("10_114758349_C_T")).toBe("10:114758349:C:T");
+  });
+
+  it("accepts X, Y, XY and MT chromosomes", () => {
+    expect(parseVariant("X:100:A:G")).toBe("X:100:A:G");
+    expect(parseVariant("MT:100:A:G")).toBe("MT:100:A:G");
+    expect(parseVariant("XY:100:A:G")).toBe("XY:100:A:G");
+  });
+
+  it("rejects an out-of-range chromosome", () => {
+    expect(parseVariant("99:100:A:G")).toBeUndefined();
+  });
+
+  it("is case-sensitive for rsIDs - upstream DBSNP_REGEXP has no /i flag", () => {
+    expect(parseVariant("RS7903146")).toBeUndefined();
+  });
 });

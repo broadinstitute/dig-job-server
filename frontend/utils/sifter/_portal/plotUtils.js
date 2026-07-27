@@ -10,6 +10,7 @@ export function renderDot(CTX, XPOS, YPOS, DOT_COLOR, WIDTH) {
 }
 
 export function renderDashedLine(CTX, X1, Y1, X2, Y2, WIDTH, COLOR, DASH) {
+
     CTX.beginPath();
     CTX.lineWidth = !!WIDTH ? WIDTH : 2;
     CTX.strokeStyle = !!COLOR ? COLOR : "#FFAA00";
@@ -18,6 +19,7 @@ export function renderDashedLine(CTX, X1, Y1, X2, Y2, WIDTH, COLOR, DASH) {
     CTX.moveTo(X1, Y1);
     CTX.lineTo(X2, Y2);
     CTX.stroke();
+    // reset
     CTX.setLineDash([]);
 }
 
@@ -28,17 +30,17 @@ export function renderStar(CTX, CX, CY, SPIKES, OR, IR, SCOLOR, FCOLOR) {
     let step = Math.PI / SPIKES;
 
     CTX.beginPath();
-    CTX.moveTo(CX, CY - OR);
+    CTX.moveTo(CX, CY - OR)
     for (let i = 0; i < SPIKES; i++) {
         x = CX + Math.cos(rot) * OR;
         y = CY + Math.sin(rot) * OR;
-        CTX.lineTo(x, y);
-        rot += step;
+        CTX.lineTo(x, y)
+        rot += step
 
         x = CX + Math.cos(rot) * IR;
         y = CY + Math.sin(rot) * IR;
-        CTX.lineTo(x, y);
-        rot += step;
+        CTX.lineTo(x, y)
+        rot += step
     }
     CTX.lineTo(CX, CY - OR);
     CTX.closePath();
