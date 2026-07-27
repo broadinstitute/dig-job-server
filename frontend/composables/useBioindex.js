@@ -6,9 +6,9 @@ export function useBioindex() {
   const config = useRuntimeConfig();
   const baseUrl = config.public.bioindexUrl;
 
-  async function queryAssociations({ guid, region, limit = 5000 }) {
+  async function queryAssociations({ guid, region }) {
     if (!baseUrl) throw new Error("NUXT_PUBLIC_BIOINDEX_URL is not configured");
-    const firstUrl = buildAssociationsUrl(baseUrl, guid, region, limit);
+    const firstUrl = buildAssociationsUrl(baseUrl, guid, region);
     return fetchAllPages(baseUrl, firstUrl);
   }
 

@@ -2,11 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 import { buildAssociationsUrl, fetchAllPages } from "../utils/bioindex.js";
 
 describe("buildAssociationsUrl", () => {
-  it("encodes q as <guid>,<region> with fmt=row and limit", () => {
-    const url = buildAssociationsUrl("https://x/gwas-ce/api/bio/", "g1", "10:1-200", 5000);
-    expect(url).toBe(
-      "https://x/gwas-ce/api/bio/query/associations?q=g1%2C10%3A1-200&fmt=row&limit=5000",
-    );
+  it("encodes q as <guid>,<region> with fmt=row", () => {
+    const url = buildAssociationsUrl("https://x/gwas-ce/api/bio/", "g1", "10:1-200");
+    expect(url).toBe("https://x/gwas-ce/api/bio/query/associations?q=g1%2C10%3A1-200&fmt=row");
+  });
+
+  // Regression: bioindex returns `continuation: null` whenever `limit` is set,
+  // which silently truncates a dense region to one page. Verified against the
+  // live gwas-ce index: a 50Mb region with &limit=5000 returned count=5000 and
+  // no continuation, while the same region without a limit paged correctly.
+  it("never sends a limit param, which would suppress continuation tokens", () => {
+    const url = buildAssociationsUrl("https://x/gwas-ce/api/bio/", "g1", "1:1-50000000");
+    expect(url).not.toContain("limit");
   });
 });
 
