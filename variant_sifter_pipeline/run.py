@@ -23,12 +23,18 @@ import boto3
 from .associations import build_associations
 from .canonicalize import canonicalize
 from .index_build import associations_key, index_associations
+from .reference import ReferenceGenome, ensure_local_reference, orient_records
 
 # Where GWAS-CE stores user uploads (same default as job_server.s3).
 USER_DATA_BUCKET = os.getenv("JOB_SERVER_BUCKET", "dig-ldsc-server")
 # The gwas-ce bioindex bucket (also read by bioindex via BIOINDEX_S3_BUCKET).
 GWAS_CE_BUCKET = os.getenv("BIOINDEX_S3_BUCKET", "dig-gwas-ce-bioindex")
 P_THRESHOLD = float(os.getenv("VS_P_THRESHOLD", "0.05"))
+# Orient alleles to the reference genome so variant ids match what the LD server
+# and KP's annotation index key on. Escape hatch in case the reference download
+# is ever unavailable -- a run with this off still produces queryable data, just
+# with the pre-existing id-orientation problem.
+ORIENT_ALLELES = os.getenv("VS_ORIENT_ALLELES", "1") != "0"
 
 
 def _raw_prefix(username: str, dataset: str) -> str:
@@ -65,6 +71,16 @@ def run(username: str, dataset: str, guid: str) -> int:
         for r in _iter_rows(s3, username, dataset, meta["file"], sep)
     )
     records = build_associations(rows, guid, p_threshold=P_THRESHOLD)
+
+    # Orient alleles AFTER the p-value filter: only the survivors are ever
+    # queried, and this way the reference lookups scale with the kept records
+    # rather than with every row in the upload.
+    if ORIENT_ALLELES:
+        fasta = ensure_local_reference()
+        with ReferenceGenome(fasta) as genome:
+            records, counts = orient_records(records, genome)
+        print("allele orientation: "
+              + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
     # The key must sit under the prefix index_build indexes, so it comes from
     # there rather than being spelled out twice.

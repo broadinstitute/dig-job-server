@@ -26,7 +26,10 @@ def test_run_reads_upload_builds_writes_and_indexes():
     s3 = MagicMock()
     s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gwas)]
 
+    # Orientation is exercised by test_run_orients_alleles below; these two cover
+    # the read/build/write/index wiring and must not reach for a reference genome.
     with patch.object(run_mod.boto3, "client", return_value=s3), \
+         patch.object(run_mod, "ORIENT_ALLELES", False), \
          patch.object(run_mod, "index_associations") as idx:
         n = run_mod.run("u", "d", "guidX")
 
@@ -59,6 +62,7 @@ def test_run_decompresses_gzipped_upload():
     s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gzipped)]
 
     with patch.object(run_mod.boto3, "client", return_value=s3), \
+         patch.object(run_mod, "ORIENT_ALLELES", False), \
          patch.object(run_mod, "index_associations"):
         n = run_mod.run("u", "d", "guidG")
 
@@ -66,4 +70,38 @@ def test_run_decompresses_gzipped_upload():
     _, kwargs = s3.put_object.call_args
     rec = json.loads(kwargs["Body"].decode().strip())
     assert (rec["chromosome"], rec["position"]) == ("8", 100)
+    assert rec["pValue"] == 1e-9
+
+
+def test_run_orients_alleles_against_the_reference(tmp_path, monkeypatch):
+    """The whole point of orientation, end to end through run(): the written
+    record carries reference-genome allele order, and beta's sign follows alt."""
+    meta = {
+        "file": "gwas.tsv", "separator": "\t",
+        "col_map": {"chromosome": "CHR", "position": "POS", "reference": "REF",
+                    "alt": "ALT", "pValue": "P", "beta": "BETA", "se": "SE"},
+    }
+    # Reference base at 8:3 is G, so the upload's REF=A/ALT=G is reversed.
+    gwas = (b"CHR\tPOS\tREF\tALT\tP\tBETA\tSE\n"
+            b"8\t3\tA\tG\t1e-9\t0.4\t0.1\n")
+
+    fasta = tmp_path / "ref.fasta"
+    fasta.write_text(">8\nTTGAA\n")
+    # contig, length, byte offset of the first base (past the 3-byte ">8\n"
+    # header), bases per line, bytes per line.
+    (tmp_path / "ref.fasta.fai").write_text("8\t5\t3\t5\t6\n")
+    monkeypatch.setenv("VS_REFERENCE_FASTA", str(fasta))
+
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gwas)]
+
+    with patch.object(run_mod.boto3, "client", return_value=s3), \
+         patch.object(run_mod, "index_associations"):
+        run_mod.run("u", "d", "guidO")
+
+    _, kwargs = s3.put_object.call_args
+    rec = json.loads(kwargs["Body"].decode().strip())
+    assert (rec["reference"], rec["alt"]) == ("G", "A")   # swapped to match reference
+    assert rec["beta"] == -0.4                            # sign follows the new alt
+    assert rec["stdErr"] == 0.1                           # direction-free, unchanged
     assert rec["pValue"] == 1e-9
