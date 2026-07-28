@@ -18,6 +18,13 @@ const helpPopover = ref(null);
 const falconPanelOpen = ref(false);
 const falconPanelDataset = ref("");
 const falconPanelFilename = ref("gwas.tsv");
+// Per-row model for the "Run Analysis" Selects. They were uncontrolled, and the
+// reset after an action called event.target.writeValue(null) -- but PrimeVue's
+// change payload is {originalEvent, value} with no `target`, so it threw and the
+// box kept displaying the action you had just run. Keyed per row because one
+// Select is rendered per table row from the same template.
+const selectedAnalysis = reactive({});
+const selectedBedAnalysis = reactive({});
 
 function runFalcon(data) {
     // Open the local instructions panel. The Docker Hub page is linked from
@@ -1579,6 +1586,7 @@ function openBedResultsInNewTab(dataset) {
                                             getAllWorkflowOptions(data).length >
                                             0
                                         "
+                                        v-model="selectedAnalysis[data.dataset]"
                                         :options="getAllWorkflowOptions(data)"
                                         optionLabel="label"
                                         optionDisabled="disabled"
@@ -1606,16 +1614,11 @@ function openBedResultsInNewTab(dataset) {
                                                     } else {
                                                         event.value.command();
                                                     }
-                                                    // Clear the selection after action.
-                                                    // PrimeVue's Select change payload is
-                                                    // {originalEvent, value} with no `target`,
-                                                    // so this threw a TypeError on EVERY
-                                                    // analysis selection. Guarded rather than
-                                                    // rewritten: clearing properly means giving
-                                                    // the Select a per-row v-model.
-                                                    event.target?.writeValue?.(
-                                                        null,
-                                                    );
+                                                    // Reset to the placeholder, not the
+                                                    // action just run.
+                                                    selectedAnalysis[
+                                                        data.dataset
+                                                    ] = null;
                                                 }
                                             }
                                         "
@@ -1953,6 +1956,9 @@ function openBedResultsInNewTab(dataset) {
                                             getBedWorkflowOptions(data).length >
                                             0
                                         "
+                                        v-model="
+                                            selectedBedAnalysis[data.filename]
+                                        "
                                         :options="getBedWorkflowOptions(data)"
                                         optionLabel="label"
                                         optionDisabled="disabled"
@@ -1975,16 +1981,11 @@ function openBedResultsInNewTab(dataset) {
                                                     } else {
                                                         event.value.command();
                                                     }
-                                                    // Clear the selection after action.
-                                                    // PrimeVue's Select change payload is
-                                                    // {originalEvent, value} with no `target`,
-                                                    // so this threw a TypeError on EVERY
-                                                    // analysis selection. Guarded rather than
-                                                    // rewritten: clearing properly means giving
-                                                    // the Select a per-row v-model.
-                                                    event.target?.writeValue?.(
-                                                        null,
-                                                    );
+                                                    // Reset to the placeholder, not the
+                                                    // action just run.
+                                                    selectedBedAnalysis[
+                                                        data.filename
+                                                    ] = null;
                                                 }
                                             }
                                         "
