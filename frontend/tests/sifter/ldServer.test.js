@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   resolveLdPopulation,
   rowToLdVariant,
   pickLeadVariantRow,
   buildLdScoresUrl,
+  fetchLdScoreMapForRefRow,
+  lookupLdScore,
   LD_SERVER_DEFAULTS,
 } from "../../utils/sifter/ldServer.js";
 
@@ -100,5 +102,97 @@ describe("buildLdScoresUrl", () => {
 
   it("defaults the genome build to GRCh37 - GWAS-CE uploads are hg19", () => {
     expect(LD_SERVER_DEFAULTS.genomeBuild).toBe("GRCh37");
+  });
+});
+
+describe("LD allele orientation (GWAS-CE divergence)", () => {
+  // Live regression from t2d-alex-test. GWAS-CE builds variant IDs from the
+  // uploader's other/effect allele columns; the U-M LD server keys on the
+  // reference genome's REF/ALT. When they disagree the server answers with an
+  // EMPTY BUT NON-ERROR payload, so the whole dataset rendered grey and nothing
+  // anywhere reported a failure. Verified live: 22:50356302_T/C returned 0
+  // partners, 22:50356302_C/T returned 571.
+  const REGION = { chr: "22", start: 50350000, end: 50450000 };
+  const SESSION = { ancestry: "AMR", region: REGION };
+  const REF_ROW = { "Variant ID": "22:50356302_T/C" }; // uploaded orientation
+
+  const EMPTY = { error: null, data: { variant1: [], variant2: [], correlation: [] } };
+  const POPULATED = {
+    error: null,
+    data: {
+      variant1: ["22:50356302_C/T", "22:50356302_C/T"],
+      // As the server really returns them - reference-genome orientation.
+      variant2: ["22:50350302_C/T", "22:50351977_G/A"],
+      correlation: [0.42, 0.87],
+    },
+  };
+
+  function stubFetch(responses) {
+    const calls = [];
+    globalThis.fetch = vi.fn((url) => {
+      calls.push(url);
+      return Promise.resolve({
+        json: () => Promise.resolve(responses[calls.length - 1]),
+      });
+    });
+    return calls;
+  }
+
+  afterEach(() => {
+    delete globalThis.fetch;
+  });
+
+  it("retries with flipped alleles when the uploaded orientation returns nothing", async () => {
+    const calls = stubFetch([EMPTY, POPULATED]);
+    const { scoreMap } = await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("22%3A50356302_T%2FC");
+    expect(calls[1]).toContain("22%3A50356302_C%2FT");
+    expect(scoreMap.size).toBeGreaterThan(0);
+  });
+
+  it("does not make a second request when the first orientation works", async () => {
+    const calls = stubFetch([POPULATED]);
+    await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("reports the row's own variant id, not the flip the server answered", async () => {
+    // The plot locates the reference dot by matching this against our rows,
+    // which carry the uploaded orientation.
+    stubFetch([EMPTY, POPULATED]);
+    const { refVariant } = await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+    expect(refVariant).toBe("22:50356302_T/C");
+  });
+
+  it("scores rows whose alleles are flipped relative to the server's", async () => {
+    stubFetch([EMPTY, POPULATED]);
+    const { scoreMap } = await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+
+    expect(lookupLdScore(scoreMap, { "Variant ID": "22:50350302_T/C" })).toBe(0.42);
+    expect(lookupLdScore(scoreMap, { "Variant ID": "22:50351977_A/G" })).toBe(0.87);
+  });
+
+  it("still scores rows that already match the server's orientation", async () => {
+    stubFetch([POPULATED]);
+    const { scoreMap } = await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+
+    expect(lookupLdScore(scoreMap, { "Variant ID": "22:50350302_C/T" })).toBe(0.42);
+    expect(lookupLdScore(scoreMap, { varId: "22:50351977:G:A" })).toBe(0.87);
+  });
+
+  it("does not match a different position just because alleles line up", async () => {
+    stubFetch([POPULATED]);
+    const { scoreMap } = await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+    expect(lookupLdScore(scoreMap, { "Variant ID": "22:99999999_T/C" })).toBeNull();
+  });
+
+  it("gives up after both orientations come back empty", async () => {
+    const calls = stubFetch([EMPTY, EMPTY]);
+    const { scoreMap } = await fetchLdScoreMapForRefRow(REF_ROW, SESSION, REGION);
+
+    expect(calls).toHaveLength(2);
+    expect(scoreMap.size).toBe(0);
   });
 });

@@ -1,5 +1,15 @@
 // Ported from dig-dug-portal@5619cbfe1
 //   src/components/researchPortal/customComponents/kpVariantSifter/variantSifterLdServer.js
+//
+// NOT VERBATIM. This file carries one deliberate GWAS-CE divergence, marked
+// inline as "GWAS-CE DIVERGENCE (allele orientation)" in variantAliasKeys() and
+// fetchLdScoreMapForRefRow(). Upstream consumes KP-warehouse varIds that are
+// already canonicalised to the reference genome's REF/ALT, so allele order
+// always agrees with the U-M LD server. GWAS-CE builds variant IDs from the
+// "other"/"effect" allele columns of a user upload, which are oriented the
+// other way for roughly half of datasets -- observed live: t2d-alex-test got
+// zero LD colouring while the demo dataset was fine. Everything else here
+// should still diff cleanly against upstream.
 import variantUtils from "./_portal/variantUtils.js";
 
 const LD_SERVER_BASE_URL = "https://portaldev.sph.umich.edu/ld/";
@@ -66,6 +76,14 @@ function gemVariantToVarId(variantId) {
     return `${match[1]}:${match[2]}:${match[3]}:${match[4]}`;
 }
 
+// GWAS-CE DIVERGENCE (allele orientation) -- see the file header.
+// Upstream matches KP-warehouse varIds, already canonicalised to the reference
+// genome's REF/ALT, so allele order always agrees with the LD server. GWAS-CE
+// builds variant IDs from whatever "other"/"effect" allele columns the uploader
+// supplied, and those are oriented the opposite way for roughly half of
+// datasets. Emitting BOTH orientations makes partner matching order-agnostic.
+// Two variants at one position with swapped alleles are the same variant, so
+// the extra keys cannot collide with a genuinely different variant.
 function variantAliasKeys(variant) {
     if (variant == null || variant === "") {
         return [];
@@ -74,22 +92,34 @@ function variantAliasKeys(variant) {
     const keys = new Set([String(variant), String(variant).toLowerCase()]);
     const asString = String(variant);
 
-    const gemMatch = asString.match(/^((?:\d+|X|Y|MT)):(\d+)_([^/]+)\/(.+)$/i);
-    if (gemMatch) {
-        const [, chr, pos, ref, alt] = gemMatch;
-        keys.add(`${chr}:${pos}:${ref}:${alt}`);
-        keys.add(`${chr}:${pos}:${ref}:${alt}`.toLowerCase());
-    }
-
-    const varIdMatch = asString.match(/^((?:\d+|X|Y|MT)):(\d+):([^:]+):(.+)$/i);
-    if (varIdMatch) {
-        const [, chr, pos, ref, alt] = varIdMatch;
-        keys.add(`${chr}:${pos}_${ref}/${alt}`);
-        keys.add(`${chr}:${pos}_${ref}/${alt}`.toLowerCase());
+    // The two ID spellings are mutually exclusive: GEM has one colon, varId three.
+    const parts =
+        asString.match(/^((?:\d+|X|Y|MT)):(\d+)_([^/]+)\/(.+)$/i) ||
+        asString.match(/^((?:\d+|X|Y|MT)):(\d+):([^:]+):(.+)$/i);
+    if (parts) {
+        const [, chr, pos, ref, alt] = parts;
+        [[ref, alt], [alt, ref]].forEach(([a, b]) => {
+            keys.add(`${chr}:${pos}:${a}:${b}`);
+            keys.add(`${chr}:${pos}:${a}:${b}`.toLowerCase());
+            keys.add(`${chr}:${pos}_${a}/${b}`);
+            keys.add(`${chr}:${pos}_${a}/${b}`.toLowerCase());
+        });
     }
 
     keys.add(gemVariantToVarId(asString));
     return Array.from(keys);
+}
+
+/**
+ * Swap ref/alt in a GEM-style (chr:pos_ref/alt) variant id; null if unparseable.
+ */
+function flipVariantAlleles(variant) {
+    const match = String(variant).match(/^((?:\d+|X|Y|MT)):(\d+)_([^/]+)\/(.+)$/i);
+    if (!match) {
+        return null;
+    }
+    const [, chr, pos, ref, alt] = match;
+    return `${chr}:${pos}_${alt}/${ref}`;
 }
 
 export function pickLeadVariantRow(rows) {
@@ -217,26 +247,43 @@ export async function fetchLdScoreMapForRefRow(refRow, session, region) {
     }
 
     const population = resolveLdPopulation(session.ancestry);
-    const ldUrl = buildLdScoresUrl({
-        population,
-        refVariant,
-        region,
-    });
 
-    try {
-        const ldJson = await fetch(ldUrl).then((response) => response.json());
-        if (ldJson?.error != null || !ldJson?.data?.variant1?.length) {
+    // GWAS-CE DIVERGENCE (allele orientation): try the uploaded orientation, then
+    // the flip. The LD server answers the wrong orientation with an empty but
+    // NON-error payload, which is indistinguishable from "this locus has no LD
+    // data" -- so without the retry a whole dataset renders grey and nothing
+    // anywhere reports a problem. The second call only happens when the first
+    // yields nothing.
+    const candidates = [refVariant, flipVariantAlleles(refVariant)].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const ldUrl = buildLdScoresUrl({
+            population,
+            refVariant: candidate,
+            region,
+        });
+
+        try {
+            const ldJson = await fetch(ldUrl).then((response) => response.json());
+            if (ldJson?.error != null || !ldJson?.data?.variant1?.length) {
+                continue;
+            }
+
+            // The ORIGINAL refVariant is returned even when the flip is what the
+            // server answered: callers use it to find the reference dot among our
+            // own rows, which carry the uploaded orientation.
+            return {
+                scoreMap: buildLdScoreMap(ldJson),
+                refVariant,
+            };
+        } catch (error) {
+            // A transport failure will not resolve differently for the flip.
+            console.warn("Variant Sifter LD score fetch failed", error);
             return { scoreMap: new Map(), refVariant };
         }
-
-        return {
-            scoreMap: buildLdScoreMap(ldJson),
-            refVariant,
-        };
-    } catch (error) {
-        console.warn("Variant Sifter LD score fetch failed", error);
-        return { scoreMap: new Map(), refVariant };
     }
+
+    return { scoreMap: new Map(), refVariant };
 }
 
 export async function enrichAssociationRowsWithLdScoresForRef(rows, session, refRow, region) {
