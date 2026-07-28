@@ -436,7 +436,7 @@ function getAllWorkflowOptions(data) {
         });
     }
 
-    // Variant Sifter (two-state: not run -> trigger prep / SUCCEEDED -> view).
+    // Variant Sifter. Three states, same shape as MAGMA/PIGEAN above.
     const sifterStatus = getJobStatus(data, "variant-sifter");
     if (!sifterStatus || sifterStatus === "FAILED") {
         options.push({
@@ -447,6 +447,16 @@ function getAllWorkflowOptions(data) {
             severity: "secondary",
             command: () => runVariantSifter(data),
             disabled: false,
+        });
+    } else if (sifterStatus === "RUNNING") {
+        options.push({
+            label: "Variant Sifter (Running)",
+            icon: "pi pi-spin pi-spinner",
+            method: "variant-sifter",
+            status: "running",
+            severity: "warn",
+            command: () => {},
+            disabled: true,
         });
     } else if (sifterStatus === "SUCCEEDED") {
         options.push({
@@ -460,6 +470,21 @@ function getAllWorkflowOptions(data) {
                     `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${encodeURIComponent(data.id)}` +
                         (data.ancestry ? `&ancestry=${encodeURIComponent(data.ancestry)}` : ""),
                 ),
+            disabled: false,
+        });
+        // A SUCCEEDED dataset must stay re-runnable: the pipeline's output
+        // changes underneath it (the per-dataset index layout did, the VEP join
+        // will), and every such change needs existing datasets rebuilt. Without
+        // this the only route is submitting the Batch job by hand. `available`
+        // is deliberate -- it is the status the Select uses to decide an action
+        // needs confirming, and a rebuild should be confirmed.
+        options.push({
+            label: "Re-run Variant Sifter",
+            icon: "pi pi-refresh",
+            method: "variant-sifter",
+            status: "available",
+            severity: "secondary",
+            command: () => runVariantSifter(data),
             disabled: false,
         });
     }
@@ -1581,8 +1606,14 @@ function openBedResultsInNewTab(dataset) {
                                                     } else {
                                                         event.value.command();
                                                     }
-                                                    // Clear the selection after action
-                                                    event.target.writeValue(
+                                                    // Clear the selection after action.
+                                                    // PrimeVue's Select change payload is
+                                                    // {originalEvent, value} with no `target`,
+                                                    // so this threw a TypeError on EVERY
+                                                    // analysis selection. Guarded rather than
+                                                    // rewritten: clearing properly means giving
+                                                    // the Select a per-row v-model.
+                                                    event.target?.writeValue?.(
                                                         null,
                                                     );
                                                 }
@@ -1944,8 +1975,14 @@ function openBedResultsInNewTab(dataset) {
                                                     } else {
                                                         event.value.command();
                                                     }
-                                                    // Clear the selection after action
-                                                    event.target.writeValue(
+                                                    // Clear the selection after action.
+                                                    // PrimeVue's Select change payload is
+                                                    // {originalEvent, value} with no `target`,
+                                                    // so this threw a TypeError on EVERY
+                                                    // analysis selection. Guarded rather than
+                                                    // rewritten: clearing properly means giving
+                                                    // the Select a per-row v-model.
+                                                    event.target?.writeValue?.(
                                                         null,
                                                     );
                                                 }
