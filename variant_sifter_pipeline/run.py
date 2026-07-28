@@ -22,7 +22,7 @@ import boto3
 
 from .associations import build_associations
 from .canonicalize import canonicalize
-from .index_build import index_associations
+from .index_build import associations_key, index_associations
 
 # Where GWAS-CE stores user uploads (same default as job_server.s3).
 USER_DATA_BUCKET = os.getenv("JOB_SERVER_BUCKET", "dig-ldsc-server")
@@ -66,14 +66,15 @@ def run(username: str, dataset: str, guid: str) -> int:
     )
     records = build_associations(rows, guid, p_threshold=P_THRESHOLD)
 
+    # The key must sit under the prefix index_build indexes, so it comes from
+    # there rather than being spelled out twice.
+    key = associations_key(guid)
     body = "".join(json.dumps(r) + "\n" for r in records)
-    s3.put_object(
-        Bucket=GWAS_CE_BUCKET, Key=f"associations/{guid}.json", Body=body.encode(),
-    )
-    print(f"wrote {len(records)} associations -> {GWAS_CE_BUCKET}/associations/{guid}.json")
+    s3.put_object(Bucket=GWAS_CE_BUCKET, Key=key, Body=body.encode())
+    print(f"wrote {len(records)} associations -> {GWAS_CE_BUCKET}/{key}")
 
-    index_associations()
-    print("indexed associations into the gwas-ce bioindex")
+    index_associations(guid)
+    print(f"indexed associations into the gwas-ce bioindex as associations-{guid}")
     return len(records)
 
 

@@ -6,7 +6,7 @@
 // Under the per-dataset layout the guid stays in `q` even though it is
 // redundant, so the record schema, the pipeline, and the query shape are all
 // unchanged and only the index name varies.
-export const ASSOCIATIONS_INDEX_LAYOUT = "shared";
+export const ASSOCIATIONS_INDEX_LAYOUT = "per-dataset";
 
 export function associationsIndexName(guid, layout = ASSOCIATIONS_INDEX_LAYOUT) {
   return layout === "per-dataset" ? `associations-${guid}` : "associations";

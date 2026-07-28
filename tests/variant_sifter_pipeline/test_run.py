@@ -34,7 +34,9 @@ def test_run_reads_upload_builds_writes_and_indexes():
     idx.assert_called_once()
 
     _, kwargs = s3.put_object.call_args
-    assert kwargs["Key"] == "associations/guidX.json"
+    # Under the per-dataset layout the object lives in the dataset's own folder,
+    # which is what bioindex indexes as a prefix.
+    assert kwargs["Key"] == "associations/guidX/associations.json"
     rec = json.loads(kwargs["Body"].decode().strip())
     assert rec["phenotype"] == "guidX"
     assert rec["dbSNP"] == "rs1"

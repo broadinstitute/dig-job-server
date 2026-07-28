@@ -46,7 +46,7 @@ Parameters:
   BioindexBucket:
     Type: String
     Default: dig-gwas-ce-bioindex
-    Description: gwas-ce bioindex bucket (read + write associations/<guid>.json).
+    Description: gwas-ce bioindex bucket (read + write associations/<guid>/).
   BioindexSecret:
     Type: String
     Default: GIANT-bioindex
@@ -105,7 +105,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::${UploadBucket}/*'
                   - !Sub 'arn:aws:s3:::${BioindexBucket}/*'
-        # Write the built associations/<guid>.json (only to the bioindex bucket).
+        # Write the built associations/<guid>/ records (only to the bioindex bucket).
         - PolicyName: S3Write
           PolicyDocument:
             Version: '2012-10-17'

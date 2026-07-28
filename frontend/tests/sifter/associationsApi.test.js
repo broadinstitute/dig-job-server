@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  ASSOCIATIONS_INDEX_LAYOUT,
   associationsIndexName,
   buildAssociationsUrl,
   fetchAllPages,
@@ -19,9 +20,16 @@ describe("associationsIndexName", () => {
 });
 
 describe("buildAssociationsUrl", () => {
+  // The deployed layout. The pipeline creates one index per dataset
+  // (variant_sifter_pipeline/index_build.py), so this must stay in step with it —
+  // flipping one without the other silently queries an index that does not exist.
+  it("defaults to the per-dataset layout, matching what the pipeline creates", () => {
+    expect(ASSOCIATIONS_INDEX_LAYOUT).toBe("per-dataset");
+  });
+
   it("encodes q as <guid>,<region> with fmt=row", () => {
     expect(buildAssociationsUrl(BASE, GUID, "10:1-200")).toBe(
-      `${BASE}query/associations?q=f83b34c1%2C10%3A1-200&fmt=row`,
+      `${BASE}query/associations-${GUID}?q=f83b34c1%2C10%3A1-200&fmt=row`,
     );
   });
 
