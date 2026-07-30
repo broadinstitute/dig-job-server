@@ -70,7 +70,12 @@ def run(username: str, dataset: str, guid: str) -> int:
         canonicalize(r, col_map)
         for r in _iter_rows(s3, username, dataset, meta["file"], sep)
     )
-    records = build_associations(rows, guid, p_threshold=P_THRESHOLD)
+    # ancestry and effective_n live in the dataset metadata, not the file; the
+    # sifter needs ancestry on the records and n is often only known per-dataset.
+    records = build_associations(
+        rows, guid, p_threshold=P_THRESHOLD,
+        ancestry=meta.get("ancestry"), effective_n=meta.get("effective_n"),
+    )
 
     # Orient alleles AFTER the p-value filter: only the survivors are ever
     # queried, and this way the reference lookups scale with the kept records

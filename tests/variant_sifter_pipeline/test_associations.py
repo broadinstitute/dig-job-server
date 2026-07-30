@@ -43,3 +43,40 @@ def test_threshold_inclusive_and_configurable():
              "pValue": 1e-6, "beta": 0.1, "se": 0.02}]
     assert len(build_associations(rows, "g", p_threshold=1e-5)) == 1
     assert len(build_associations(rows, "g", p_threshold=1e-7)) == 0
+
+
+def test_optional_fields_are_emitted_only_when_present():
+    """The sifter drives table columns and filters off field PRESENCE, so an
+    absent upload column must leave the field out rather than emit a null."""
+    rows = [{"chromosome": "1", "position": 10, "reference": "A", "alt": "G",
+             "pValue": 1e-9, "beta": 0.2, "se": 0.05,
+             "eaf": 0.31, "maf": 0.31, "n": 5000}]
+    rec = build_associations(rows, "g", ancestry="EUR")[0]
+    assert rec["eaf"] == 0.31 and rec["maf"] == 0.31
+    assert rec["n"] == 5000
+    assert rec["ancestry"] == "EUR"
+
+    bare = [{"chromosome": "1", "position": 10, "reference": "A", "alt": "G",
+             "pValue": 1e-9, "beta": 0.2}]
+    rec2 = build_associations(bare, "g")[0]
+    for absent in ("eaf", "maf", "n", "ancestry", "stdErr", "zScore"):
+        assert absent not in rec2
+
+
+def test_effective_n_is_the_per_dataset_fallback_for_n():
+    rows = [{"chromosome": "1", "position": 10, "reference": "A", "alt": "G",
+             "pValue": 1e-9, "beta": 0.2}]
+    assert build_associations(rows, "g", effective_n=10995)[0]["n"] == 10995
+    # A per-row n wins over the dataset-level fallback.
+    rows[0]["n"] = 42
+    assert build_associations(rows, "g", effective_n=10995)[0]["n"] == 42
+
+
+def test_zscore_from_the_file_is_used_when_there_is_no_standard_error():
+    """Munged sumstats often carry Z and no SE; without this the column is lost."""
+    rows = [{"chromosome": "1", "position": 10, "reference": "A", "alt": "G",
+             "pValue": 1e-9, "beta": 0.2, "zScore": 4.0}]
+    assert build_associations(rows, "g")[0]["zScore"] == 4.0
+    # But a derived z (beta/se) is preferred, since it matches the emitted beta.
+    rows[0]["se"] = 0.05
+    assert build_associations(rows, "g")[0]["zScore"] == 4.0

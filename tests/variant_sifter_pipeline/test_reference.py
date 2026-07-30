@@ -103,6 +103,25 @@ def test_flipping_swaps_alleles_and_negates_effect_direction(genome):
     assert out["pValue"] == 1e-8
 
 
+def test_flipping_takes_the_complement_of_effect_allele_frequency(genome):
+    """eaf is the frequency OF alt, so swapping alleles makes it 1-eaf. maf must
+    NOT move -- the minor allele is the minor allele either way round."""
+    rec = {"chromosome": "1", "position": 1, "reference": "G", "alt": "A",
+           "eaf": 0.30, "maf": 0.30}
+    out, outcome = orient_record(rec, genome)
+    assert outcome == FLIPPED
+    assert out["eaf"] == pytest.approx(0.70)
+    assert out["maf"] == 0.30
+
+
+def test_canonical_records_keep_their_frequency(genome):
+    rec = {"chromosome": "1", "position": 1, "reference": "A", "alt": "G",
+           "eaf": 0.30}
+    out, outcome = orient_record(rec, genome)
+    assert outcome == ALREADY_CANONICAL
+    assert out["eaf"] == 0.30
+
+
 def test_orient_record_never_mutates_its_input(genome):
     rec = {"chromosome": "1", "position": 1, "reference": "G", "alt": "A", "beta": 0.5}
     orient_record(rec, genome)

@@ -127,11 +127,17 @@ def orient_record(record: dict, genome) -> tuple:
 
     flipped = dict(record)
     flipped["reference"], flipped["alt"] = alt, ref
-    # alt changed, so every ALT-relative quantity changes sign with it.
+    # alt changed, so every ALT-relative quantity changes with it.
     for field in ("beta", "zScore"):
         value = flipped.get(field)
         if isinstance(value, (int, float)):
             flipped[field] = -value
+    # Effect-allele frequency is the frequency OF alt, so it becomes its
+    # complement. `maf` deliberately does not move: the minor allele is the
+    # minor allele regardless of which allele we call the effect one.
+    eaf = flipped.get("eaf")
+    if isinstance(eaf, (int, float)):
+        flipped["eaf"] = 1 - eaf
     return flipped, FLIPPED
 
 

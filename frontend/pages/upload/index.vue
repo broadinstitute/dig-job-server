@@ -353,6 +353,7 @@
 <script setup>
 import { useUserStore } from "~/stores/UserStore";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore";
+import { suggestColumnMap } from "~/utils/upload/suggestColumnMap";
 import axios from "axios";
 const fileInfo = ref({});
 const fileInput = ref(null);
@@ -429,6 +430,8 @@ const ancestryOptions = [
     { name: "South Asian", value: "SAS" },
     { name: "Ad Mixed American", value: "AMR" },
 ];
+// Anything not mapped here can never reach the Variant Sifter, so the optional
+// fields matter: eaf drives its EAF filter, maf/zScore its table columns.
 const colOptions = [
     { name: "chromosome", value: "chromosome" },
     { name: "position", value: "position" },
@@ -440,6 +443,9 @@ const colOptions = [
     { name: "oddsRatio", value: "oddsRatio" },
     { name: "se", value: "se" },
     { name: "n", value: "n" },
+    { name: "effect_allele_freq", value: "eaf" },
+    { name: "maf", value: "maf" },
+    { name: "zScore", value: "zScore" },
 ];
 const requiredFields = [
     { name: "chromosome", value: "chromosome" },
@@ -595,10 +601,26 @@ async function sampleFile(e) {
     // No file extension validation - backend will infer delimiter from content
     try {
         fileInfo.value = await store.sampleTextFile(e.files[0]);
-        //copy fileInfo.columns to selectedFields
+        // Pre-fill the mapping from the header names. Allele and effect fields
+        // are matched by explicit alias only (see suggestColumnMap), so a guess
+        // there is never a similarity match. Everything stays editable, and the
+        // toast tells the user to check it.
+        const guessed = suggestColumnMap(
+            fileInfo.value.columns,
+            colOptions.map((o) => o.value),
+        );
         fileInfo.value.columns.forEach((col) => {
-            selectedFields.value[col] = null;
+            selectedFields.value[col] = guessed[col] ?? null;
         });
+        const n = Object.keys(guessed).length;
+        if (n > 0) {
+            toast.add({
+                severity: "info",
+                summary: "Columns pre-filled",
+                detail: `Matched ${n} of ${fileInfo.value.columns.length} columns. Please review before continuing.`,
+                life: 6000,
+            });
+        }
     } catch (e) {
         console.log(e);
         toast.add({

@@ -43,10 +43,19 @@ def _pvalue_of(row: dict, beta, se):
 
 
 def build_associations(rows: Iterable[dict], guid: str,
-                       p_threshold: float = 0.05) -> list[dict]:
+                       p_threshold: float = 0.05,
+                       ancestry: "str | None" = None,
+                       effective_n: "float | None" = None) -> list[dict]:
     """Keep rows with pValue <= p_threshold (the filter that shrinks millions of
     variants to thousands), shape each survivor into a record keyed by
     phenotype=<guid>, and return them sorted by locus.
+
+    Optional fields are emitted only when the upload actually carries them --
+    the sifter's table columns and filters are driven by field presence, so an
+    absent field simply hides its column rather than showing a blank one.
+
+    `ancestry` and `effective_n` come from the dataset metadata rather than the
+    file, and are the per-dataset fallbacks for the per-row `n` column.
     """
     out: list[dict] = []
     for r in rows:
@@ -65,14 +74,37 @@ def build_associations(rows: Iterable[dict], guid: str,
             "alt": r["alt"],
             "pValue": p,
         }
+        if ancestry:
+            rec["ancestry"] = ancestry
         if beta is not None:
             rec["beta"] = beta
         if se is not None:
             rec["stdErr"] = se
+        # Prefer the derived z (consistent with beta/stdErr); fall back to a
+        # z the upload supplied directly, which is common in munged sumstats
+        # that carry no standard error.
         if beta is not None and se not in (None, 0):
             rec["zScore"] = beta / se
+        else:
+            z = _to_float(r.get("zScore"))
+            if z is not None:
+                rec["zScore"] = z
         if r.get("rsid") is not None:
             rec["dbSNP"] = r["rsid"]
+        # Effect-allele frequency is ALT-relative like beta, so orienting a
+        # variant rewrites it (see reference.orient_record). MAF is not --
+        # the minor allele is the minor allele either way round.
+        eaf = _to_float(r.get("eaf"))
+        if eaf is not None:
+            rec["eaf"] = eaf
+        maf = _to_float(r.get("maf"))
+        if maf is not None:
+            rec["maf"] = maf
+        n = _to_float(r.get("n"))
+        if n is None:
+            n = _to_float(effective_n)
+        if n is not None:
+            rec["n"] = n
         out.append(rec)
     out.sort(key=variant_key)
     return out
