@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  FALCON on AWS Batch - ECR, S3 results bucket, IAM, Batch compute environment
+  and queue.
+
+  This stack owns the DURABLE infrastructure only. Job definitions are
+  registered per-build by docker/deploy.sh, which pins each one to an exact
+  image digest and stamps the engine's git SHA into its tags. CloudFormation
+  cannot pin a digest that changes on every build, so keeping job definitions
+  here would either force a stack update per build or lose that provenance.
+
+Parameters:
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: subnet-041ed74e61806c6f0
+    Description: Subnets the Fargate tasks will run in
+  SecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Default: sg-28485f53
+    Description: Security groups attached to the Fargate tasks
+  JobServerBucket:
+    Type: String
+    Default: dig-ldsc-server
+    Description: >-
+      Bucket holding dig-job-server uploads (userdata/) and the dbSNP GRCh37
+      map (bin/magma/). FALCON reads uploads from it and writes results back
+      under each dataset's falcon/ prefix.
+  ReferenceDataBucket:
+    Type: String
+    Default: falcon-data-center
+    Description: >-
+      Bucket holding FALCON's LD reference. genes/V2G/annotations are baked
+      into the image and are not read from here at runtime.
+
+Resources:
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: falcon-repo
+
+  ResultsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: dig-falcon-results
+
+  BatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - batch.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  FalconComputeEnv:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt BatchServiceRole.Arn
+      ComputeResources:
+        Type: FARGATE
+        MaxvCpus: 128
+        Subnets: !Ref SubnetIds
+        SecurityGroupIds: !Ref SecurityGroupIds
+
+  FalconJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: falcon-queue
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref FalconComputeEnv
+      Priority: 1
+      State: ENABLED
+
+  FalconJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: S3Read
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: '*'
+        - PolicyName: S3Write
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              # Research and benchmark runs (falcon-batch <config.ini>).
+              - Sid: ResearchResults
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ResultsBucket}/*'
+              # Job-server dataset mode (falcon-batch --username U --dataset D).
+              # Deliberately scoped to each dataset's falcon/ output prefix, NOT
+              # to userdata/* -- a bug in FALCON must not be able to overwrite or
+              # destroy a user's uploaded GWAS under raw/.
+              - Sid: JobServerFalconOutputsOnly
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource:
+                  - !Sub 'arn:aws:s3:::${JobServerBucket}/userdata/*/genetic/*/falcon/*'
+        - PolicyName: ECSTaskExecution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  FalconJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      JobDefinitionName: falcon-job
+      PlatformCapabilities:
+        - FARGATE
+      PropagateTags: true
+      Tags:
+        Project: falcon
+        ManagedBy: cloudformation
+      Timeout:
+        AttemptDurationSeconds: 86400
+      Parameters:
+        s3_config: ''
+      ContainerProperties:
+        Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepository}'
+        Command:
+          - 'Ref::s3_config'
+        JobRoleArn: !GetAtt FalconJobRole.Arn
+        ExecutionRoleArn: !GetAtt FalconJobRole.Arn
+        ResourceRequirements:
+          - Type: VCPU
+            Value: '8'
+          - Type: MEMORY
+            Value: '32768'
+        EphemeralStorage:
+          SizeInGiB: 200
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+
+Outputs:
+  EcrRepositoryUri:
+    Description: Push the image here
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepository}'
+  JobQueueName:
+    Value: !Ref FalconJobQueue
+  JobDefinitionName:
+    Value: !Ref FalconJobDefinition
+  ResultsBucketName:
+    Value: !Ref ResultsBucket
+  JobRoleArn:
+    Description: >-
+      Pass to docker/deploy.sh as FALCON_JOB_ROLE so it does not hardcode the
+      role's CloudFormation-generated random suffix, which changes if the stack
+      is ever recreated.
+    Value: !GetAtt FalconJobRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-JobRoleArn'

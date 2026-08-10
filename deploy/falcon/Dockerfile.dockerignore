@@ -1,0 +1,12 @@
+# Build context for the FALCON image. BuildKit prefers this over the repository
+# root .dockerignore, which excludes everything but variant_sifter_pipeline to
+# keep that image's context small. Exclude-all-then-allow keeps this context to
+# just what the Dockerfile COPYs.
+*
+!falcon_prep
+!job_server/__init__.py
+!job_server/falcon.py
+!deploy/falcon
+# Never ship tests or caches into the image.
+falcon_prep/tests
+**/__pycache__
