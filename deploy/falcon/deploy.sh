@@ -4,6 +4,7 @@
 #
 #   ./deploy/falcon/deploy.sh --falcon-sha <commit>                  # dataset mode
 #   ./deploy/falcon/deploy.sh --falcon-sha <commit> --mode config    # research mode
+#   ./deploy/falcon/deploy.sh --falcon-sha <commit> --falcon-repo <url>
 #
 # Run from the repository root -- the build context is the repo, filtered by
 # deploy/falcon/Dockerfile.dockerignore.
@@ -29,12 +30,17 @@ EPHEMERAL="200"
 MODE="dataset"
 JOB_DEF=""
 FALCON_SHA=""
-FALCON_REPO="${FALCON_REPO:-https://github.com/Alex-Llamas/falcon.git}"
+# SSH by default, matching how every other repo in this org is cloned and
+# avoiding a dependency on an HTTPS credential helper. Override with
+# --falcon-repo or FALCON_REPO.
+FALCON_REPO="${FALCON_REPO:-git@github.com:Alex-Llamas/falcon.git}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --falcon-sha) [[ $# -ge 2 ]] || { echo "--falcon-sha requires a value" >&2; exit 2; }
                       FALCON_SHA="$2"; shift 2 ;;
+        --falcon-repo) [[ $# -ge 2 ]] || { echo "--falcon-repo requires a value" >&2; exit 2; }
+                      FALCON_REPO="$2"; shift 2 ;;
         --mode)       [[ $# -ge 2 ]] || { echo "--mode requires a value" >&2; exit 2; }
                       MODE="$2"; shift 2 ;;
         --job-def)    [[ $# -ge 2 ]] || { echo "--job-def requires a value" >&2; exit 2; }
@@ -82,10 +88,36 @@ fi
     exit 2
 }
 
+# The FALCON repository is private, so the clone happens HERE, on the host, using
+# the developer's existing git credentials -- a builder container has none. The
+# image then copies from deploy/falcon/engine/, the same shape as the bundled
+# reference data.
+ENGINE_DIR="$REPO_ROOT/deploy/falcon/engine"
+if [[ -d "$ENGINE_DIR/.git" ]]; then
+    echo "==> updating engine checkout"
+    git -C "$ENGINE_DIR" fetch --quiet --tags origin
+else
+    echo "==> cloning FALCON engine (private repo; uses your git credentials)"
+    rm -rf "$ENGINE_DIR"
+    # Partial + sparse: the image needs only falcon-rs/. A full clone of this
+    # repository is ~1.2 GB (480 MB of examples, 660 MB of history) against the
+    # ~740 KB actually built, and all of it would land in the build context.
+    git clone --quiet --filter=blob:none --sparse "$FALCON_REPO" "$ENGINE_DIR" \
+        || { echo "!! clone failed. The FALCON repo is private -- check your git auth." >&2; exit 2; }
+    git -C "$ENGINE_DIR" sparse-checkout set falcon-rs
+fi
+git -C "$ENGINE_DIR" checkout --quiet --detach "$FALCON_SHA" \
+    || { echo "!! no such commit in the FALCON repo: ${FALCON_SHA}" >&2; exit 2; }
+
+# Pin provenance to the FULL commit id, not whatever abbreviation was typed.
+FALCON_SHA="$(git -C "$ENGINE_DIR" rev-parse HEAD)"
+[[ -f "$ENGINE_DIR/falcon-rs/Cargo.toml" ]] \
+    || { echo "!! ${FALCON_SHA} has no falcon-rs/Cargo.toml -- wrong commit?" >&2; exit 2; }
+echo "==> engine pinned at ${FALCON_SHA}"
+
 echo "==> building ${REPO_URI}:${IMAGE_TAG} from FALCON ${FALCON_SHA}"
 docker build --platform=linux/amd64 \
     --build-arg "FALCON_SHA=${FALCON_SHA}" \
-    --build-arg "FALCON_REPO=${FALCON_REPO}" \
     -f "$REPO_ROOT/deploy/falcon/Dockerfile" \
     -t "${REPO_URI}:${IMAGE_TAG}" \
     "$REPO_ROOT"

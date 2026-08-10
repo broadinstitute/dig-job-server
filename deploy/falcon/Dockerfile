@@ -3,10 +3,11 @@
 # Build from the repository root:
 #   ./deploy/falcon/deploy.sh --falcon-sha <commit>
 #
-# The FALCON engine itself lives in a separate repository. Rather than vendoring
-# it, the builder clones it at an explicit commit passed as FALCON_SHA. That
-# makes the engine version a reviewable pin rather than "whatever happened to be
-# checked out", and it is what the run's provenance is stamped with.
+# The FALCON engine lives in a separate, private repository. deploy.sh clones it
+# on the host at the commit given by --falcon-sha and places it under
+# deploy/falcon/engine/; this file copies from there. The engine version is
+# therefore an explicit, reviewable pin rather than "whatever happened to be
+# checked out", and it is what each run's provenance is stamped with.
 #
 # NOTE: this Dockerfile has its own ignore file, deploy/falcon/Dockerfile.dockerignore.
 # The repository root .dockerignore excludes everything but variant_sifter_pipeline
@@ -18,17 +19,30 @@
 # ==========================================
 FROM rust:1.90-bookworm AS builder
 
-ARG FALCON_REPO=https://github.com/Alex-Llamas/falcon.git
 ARG FALCON_SHA
 RUN test -n "$FALCON_SHA" || { echo "FALCON_SHA build-arg is required" >&2; exit 1; }
 
 WORKDIR /build
-RUN git clone --filter=blob:none "$FALCON_REPO" src \
-    && git -C src checkout --detach "$FALCON_SHA" \
-    && git -C src rev-parse HEAD > /build/FALCON_SHA
 
-RUN cargo build --release --manifest-path src/falcon-rs/Cargo.toml \
-    && strip src/falcon-rs/target/release/falcon
+# The engine source is checked out on the HOST by deploy.sh, at the pinned SHA,
+# and copied in. It is not cloned here: the FALCON repository is private, and a
+# builder container has no credentials. deploy.sh does the clone where the
+# developer's existing git auth already works -- the same shape as the bundled
+# reference data, which fetch-reference.sh puts into the context.
+
+# Dependencies first, against a stub main, so a source-only change does not
+# refetch and rebuild the whole crate graph.
+COPY deploy/falcon/engine/falcon-rs/Cargo.toml ./falcon-rs/Cargo.toml
+RUN mkdir -p falcon-rs/src \
+    && echo 'fn main() {}' > falcon-rs/src/main.rs \
+    && echo '' > falcon-rs/src/lib.rs \
+    && cargo build --release --manifest-path falcon-rs/Cargo.toml \
+    && rm -rf falcon-rs/src
+
+COPY deploy/falcon/engine/falcon-rs/src ./falcon-rs/src
+RUN touch falcon-rs/src/main.rs falcon-rs/src/lib.rs \
+    && cargo build --release --manifest-path falcon-rs/Cargo.toml \
+    && strip falcon-rs/target/release/falcon
 
 # s5cmd moves the ~39 GB LD reference far faster than `aws s3 cp`.
 ARG S5CMD_VERSION=2.2.2
@@ -71,7 +85,7 @@ ENV PYTHONPATH=/opt/prep
 # Config template read by the entrypoint's dataset mode.
 COPY deploy/falcon/configs /opt/configs
 
-COPY --from=builder /build/src/falcon-rs/target/release/falcon /usr/local/bin/falcon
+COPY --from=builder /build/falcon-rs/target/release/falcon /usr/local/bin/falcon
 COPY --from=builder /usr/local/bin/s5cmd /usr/local/bin/s5cmd
 COPY deploy/falcon/falcon-batch.sh /usr/local/bin/falcon-batch
 

@@ -155,3 +155,8 @@ synthetic_*.csv
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# FALCON engine source, checked out by deploy/falcon/deploy.sh at a pinned SHA.
+deploy/falcon/engine/
+# Reference data fetched into the build context by deploy/falcon/fetch-reference.sh.
+deploy/falcon/reference/
