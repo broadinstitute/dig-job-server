@@ -37,7 +37,7 @@ def test_parse_metadata_maps_odds_ratio():
 
 
 def test_parse_metadata_reads_rsid_and_se_when_the_upload_recorded_them():
-    # Current uploads carry these keys (job_server/falcon.py::COLMAP_TO_SUMSTATS);
+    # Current uploads carry these keys (frontend/utils/upload/suggestColumnMap.js);
     # historical ones do not, hence the content-based fallback in Task 3.
     meta = {
         "ancestry": "EUR", "separator": "\t", "genome_build": "GRCh37",

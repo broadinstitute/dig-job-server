@@ -88,30 +88,3 @@ def validate_manifest(
             expected=expected_gwas_sha256,
             got=manifest["input_sha256"],
         )
-
-
-# Maps the upload form's col_map keys to FALCON's sumstats-*-col config options.
-# (pValue / oddsRatio have no FALCON sumstats field and are intentionally absent.)
-COLMAP_TO_SUMSTATS = {
-    "chromosome": "sumstats-chr-col",
-    "position":   "sumstats-pos-col",
-    "rsid":       "sumstats-id-col",
-    "beta":       "sumstats-beta-col",
-    "se":         "sumstats-se-col",
-    "reference":  "sumstats-ref-col",
-    "alt":        "sumstats-alt-col",
-    "n":          "sumstats-n-col",
-}
-
-
-def col_map_to_sumstats_columns(col_map: dict) -> dict:
-    """Translate an upload col_map into FALCON sumstats-*-col config values.
-
-    Keys present in col_map become the user's column name; keys absent are
-    omitted (FALCON falls back to its default name). FALCON's z default is the
-    column name 'Z', which the upload never captures, so force it to None.
-    (freq already defaults to None, so it needs no entry.)
-    """
-    cols = {opt: col_map[k] for k, opt in COLMAP_TO_SUMSTATS.items() if col_map.get(k)}
-    cols["sumstats-z-col"] = "None"
-    return cols

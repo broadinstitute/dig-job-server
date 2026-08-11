@@ -5,7 +5,7 @@ def canonicalize(row: dict, col_map: dict) -> dict:
     """Map one upload row to canonical field names.
 
     col_map is {canonical_field: upload_column_name} (the format produced by the
-    upload UI and consumed by job_server.falcon.col_map_to_sumstats_columns).
+    upload UI and consumed by falcon_prep.columns.parse_metadata).
     Only mapped fields present in the row are kept; everything else is dropped.
     """
     out = {}
