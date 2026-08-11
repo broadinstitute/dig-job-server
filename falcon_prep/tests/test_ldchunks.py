@@ -86,3 +86,37 @@ def test_cli_exits_3_when_nothing_was_selected(tmp_path):
 
 def test_chunk_size_matches_the_published_windows():
     assert CHUNK_SIZE == 1_000_000
+
+
+def _available(tmp_path, names):
+    p = tmp_path / "available.txt"
+    p.write_text("\n".join(f"s3://b/ld_chunks/{n}" for n in names) + "\n")
+    return str(p)
+
+
+def test_windows_without_a_published_chunk_are_skipped(tmp_path, capsys):
+    # chr20's published windows stop at its 63 Mb end; a variant past that has
+    # no chunk, and no LD data either, so FALCON would drop it regardless.
+    _sumstats(tmp_path, 20, [30_000_000, 64_500_000])
+    avail = _available(tmp_path, ["chr20_30000000_31000000.ld"])
+    rc = main(["--sumstats-dir", str(tmp_path), "--prefix", "s3://b/ld_chunks",
+               "--available", avail])
+    assert rc == 0
+    cap = capsys.readouterr()
+    assert cap.out.strip() == "s3://b/ld_chunks/chr20/chr20_30000000_31000000.ld\t20"
+    assert "1 window(s) have no published chunk" in cap.err
+
+
+def test_skipping_is_reported_not_silent(tmp_path, capsys):
+    _sumstats(tmp_path, 20, [64_500_000])
+    avail = _available(tmp_path, ["chr20_30000000_31000000.ld"])
+    rc = main(["--sumstats-dir", str(tmp_path), "--available", avail])
+    assert rc == 3
+    assert "no requested LD chunk exists" in capsys.readouterr().err
+
+
+def test_without_available_nothing_is_filtered(tmp_path, capsys):
+    _sumstats(tmp_path, 20, [64_500_000])
+    rc = main(["--sumstats-dir", str(tmp_path), "--prefix", "s3://b/ld_chunks"])
+    assert rc == 0
+    assert "chr20_64000000_65000000.ld" in capsys.readouterr().out

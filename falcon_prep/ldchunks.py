@@ -57,6 +57,12 @@ def positions_in(sumstats_path: str) -> list[int]:
     return out
 
 
+def load_available(path: str) -> set[str]:
+    """Read the chunk keys that actually exist, one per line."""
+    with open(path) as fh:
+        return {os.path.basename(line.strip()) for line in fh if line.strip()}
+
+
 def plan(sumstats_dir: str) -> dict[int, list[str]]:
     """Map each chromosome to the chunk filenames its variants need.
 
@@ -82,6 +88,13 @@ def main(argv: list[str] | None = None) -> int:
         default="s3://falcon-data-center/ld_chunks",
         help="base of the chunked LD reference",
     )
+    ap.add_argument(
+        "--available",
+        help=(
+            "file listing the chunk keys that exist. Windows without a chunk "
+            "are dropped rather than requested, and counted on stderr."
+        ),
+    )
     args = ap.parse_args(argv)
 
     selected = plan(args.sumstats_dir)
@@ -89,15 +102,34 @@ def main(argv: list[str] | None = None) -> int:
         print("no chromosomes with significant variants", file=sys.stderr)
         return 3
 
+    skipped = 0
+    if args.available:
+        # Not every 1 Mb window has a published chunk: chromosome ends stop
+        # short, and some interior windows hold no LD at all. A window with no
+        # chunk has no LD data, so its variants would be dropped by FALCON
+        # regardless -- but say so rather than failing the download or, worse,
+        # skipping silently.
+        have = load_available(args.available)
+        pruned: dict[int, list[str]] = {}
+        for chrom, names in selected.items():
+            keep = [n for n in names if n in have]
+            skipped += len(names) - len(keep)
+            if keep:
+                pruned[chrom] = keep
+        selected = pruned
+        if not selected:
+            print("no requested LD chunk exists", file=sys.stderr)
+            return 3
+
     # One "<source> <chromosome>" line per chunk, for the entrypoint to consume.
     for chrom, names in selected.items():
         for name in names:
             print(f"{args.prefix}/chr{chrom}/{name}\t{chrom}")
     total = sum(len(v) for v in selected.values())
-    print(
-        f"selected {total} LD chunks across {len(selected)} chromosomes",
-        file=sys.stderr,
-    )
+    msg = f"selected {total} LD chunks across {len(selected)} chromosomes"
+    if skipped:
+        msg += f"; {skipped} window(s) have no published chunk and were skipped"
+    print(msg, file=sys.stderr)
     return 0
 
 

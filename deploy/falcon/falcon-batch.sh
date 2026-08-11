@@ -204,9 +204,20 @@ print(int(round(n)) if n is not None else "")
     LD_DIR="$WORK_DIR/ld"
     mkdir -p "$LD_DIR"
     CHUNK_LIST="$WORK_DIR/ld-chunks.txt"
+    CHUNK_PREFIX="${FALCON_LD_CHUNKS:-s3://falcon-data-center/ld_chunks}"
+    # Not every 1 Mb window has a published chunk -- chromosome ends stop short
+    # and some interior windows hold no LD -- so list what exists and ask only
+    # for that. Requesting a missing key aborts the whole batch download.
+    AVAILABLE="$WORK_DIR/ld-available.txt"
+    # No --log error here: it suppresses ls output as well as diagnostics.
+    s5cmd ls "${CHUNK_PREFIX}/*/*.ld" 2>/dev/null \
+        | awk '{print $NF}' > "$AVAILABLE" \
+        || die "could not list the chunked LD reference"
+    [[ -s "$AVAILABLE" ]] || die "chunked LD reference is empty at ${CHUNK_PREFIX}"
     if ! python3 -m falcon_prep.ldchunks \
             --sumstats-dir "$SUMSTATS_DIR" \
-            --prefix "${FALCON_LD_CHUNKS:-s3://falcon-data-center/ld_chunks}" \
+            --prefix "$CHUNK_PREFIX" \
+            --available "$AVAILABLE" \
             > "$CHUNK_LIST"; then
         die "could not determine which LD chunks are needed"
     fi

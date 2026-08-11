@@ -78,3 +78,41 @@ Four rsIDs in this dataset appear more than once — on chromosomes 2, 7, 12 and
 silently kept whichever row was written last, which at a multi-allelic site can
 select the opposite effect direction. Those four are now resolved
 deterministically by largest |Z|, and counted.
+
+## LD chunk selection (2026-08-11)
+
+Same dataset, same engine commit, chunked LD instead of whole-chromosome files:
+
+| | Whole-chromosome LD | Chunked LD |
+| :--- | ---: | ---: |
+| Job wall clock | 590 s | **315 s** |
+| FALCON engine time | 208 s | **171 s** |
+| S3 staging (generic loop) | 245 s | 0.2 s |
+| resolved / duplicates / rate | 13,929 / 4 / 0.9332 | identical |
+
+**47% faster**, against the 39% projected from chunk sizes alone. The engine got
+faster too, which the projection did not anticipate: parsing ~4 GB of LD instead
+of 38.7 GB is less work inside `read_ld_sparse`, not only less transfer.
+
+`stage_seconds` now reads ~0 because LD is fetched by the chunk block rather
+than the generic `*-folder` staging loop. The cost moved and shrank; it did not
+disappear, and it is logged separately.
+
+### Correctness
+
+Verified against the reference rather than argued from the code. Taking the 162
+variants FALCON actually modelled on chr22 in the previous run, the usable LD
+rows — those with **both** SNPs in the modelled set, which is exactly what
+`read_ld_sparse` keeps — are identical from either source: 11,602 rows, nothing
+missing, nothing extra, from 35.3 MB of chunks against 347.6 MB monolithic. The
+assembled `{chr}.ld.sorted` was checked as well as the raw chunks, since
+concatenation is where a header or ordering fault would hide.
+
+### Not every window has a chunk
+
+Published windows stop at each chromosome's end and have occasional interior
+gaps. This dataset contains a chr20 variant at 64.5 Mb — past chr20's 63 Mb end
+— so its window has no chunk. Requesting a missing key aborts the whole batch
+download, so the entrypoint lists what exists, intersects, and reports how many
+windows were skipped. Those variants have no LD data and FALCON would drop them
+regardless; the point is that it is stated rather than silent.
