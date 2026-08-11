@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - "*"
+      # "**", not "*": a single star stops at a slash, so grouped branch names
+      # (dependabot/..., deps/..., fix/...) matched nothing and ran no CI.
+      # The deploy job below is gated on refs/heads/main, so widening this
+      # adds runs, never deploys.
+      - "**"
     paths:
       - 'job_server/**'
       - 'requirements.txt'

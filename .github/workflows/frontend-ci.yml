@@ -3,7 +3,11 @@ name: Frontend CI/CD
 on:
     push:
         branches:
-            - "*"
+            # "**", not "*": a single star stops at a slash, so "*" matched
+            # neither dependabot/npm_and_yarn/... nor any other grouped branch
+            # name. Every Dependabot PR here had therefore run no CI at all,
+            # which is why none of them could be judged safe to merge.
+            - "**"
         paths:
             - "frontend/**"
 
