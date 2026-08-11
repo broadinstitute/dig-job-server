@@ -1,7 +1,7 @@
 <script setup>
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
-import FalconInstructionsPanel from "~/components/falcon/FalconInstructionsPanel.vue";
+import { falconEligibility } from "~/utils/falcon/eligibility.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -15,9 +15,6 @@ const totalBedFiles = ref(0);
 const config = useRuntimeConfig();
 const eventSources = ref({});
 const helpPopover = ref(null);
-const falconPanelOpen = ref(false);
-const falconPanelDataset = ref("");
-const falconPanelFilename = ref("gwas.tsv");
 // Per-row model for the "Run Analysis" Selects. They were uncontrolled, and the
 // reset after an action called event.target.writeValue(null) -- but PrimeVue's
 // change payload is {originalEvent, value} with no `target`, so it threw and the
@@ -26,13 +23,16 @@ const falconPanelFilename = ref("gwas.tsv");
 const selectedAnalysis = reactive({});
 const selectedBedAnalysis = reactive({});
 
-function runFalcon(data) {
-    // Open the local instructions panel. The Docker Hub page is linked from
-    // inside the panel — opening it automatically would steal focus from
-    // the user, who'll spend most of their time copying from the panel.
-    falconPanelDataset.value = data.dataset;
-    falconPanelFilename.value = data.file_name || "gwas.tsv";
-    falconPanelOpen.value = true;
+async function runFalcon(data) {
+    const { job_id } = await userStore.startAnalysis(data.dataset, "falcon");
+    data.status = "RUNNING falcon";
+    listenForJobStatus(job_id, data);
+    toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "FALCON analysis started successfully",
+        life: 5000,
+    });
 }
 
 async function runVariantSifter(data) {
@@ -261,6 +261,10 @@ function getAvailableWorkflows(data) {
         });
     }
 
+    // FALCON is deliberately absent: nothing calls this function. The Select in
+    // the template is driven by getAllWorkflowOptions. Listing FALCON here would
+    // put the eligibility rule in a second place that no user ever reaches.
+
     return workflows;
 }
 
@@ -416,11 +420,28 @@ function getAllWorkflowOptions(data) {
         });
     }
 
-    // Check FALCON (two-state: not run / SUCCEEDED).
+    // Check FALCON. It was two-state (not run / SUCCEEDED) while it ran on the
+    // user's own laptop and the server could only observe the uploaded result.
+    // It runs on Batch now, so it has the same four states as MAGMA above.
     const falconStatus = getJobStatus(data, "falcon");
     const falconWorkflow = data.workflows?.falcon?.falcon;
+    const falconOk = falconEligibility(data);
 
-    if (!falconStatus) {
+    if (!falconStatus && !falconOk.eligible) {
+        // Shown disabled rather than hidden. Omitting it entirely leaves no
+        // answer to "why can't I run FALCON on this?", and the reason is
+        // something the user can act on by picking another dataset.
+        options.push({
+            label: "FALCON (Unavailable)",
+            icon: "pi pi-ban",
+            method: "falcon",
+            status: "unavailable",
+            severity: "secondary",
+            tooltip: falconOk.reason,
+            command: () => {},
+            disabled: true,
+        });
+    } else if (!falconStatus) {
         options.push({
             label: "Run FALCON",
             icon: "pi pi-cog",
@@ -429,6 +450,27 @@ function getAllWorkflowOptions(data) {
             severity: "secondary",
             command: () => runFalcon(data),
             disabled: false,
+        });
+    } else if (falconStatus === "FAILED") {
+        options.push({
+            label: "FALCON (Failed)",
+            icon: "pi pi-times-circle",
+            method: "falcon",
+            status: "failed",
+            severity: "danger",
+            command: () =>
+                showWorkflowDialog(data, "falcon", "failed", falconWorkflow),
+            disabled: false,
+        });
+    } else if (falconStatus === "RUNNING") {
+        options.push({
+            label: "FALCON (Running)",
+            icon: "pi pi-spin pi-spinner",
+            method: "falcon",
+            status: "running",
+            severity: "warn",
+            command: () => {},
+            disabled: true,
         });
     } else if (falconStatus === "SUCCEEDED") {
         options.push({
@@ -742,6 +784,7 @@ async function confirmAndRunWorkflow(data, workflow) {
         sldsc: "SLDSC (Stratified LD Score Regression) analysis will calculate heritability and genetic correlations for your dataset.",
         magma: "MAGMA analysis will perform gene-based association testing and pathway analysis on your dataset.",
         pigean: "PIGEAN analysis will run gene and gene-set enrichment to highlight pathway-level associations for your dataset.",
+        falcon: "FALCON will fine-map your dataset, estimating causal probabilities for variants and genes in each associated region. It runs on genome-wide significant variants only, so runtime depends on how many your trait has.",
     };
 
     confirm.require({
@@ -1602,15 +1645,10 @@ function openBedResultsInNewTab(dataset) {
                                                         event.value.status ===
                                                         'available'
                                                     ) {
-                                                        if (event.value.method === 'falcon') {
-                                                            // FALCON has no batch job — open the instructions panel directly.
-                                                            event.value.command();
-                                                        } else {
-                                                            confirmAndRunWorkflow(
-                                                                data,
-                                                                event.value,
-                                                            );
-                                                        }
+                                                        confirmAndRunWorkflow(
+                                                            data,
+                                                            event.value,
+                                                        );
                                                     } else {
                                                         event.value.command();
                                                     }
@@ -1626,6 +1664,9 @@ function openBedResultsInNewTab(dataset) {
                                         <template #option="slotProps">
                                             <div
                                                 class="flex items-center gap-1.5 px-3 py-1.5"
+                                                :title="
+                                                    slotProps.option.tooltip
+                                                "
                                                 :class="{
                                                     'opacity-50 cursor-not-allowed':
                                                         slotProps.option
@@ -2245,11 +2286,6 @@ function openBedResultsInNewTab(dataset) {
             </Card>
         </div>
     </div>
-        <FalconInstructionsPanel
-            v-model:visible="falconPanelOpen"
-            :dataset="falconPanelDataset"
-            :filename="falconPanelFilename"
-        />
 </template>
 <style scoped>
 /* Timeline styling */

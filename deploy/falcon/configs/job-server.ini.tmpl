@@ -1,0 +1,143 @@
+[Settings]
+# ==========================================================================
+# FALCON config for dig-job-server uploads (dataset mode).
+#
+# A copy of t2d-headtohead.ini.tmpl with the pipeline-supplied block reduced
+# to what dataset mode actually varies. `falcon-batch --username U --dataset
+# D` (deploy/falcon/falcon-batch.sh) renders this template by substituting
+# @OUT_BASE@, @CHR@ and @SUMSTATS@, then appends s2g-folder and gene-folder
+# (pointing at the bundled reference under FALCON_REF_DIR) and ld-folder
+# (S3) itself -- so they are deliberately NOT set here.
+#
+# No dentist-file / dentist-folder: with a DENTIST file present FALCON keeps
+# only the top 20% of variants by |Z|, which would silently invalidate the
+# |Z| >= zero-snp-thr pre-filter the converter already applied.
+#
+# Every model parameter below is unchanged from Edgar's settings file.
+# ==========================================================================
+
+# --- pipeline-supplied ----------------------------------------------------
+out-base-name = @OUT_BASE@
+chr-to-update = @CHR@
+
+sumstats-folder = @SUMSTATS@
+
+ld-id1-col = SNP_A
+ld-chrom1-col = CHR_A
+ld-pos1-col = BP_A
+ld-id2-col = SNP_B
+ld-chrom2-col = CHR_B
+ld-pos2-col = BP_B
+ld-r-col = R2
+sumstats-freq-col = None
+# --- end pipeline-supplied ------------------------------------------------
+
+# Sumstats file ======================================================
+# sumstats file is handled by pipeline
+sumstats-id-col = rsID
+sumstats-beta-col = BETA
+sumstats-se-col = SE
+sumstats-z-col = Z
+sumstats-n-col = N
+sumstats-chr-col = CHROM
+sumstats-pos-col = POS
+sumstats-ref-col = REF
+sumstats-alt-col = ALT
+
+# Gene file ===========================================================
+
+gene-id-col = GENE
+gene-chrom-col = CHR
+gene-start-col = START
+gene-end-col = END
+gene-direction-col = DIRECTION
+
+# S2G options ====================================================
+
+s2g-rsid-col = SNP
+s2g-gene-col = GENE
+s2g-score-col = cS2G
+s2g-precision = 1.0
+s2g-variants-only = 0
+norm-link-prob = 0
+
+# LD file ==================================================================
+
+all-positive = False
+max-component-size = 1000
+stab-term-frac = 1e-4
+min-ld-threshold = 0.0
+max-ld-threshold = 1.0
+
+# Variant filtering =======================================================
+n-threshold = 0
+maf = 0.0
+zero-snp-thr = 5.0
+
+# Infinitesimal Model =========================================================
+# TODO: estimate per-dataset instead of reusing the T2D head-to-head value --
+# needs an h2 source, which is out of scope for dataset mode (Task 8).
+inf-heritability = 0.1212
+inf-total-num-SNPs = 2648683
+
+# Gibbs Model ================================================================
+p = 0.00014
+epsilon = 0.00000001
+p-in = 0.0014
+sigma = 8.3127e-06
+local-sigma = 500_000
+dynamic-boundary = 0
+sample-size = 625000
+gene-prior = 0.01
+normalization-source = z-score
+
+# Window options ================================================================
+window-distro = logit_approx
+weibull-shape = 6.777
+weibull-scale = 4.478
+causal-window = 100_000
+initial-window-decay = -1500
+num-win-components = 20
+window-type = mean
+learn-logit-fixed-decay = 1
+
+# Gibbs control sequence ========================================================
+update-gene = 1
+update-stats = 1
+update-window = 1
+update-links = 1
+update-snp-prior = 1
+
+# Gibbs prior strength ==========================================================
+prior-sigma-alpha = 1000000
+prior-p-alpha = 1000000
+prior-p-in-alpha = 1000000
+prior-pi-alpha = 1000000
+prior-p-out-alpha = 1000000
+
+# Gibbs convergence ============================================================
+num-chains = 20
+burn-in = 30
+max-iter = 500
+convergence-thr = 1.1
+window-convergence-thr = 1.2
+convergence-method = regular
+
+# Gibbs Debug ==================================================================
+store-data = 0
+light-mode = 1
+debug-level = 3
+plot-results = 0
+plot-all = 0
+debug-chr-coeff = 0
+beta-agg-method = maxmin
+ignore-shrinkage = 1
+
+# Annotation options ===========================================================
+# annotations coefficients are handled by pipeline
+
+# Optimization options ==========================================================
+num-competing-genes = 10
+proxy-snps-distance = 1_000_000
+sorted-ld = 1
+lazy-link-update = 1

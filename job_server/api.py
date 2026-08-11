@@ -809,15 +809,10 @@ async def job_status(job_id: str):
 
 async def start_job(user: User, dataset: str, method: str, background_tasks: BackgroundTasks, prefix: str = ""):
     database_utils.log_job_start(get_db(), user.username, dataset, f"RUNNING {method}", prefix=prefix)
-    background_tasks.add_task(batch.submit_and_await_job, {
-        'jobName': 'dig-sldsc-methods',
-        'jobQueue': 'sldsc-methods-job-queue',
-        'jobDefinition': 'dig-sldsc-methods',
-        'parameters': {
-            'username': user.username,
-            'dataset': dataset,
-            'method': method
-        }}, user.username, dataset, method, job_queues, prefix)
+    background_tasks.add_task(
+        batch.submit_and_await_job,
+        batch.job_config(method, user.username, dataset),
+        user.username, dataset, method, job_queues, prefix)
 
 @router.post("/start-analysis")
 async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks,
