@@ -31,7 +31,8 @@
         "vue-router": "^4.6.3"
     },
     "overrides": {
-        "vue": "^3.5.32"
+        "vue": "^3.5.32",
+        "@bomb.sh/tab": "^0.0.22"
     },
     "devDependencies": {
         "@primevue/nuxt-module": "^4.5.5",
