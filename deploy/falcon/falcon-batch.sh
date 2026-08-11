@@ -195,6 +195,41 @@ print(int(round(n)) if n is not None else "")
 ' "$RAW_DIR/metadata" 2>/dev/null || true)"
 
     CONFIG_ARG="$WORK_DIR/job-server.ini"
+    # --- LD chunk selection -------------------------------------------------
+    # Fetch only the 1 Mb windows holding significant variants, not the whole
+    # 39 GB reference. falcon-rs keeps an LD row only when BOTH its SNPs are in
+    # the modelled set, so windows without one contribute nothing. Verified
+    # lossless against the monolithic reference on real data: identical usable
+    # rows from 35 MB instead of 348 MB on chr22.
+    LD_DIR="$WORK_DIR/ld"
+    mkdir -p "$LD_DIR"
+    CHUNK_LIST="$WORK_DIR/ld-chunks.txt"
+    if ! python3 -m falcon_prep.ldchunks \
+            --sumstats-dir "$SUMSTATS_DIR" \
+            --prefix "${FALCON_LD_CHUNKS:-s3://falcon-data-center/ld_chunks}" \
+            > "$CHUNK_LIST"; then
+        die "could not determine which LD chunks are needed"
+    fi
+    CHUNK_COUNT="$(wc -l < "$CHUNK_LIST")"
+    log "staging ${CHUNK_COUNT} LD chunks (of the whole-genome reference)"
+    T_LD_START="$(now)"
+    # One s5cmd batch beats one invocation per chunk.
+    awk -F'\t' -v d="$LD_DIR" '{print "cp " $1 " " d "/" $2 "/"}' "$CHUNK_LIST" \
+        | s5cmd --log error run || die "LD chunk download failed"
+    # Concatenate each chromosome's chunks into the {chr}.ld.sorted FALCON
+    # expects. Order does not matter -- read_ld_sparse builds a sparse matrix
+    # from rows in any order, and `sorted-ld` is declared but never read. Extra
+    # header lines are dropped so the file has exactly one.
+    for d in "$LD_DIR"/*/; do
+        [[ -d "$d" ]] || continue
+        c="$(basename "$d")"
+        { head -1 "$(find "$d" -name '*.ld' | head -1)"
+          find "$d" -name '*.ld' -exec grep -hv '^#' {} +
+        } > "$LD_DIR/${c}.ld.sorted"
+        rm -rf "$d"
+    done
+    log "LD staged in $(elapsed "$T_LD_START" "$(now)")s ($(du -sh "$LD_DIR" | cut -f1))"
+
     sed -e "s|@OUT_BASE@|${JS_ROOT}/falcon/out|" \
         -e "s|@CHR@|${CHRS}|" \
         -e "s|@SUMSTATS@|${SUMSTATS_DIR}/|" \
@@ -202,7 +237,7 @@ print(int(round(n)) if n is not None else "")
     {
         printf 's2g-folder = %s/V2G/\n'   "${FALCON_REF_DIR:-/opt/falcon-ref}"
         printf 'gene-folder = %s/genes/\n' "${FALCON_REF_DIR:-/opt/falcon-ref}"
-        printf 'ld-folder = s3://falcon-data-center/LD/\n'
+        printf 'ld-folder = %s/\n' "$LD_DIR"
         if [[ -n "$EFFECTIVE_N" ]]; then
             printf 'sample-size = %s\n' "$EFFECTIVE_N"
         fi
