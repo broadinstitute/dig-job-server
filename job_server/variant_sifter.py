@@ -8,6 +8,22 @@ feature logic lives here; HTTP routes stay in job_server/api.py.
 # the other per-dataset workflows.
 SIFTER_METHOD = "variant-sifter"
 
+# Served unauthenticated to any holder of the GUID, so this is an allow-list,
+# not a convenience projection. The dataset name and the uploader are excluded
+# deliberately: the GUID is sha256("<dataset>-<username>"), so anyone who can
+# derive it already knows those two strings, and echoing them back would confirm
+# the guess. Widening this publishes whatever is added, to everyone.
+PUBLIC_METADATA_FIELDS = ("phenotype", "ancestry", "genome_build")
+
+
+def public_dataset_metadata(metadata: dict) -> dict:
+    """Project a stored DatasetInfo dict down to the publicly served fields.
+
+    `.get` rather than `[]` so the response shape is fixed regardless of what an
+    older row happens to carry -- a missing field serves null instead of 500ing.
+    """
+    return {field: metadata.get(field) for field in PUBLIC_METADATA_FIELDS}
+
 
 def build_sifter_url(base_url: str, guid: str, region: str | None = None) -> str:
     """Launch URL for the embedded research.html sifter, scoped to one dataset."""

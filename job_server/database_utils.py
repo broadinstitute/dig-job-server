@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from job_server.compress import LogCompressor
 from job_server.model import DatasetInfo
+from job_server.variant_sifter import SIFTER_METHOD
 
 
 def authenticate_user(db, username, password):
@@ -154,6 +155,25 @@ def get_dataset_metadata(db, username) -> dict:
         query = text("SELECT metadata, metadata->>'$.name', uploaded_at as ds_name FROM datasets WHERE uploaded_by = :username")
         results = connection.execute(query, {"username": username}).fetchall()
         return {row[1]: {**json.loads(row[0]), "uploaded_at": row[2]} for row in results}
+
+def get_indexed_dataset_metadata(db, guid: str) -> dict | None:
+    """Stored metadata for a dataset whose variant-sifter run has SUCCEEDED.
+
+    Running the sifter is what publishes a dataset to the portal, so the join
+    against workflow_jobs is the access rule, not an optimisation: an upload
+    nobody sifted is not reachable through the public endpoint.
+
+    Returns None both for an unknown GUID and for a dataset that was never
+    published; the caller must not distinguish the two.
+    """
+    with db as connection:
+        query = text("SELECT d.metadata FROM datasets d "
+                     "JOIN workflow_jobs w ON w.id = d.id "
+                     "WHERE d.id = :guid AND w.method = :method "
+                     "AND w.status = 'SUCCEEDED'")
+        row = connection.execute(
+            query, {"guid": guid, "method": SIFTER_METHOD}).fetchone()
+        return json.loads(row[0]) if row else None
 
 def get_job_status(db, job_id):
     """Returns a summary status for the dataset (most recent activity)"""

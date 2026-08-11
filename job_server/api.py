@@ -854,6 +854,36 @@ async def run_variant_sifter(dataset: str, background_tasks: BackgroundTasks,
     return {"job_id": job_id}
 
 
+# datasets.id is a sha256 hex digest. Rejecting anything else up front keeps a
+# scan of the path space off the database.
+_GUID_RE = re.compile(r"\A[0-9a-f]{64}\Z")
+
+
+@router.get("/metadata/{dataset_id}")
+def dataset_metadata(dataset_id: str):
+    """Public: resolve a sifter GUID to the dataset's display metadata.
+
+    Unauthenticated by design -- the KP portal reaches a sifted dataset as
+    `?phenotype=<guid>` and has no GWAS-CE session, so it cannot label the page
+    without this. Exempted from the blanket auth in server.py by this function's
+    name; renaming it re-authenticates the route.
+
+    Every failure returns the same 404. The endpoint is public and the GUID is
+    derivable by anyone who knows the dataset name and the username, so telling
+    "no such dataset" apart from "exists but was never published" would make
+    this an oracle for which datasets exist and who has run the sifter.
+
+    `def`, not `async def`: the query is blocking SQLAlchemy, so FastAPI runs it
+    in the threadpool rather than on the event loop.
+    """
+    if not _GUID_RE.match(dataset_id):
+        raise fastapi.HTTPException(status_code=404, detail="Not found")
+    metadata = database_utils.get_indexed_dataset_metadata(get_db(), dataset_id)
+    if metadata is None:
+        raise fastapi.HTTPException(status_code=404, detail="Not found")
+    return variant_sifter.public_dataset_metadata(metadata)
+
+
 def get_s3_results_path(dataset: str, user: User, dataset_type: str, method_group: str, method: str) -> str:
     return f"userdata/{user.username}/{dataset_type}/{dataset}/{method_group}/{method}"
 
