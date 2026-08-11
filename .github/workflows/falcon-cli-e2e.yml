@@ -7,6 +7,18 @@ on:
       - 'tests/run-sh/**'
       - 'job_server/api.py'
       - 'job_server/falcon_tokens.py'
+      # The manifest validator. falcon_prep/tests/test_contracts.py pins the
+      # converter's SCHEMA_VERSION to this module's, so a change here can only
+      # be judged by running those tests.
+      - 'job_server/falcon.py'
+      # The Batch converter and the image it ships in. Nothing else triggers on
+      # these: api-ci.yml watches job_server/, requirements.txt, tests/ and
+      # static/, so a change confined to either path ran no CI at all. That
+      # mattered most for deploy/falcon/ -- test_contracts.py exists to catch
+      # the entrypoint and the config template drifting apart, and editing
+      # either one alone was exactly the case it never ran for.
+      - 'falcon_prep/**'
+      - 'deploy/falcon/**'
       # Trigger on changes to this workflow too, so CI fixes are validated
       # without needing an unrelated code change (mirrors api-ci.yml).
       - '.github/workflows/falcon-cli-e2e.yml'
