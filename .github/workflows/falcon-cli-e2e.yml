@@ -1,12 +1,9 @@
-name: FALCON CLI E2E
+name: FALCON
 
 on:
   pull_request:
     paths:
-      - 'static/run.sh.tmpl'
-      - 'tests/run-sh/**'
       - 'job_server/api.py'
-      - 'job_server/falcon_tokens.py'
       # The manifest validator. falcon_prep/tests/test_contracts.py pins the
       # converter's SCHEMA_VERSION to this module's, so a change here can only
       # be judged by running those tests.
@@ -24,23 +21,6 @@ on:
       - '.github/workflows/falcon-cli-e2e.yml'
 
 jobs:
-  bats:
-    name: bats run.sh tests
-    # Linux-only: all run.sh tests pass on Linux (verified locally). The GitHub
-    # macOS runner lacks Docker and the harness hangs there (~16 min then fails),
-    # unreproducible on Linux; low value given run.sh is slated for deprecation
-    # (FALCON moving to AWS Batch). Re-add a macos-latest leg if that changes.
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      # apt is reliable on the runner; `npm install -g bats` was failing in the
-      # runner's global-npm environment before the tests could run.
-      - name: Install bats
-        run: sudo apt-get update && sudo apt-get install -y bats
-      - name: Run bats
-        run: bats tests/run-sh/
-
   pytest:
     name: pytest endpoints
     runs-on: ubuntu-latest

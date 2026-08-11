@@ -59,8 +59,8 @@ class Metadata:
 
 def parse_metadata(meta: dict) -> Metadata:
     """Turn a job-server raw/metadata dict into a typed Metadata."""
-    # Key names come from job_server/falcon.py::COLMAP_TO_SUMSTATS, which is the
-    # authority on what the upload form emits. `rsid` and `se` are supported for
+    # Key names are the upload form's canonical fields, emitted by
+    # frontend/utils/upload/suggestColumnMap.js. `rsid` and `se` are supported for
     # current uploads; historical datasets predate them, which is why Task 3
     # falls back to content-based rsID detection.
     cm = meta.get("col_map") or {}
