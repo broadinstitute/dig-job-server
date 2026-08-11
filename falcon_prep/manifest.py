@@ -29,6 +29,8 @@ def sha256_file(path: str) -> str:
 def build_manifest(
     dataset_name: str,
     falcon_version: str,
+    *,
+    engine: str = "falcon-rs",
     input_path: str,
     input_filename: str,
     split_chromosomes: list[int],
@@ -48,7 +50,7 @@ def build_manifest(
         "out_base_name": out_base_name,
         # Non-schema provenance. validate_manifest ignores unknown keys.
         "falcon": {
-            "engine": "falcon-rs",
+            "engine": engine,
             "z_threshold": prep_summary.get("z_threshold"),
             "rsid_column": prep_summary.get("rsid_column"),
             "rsid_resolution_rate": prep_summary.get("resolution_rate"),

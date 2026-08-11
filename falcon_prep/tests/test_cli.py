@@ -1,7 +1,7 @@
 import gzip
 import json
 import pytest
-from falcon_prep.cli import main
+from falcon_prep.cli import EXIT_NO_VARIANTS, EXIT_UNSUPPORTED, main
 
 META = {
     "name": "t", "file": "g.tsv.gz", "ancestry": "EUR", "separator": "\t",
@@ -64,7 +64,7 @@ def test_rejects_non_eur_ancestry(workspace):
     rc = main(["--raw-dir", str(workspace / "raw"),
                "--out-dir", str(workspace / "s"),
                "--dbsnp", str(workspace / "dbsnp.csv")])
-    assert rc == 2
+    assert rc == EXIT_UNSUPPORTED
 
 
 def test_rejects_grch38_without_rsid(workspace):
@@ -76,7 +76,7 @@ def test_rejects_grch38_without_rsid(workspace):
     rc = main(["--raw-dir", str(workspace / "raw"),
                "--out-dir", str(workspace / "s"),
                "--dbsnp", str(workspace / "dbsnp.csv")])
-    assert rc == 2
+    assert rc == EXIT_UNSUPPORTED
 
 
 def test_fails_when_no_variants_survive(workspace):
@@ -84,31 +84,62 @@ def test_fails_when_no_variants_survive(workspace):
                "--out-dir", str(workspace / "s"),
                "--dbsnp", str(workspace / "dbsnp.csv"),
                "--z-threshold", "50"])
-    assert rc == 3
+    assert rc == EXIT_NO_VARIANTS
 
 
-def test_missing_metadata_exits_2(workspace, capsys):
+def test_missing_metadata_exits_unsupported(workspace, capsys):
     (workspace / "raw" / "metadata").unlink()
     rc = main(["--raw-dir", str(workspace / "raw"),
                "--out-dir", str(workspace / "s"),
                "--dbsnp", str(workspace / "dbsnp.csv")])
-    assert rc == 2
+    assert rc == EXIT_UNSUPPORTED
     assert "metadata" in capsys.readouterr().err
 
 
-def test_malformed_metadata_exits_2(workspace, capsys):
+def test_malformed_metadata_exits_unsupported(workspace, capsys):
     (workspace / "raw" / "metadata").write_text("{not json")
     rc = main(["--raw-dir", str(workspace / "raw"),
                "--out-dir", str(workspace / "s"),
                "--dbsnp", str(workspace / "dbsnp.csv")])
-    assert rc == 2
+    assert rc == EXIT_UNSUPPORTED
     assert "metadata" in capsys.readouterr().err
 
 
-def test_metadata_that_is_not_an_object_exits_2(workspace, capsys):
+def test_metadata_that_is_not_an_object_exits_unsupported(workspace, capsys):
     (workspace / "raw" / "metadata").write_text("[1, 2, 3]")
     rc = main(["--raw-dir", str(workspace / "raw"),
                "--out-dir", str(workspace / "s"),
                "--dbsnp", str(workspace / "dbsnp.csv")])
-    assert rc == 2
+    assert rc == EXIT_UNSUPPORTED
     assert "metadata" in capsys.readouterr().err
+
+
+def test_contract_codes_do_not_collide_with_argparse(workspace, capsys):
+    """argparse exits 2 on a usage error.
+
+    If the contract reused 2, a harness passing a bad argument would be
+    reported as "this dataset is unsupported", and a caller branching on the
+    code would permanently mark a good dataset unusable.
+    """
+    assert EXIT_UNSUPPORTED != 2
+    assert EXIT_NO_VARIANTS != 2
+    with pytest.raises(SystemExit) as e:
+        main(["--raw-dir", str(workspace / "raw"),
+              "--out-dir", str(workspace / "s"),
+              "--dbsnp", str(workspace / "dbsnp.csv"),
+              "--z-threshold", "not-a-float"])
+    assert e.value.code == 2
+
+
+def test_unmapped_essential_columns_are_rejected_not_counted_as_thin(workspace, capsys):
+    """A col_map that never matches the header must not read as 'no signal'."""
+    meta = dict(META)
+    meta["col_map"] = {**META["col_map"], "chromosome": "NoSuchColumn"}
+    (workspace / "raw" / "metadata").write_text(json.dumps(meta))
+    rc = main(["--raw-dir", str(workspace / "raw"),
+               "--out-dir", str(workspace / "s"),
+               "--dbsnp", str(workspace / "dbsnp.csv")])
+    assert rc == EXIT_UNSUPPORTED
+    err = capsys.readouterr().err
+    assert "not present in the upload" in err
+    assert "chromosome" in err

@@ -16,6 +16,10 @@ from .columns import Metadata, detect_rsid_column
 from .zscore import derive
 
 _SAMPLE_ROWS = 200
+
+
+class UnmappedColumns(Exception):
+    """The upload's header lacks a column the run cannot proceed without."""
 _MISSING = {"", "na", "n/a", "nan", "null", "none", "."}
 
 
@@ -91,6 +95,23 @@ def extract_significant(
     i_beta, i_or = col(c.beta), col(c.odds_ratio)
     i_se, i_p, i_z, i_n = col(c.se), col(c.pvalue), col(c.zscore), col(c.n)
     i_rsid = col(rsid_col)
+
+    # Without these, every row is unparseable and the run reports "no variants
+    # passed the threshold" -- which is false, and points at the trait rather
+    # than at a column mapping that never matched the header.
+    missing = [
+        label
+        for label, idx in (("chromosome", i_chrom), ("position", i_pos))
+        if idx is None
+    ]
+    if i_beta is None and i_or is None and i_z is None:
+        missing.append("beta/oddsRatio/zScore")
+    if missing:
+        raise UnmappedColumns(
+            "these columns are not present in the upload's header: "
+            + ", ".join(missing)
+            + f". Header is: {', '.join(header[:12])}"
+        )
 
     stats = ExtractStats()
     out: list[Variant] = []

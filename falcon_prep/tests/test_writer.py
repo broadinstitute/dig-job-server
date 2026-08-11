@@ -1,5 +1,4 @@
 import os
-import pytest
 from falcon_prep.extract import Variant
 from falcon_prep.writer import write_sumstats, SUMSTATS_HEADER
 

@@ -141,7 +141,8 @@ if [[ "$CONFIG_ARG" == --username || "$CONFIG_ARG" == --dataset ]]; then
     [[ -f /opt/configs/job-server.ini.tmpl ]] \
         || die "dataset mode requires the falcon-rs image (no /opt/configs found)"
 
-    JS_ROOT="s3://${JOB_SERVER_BUCKET:-dig-ldsc-server}/userdata/${JS_USER}/genetic/${JS_DATASET}"
+    JS_BUCKET="${JOB_SERVER_BUCKET:-dig-ldsc-server}"
+    JS_ROOT="s3://${JS_BUCKET}/userdata/${JS_USER}/genetic/${JS_DATASET}"
     RAW_DIR="$WORK_DIR/raw"
     SUMSTATS_DIR="$WORK_DIR/sumstats"
     mkdir -p "$RAW_DIR" "$SUMSTATS_DIR"
@@ -152,7 +153,7 @@ if [[ "$CONFIG_ARG" == --username || "$CONFIG_ARG" == --dataset ]]; then
     DBSNP="$WORK_DIR/dbsnp.csv"
     log "fetching dbSNP GRCh37 map"
     s5cmd --log error cp \
-        "s3://${JOB_SERVER_BUCKET:-dig-ldsc-server}/bin/magma/dbSNP_common_GRCh37.csv" \
+        "s3://${JS_BUCKET}/bin/magma/dbSNP_common_GRCh37.csv" \
         "$DBSNP" || die "cannot stage dbSNP map"
 
     # One source of truth for the Z threshold: the config's own zero-snp-thr.
@@ -241,9 +242,12 @@ print(int(round(n)) if n is not None else "")
     done
     log "LD staged in $(elapsed "$T_LD_START" "$(now)")s ($(du -sh "$LD_DIR" | cut -f1))"
 
-    sed -e "s|@OUT_BASE@|${JS_ROOT}/falcon/out|" \
+    # sed treats & and | as metacharacters in a replacement, and these values
+    # come from user-supplied dataset names. Escape before substituting.
+    sed_escape() { printf '%s' "$1" | sed -e 's/[&|\\]/\\&/g'; }
+    sed -e "s|@OUT_BASE@|$(sed_escape "${JS_ROOT}/falcon/out")|" \
         -e "s|@CHR@|${CHRS}|" \
-        -e "s|@SUMSTATS@|${SUMSTATS_DIR}/|" \
+        -e "s|@SUMSTATS@|$(sed_escape "${SUMSTATS_DIR}/")|" \
         /opt/configs/job-server.ini.tmpl > "$CONFIG_ARG"
     {
         printf 's2g-folder = %s/V2G/\n'   "${FALCON_REF_DIR:-/opt/falcon-ref}"
@@ -465,13 +469,13 @@ if [[ -n "${JS_ROOT:-}" ]]; then
     UPLOAD_FILE="$(printf '%s' "$PREP_SUMMARY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_file"])')"
     [[ -n "$UPLOAD_FILE" ]] || die "converter did not report which upload file it read"
     python3 - "$JS_DATASET" "$GIT_SHA" "$RAW_DIR/$UPLOAD_FILE" "$UPLOAD_FILE" \
-             "$CHRS" "${JS_ROOT}/falcon/out" "$WORK_DIR/prep-summary.json" \
+             "${CHR_SPEC:-$CHRS}" "${JS_ROOT}/falcon/out" "$WORK_DIR/prep-summary.json" \
              <<'PY' > "$WORK_DIR/manifest.json"
-import json, sys
+import json, os, sys
 from falcon_prep.manifest import build_manifest
 dataset, sha, path, fname, chrs, out_base, prep_path = sys.argv[1:8]
 print(json.dumps(build_manifest(
-    dataset_name=dataset, falcon_version=sha,
+    dataset_name=dataset, falcon_version=sha, engine=os.environ.get("FALCON_ENGINE", "falcon-rs"),
     input_path=path, input_filename=fname,
     split_chromosomes=[int(c) for c in chrs.split(",") if c],
     out_base_name=out_base,

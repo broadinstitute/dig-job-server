@@ -3,9 +3,14 @@
     python3 -m falcon_prep.cli --raw-dir RAW --out-dir OUT --dbsnp MAP
 
 Prints a JSON summary on stdout. Exit codes:
-    0  success
-    2  dataset unsupported (ancestry, build, or missing rsID)
-    3  no variants survived -- nothing for FALCON to model
+    0   success
+    10  dataset unsupported (ancestry, build, or missing rsID)
+    11  no variants survived -- nothing for FALCON to model
+
+Deliberately not 2: argparse exits 2 on any usage error, so a harness bug
+passing a bad argument would otherwise be indistinguishable from a genuine
+"this dataset cannot be processed", and a caller branching on the code would
+mark a perfectly good dataset unsupported.
 """
 from __future__ import annotations
 
@@ -18,11 +23,14 @@ import sys
 from typing import IO, Optional
 
 from .columns import parse_metadata
-from .extract import extract_significant
+from .extract import UnmappedColumns, extract_significant
 from .resolve import UnsupportedDataset, resolve
 from .writer import write_sumstats
 
 SUPPORTED_ANCESTRY = "EUR"
+
+EXIT_UNSUPPORTED = 10
+EXIT_NO_VARIANTS = 11
 
 
 def _open_upload(raw_dir: str, filename: Optional[str]) -> tuple[IO[str], str]:
@@ -68,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         # json.JSONDecodeError subclasses ValueError, so this covers malformed
         # JSON, a non-object payload, and any filesystem error in one place.
         print(f"UNSUPPORTED: cannot read {args.raw_dir}/metadata: {exc}", file=sys.stderr)
-        return 2
+        return EXIT_UNSUPPORTED
 
     try:
         if meta.ancestry != SUPPORTED_ANCESTRY:
@@ -81,9 +89,9 @@ def main(argv: list[str] | None = None) -> int:
         with fh:
             variants, xstats, meta = extract_significant(fh, meta, args.z_threshold)
         variants, rstats = resolve(variants, meta, args.dbsnp)
-    except UnsupportedDataset as exc:
+    except (UnsupportedDataset, UnmappedColumns) as exc:
         print(f"UNSUPPORTED: {exc}", file=sys.stderr)
-        return 2
+        return EXIT_UNSUPPORTED
 
     counts = write_sumstats(variants, args.out_dir)
 
@@ -107,11 +115,20 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(summary))
 
     if not variants:
-        print(
-            f"no variants survived |Z| >= {args.z_threshold}; nothing to model",
-            file=sys.stderr,
-        )
-        return 3
+        # Which of the two happened matters: one is a thin trait, the other is a
+        # reference-coverage problem, and they need different responses.
+        if xstats.significant:
+            msg = (
+                f"{xstats.significant} variant(s) passed |Z| >= {args.z_threshold} "
+                f"but none resolved against the dbSNP reference"
+            )
+        else:
+            msg = (
+                f"no variants passed |Z| >= {args.z_threshold} "
+                f"(of {xstats.total} read, {xstats.unparseable} unparseable)"
+            )
+        print(msg, file=sys.stderr)
+        return EXIT_NO_VARIANTS
     return 0
 
 

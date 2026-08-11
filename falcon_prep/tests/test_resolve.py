@@ -1,8 +1,7 @@
-import dataclasses
 import pytest
 from falcon_prep.columns import Columns, Metadata
 from falcon_prep.extract import Variant
-from falcon_prep.resolve import resolve, ResolveStats, UnsupportedDataset
+from falcon_prep.resolve import resolve, UnsupportedDataset
 
 DBSNP = "dbSNP\tvarId\nrs100\t1:500:A:G\nrs200\t2:900:C:T\n"
 

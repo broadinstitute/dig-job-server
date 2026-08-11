@@ -4,9 +4,10 @@ The job server stores a `col_map` in each dataset's raw/metadata, but it maps
 only the columns the existing methods need -- it never records rsID. FALCON
 requires one, because its LD and S2G references are rsID-keyed.
 
-rsID detection is by CONTENT, not by column name. `variant_id` holds
-`chr:pos:ref:alt` in one surveyed upload and rsIDs in another, so names alone
-are not safe.
+rsID detection picks among plausibly-named columns by inspecting their CONTENT.
+Names alone are not safe -- `variant_id` holds `chr:pos:ref:alt` in one surveyed
+upload and rsIDs in another -- but the candidate names still gate which columns
+are considered, so a column with an unrecognised name is never chosen.
 """
 from __future__ import annotations
 
@@ -18,8 +19,13 @@ from typing import Optional
 _RSID_CANDIDATES = ("rsid", "rs_id", "rsids", "hm_rsid", "snp", "variant_id", "rs")
 _RSID_PATTERN = re.compile(r"^rs\d+$", re.IGNORECASE)
 _MISSING = {"", "na", "n/a", "nan", "null", "none", "."}
-# Fraction of sampled values that must look like rsIDs.
+# Of the values that are PRESENT, the fraction that must look like rsIDs.
 _RSID_MIN_HIT_RATE = 0.9
+# ...and enough of the column must be populated to judge it at all. Sampling
+# starts at the head of a position-sorted file, where novel variants without
+# rsIDs cluster, so a strict denominator over all sampled rows would reject
+# columns that are almost entirely valid further down.
+_RSID_MIN_PRESENT_RATE = 0.5
 
 
 @dataclass(frozen=True)
@@ -87,10 +93,12 @@ def detect_rsid_column(header: list[str], sample_rows: list[list[str]]) -> Optio
         if name.strip().lower() not in _RSID_CANDIDATES:
             continue
         values = [r[idx] for r in sample_rows if idx < len(r)]
+        if not values:
+            continue
         present = [v for v in values if v.strip().lower() not in _MISSING]
-        if not present:
+        if len(present) / len(values) < _RSID_MIN_PRESENT_RATE:
             continue
         hits = sum(1 for v in present if _RSID_PATTERN.match(v.strip()))
-        if hits / len(values) >= _RSID_MIN_HIT_RATE:
+        if hits / len(present) >= _RSID_MIN_HIT_RATE:
             return name
     return None

@@ -1,5 +1,4 @@
-import pytest
-from falcon_prep.columns import Columns, Metadata, parse_metadata, detect_rsid_column
+from falcon_prep.columns import parse_metadata, detect_rsid_column
 
 
 def test_parse_metadata_maps_job_server_col_map():
@@ -76,4 +75,19 @@ def test_detect_rsid_returns_none_when_absent():
 def test_detect_rsid_ignores_column_with_mostly_missing_values():
     header = ["chromosome", "rsid", "beta"]
     rows = [["1", "NA", "0.1"], ["1", "NA", "0.2"], ["1", "rs123", "0.3"]]
+    assert detect_rsid_column(header, rows) is None
+
+
+def test_detection_survives_missing_rsids_in_the_sampled_head():
+    # Sampling starts at the head of a position-sorted file, where novel
+    # variants without rsIDs cluster. A column that is 85% populated and wholly
+    # valid where populated must still be detected.
+    header = ["chrom", "rsid", "beta"]
+    rows = [["1", "NA", "0.1"]] * 3 + [["1", f"rs{i}", "0.2"] for i in range(17)]
+    assert detect_rsid_column(header, rows) == "rsid"
+
+
+def test_a_column_of_mostly_junk_is_still_rejected():
+    header = ["chrom", "rsid", "beta"]
+    rows = [["1", f"chr1:{i}:A:G", "0.1"] for i in range(20)]
     assert detect_rsid_column(header, rows) is None

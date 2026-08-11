@@ -1,8 +1,7 @@
 import io
-import math
 import pytest
 from falcon_prep.columns import parse_metadata
-from falcon_prep.extract import extract_significant, Variant, ExtractStats
+from falcon_prep.extract import extract_significant
 
 META = {
     "ancestry": "EUR", "separator": "\t", "genome_build": "GRCh37",

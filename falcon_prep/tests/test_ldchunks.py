@@ -1,4 +1,3 @@
-import pytest
 
 from falcon_prep.ldchunks import (
     CHUNK_SIZE,
