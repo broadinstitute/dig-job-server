@@ -3,9 +3,17 @@ name: Frontend CI/CD
 on:
     push:
         branches:
-            - "*"
+            # "**", not "*": a single star stops at a slash, so "*" matched
+            # neither dependabot/npm_and_yarn/... nor any other grouped branch
+            # name. Every Dependabot PR here had therefore run no CI at all,
+            # which is why none of them could be judged safe to merge.
+            - "**"
         paths:
             - "frontend/**"
+            # Trigger on changes to this workflow too, so CI fixes are validated
+            # without needing an unrelated frontend change. api-ci.yml and
+            # falcon-cli-e2e.yml both already do this; this one did not.
+            - ".github/workflows/frontend-ci.yml"
 
 jobs:
     build:
