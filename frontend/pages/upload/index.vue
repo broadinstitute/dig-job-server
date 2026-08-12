@@ -209,7 +209,7 @@
                                     class="card flex flex-wrap gap-1 required-card"
                                 >
                                     <h6 class="w-full">Required fields:</h6>
-                                    <template v-for="field in requiredFields">
+                                    <template v-for="field in REQUIRED_FIELDS">
                                         <Chip
                                             v-if="
                                                 Object.values(
@@ -354,6 +354,10 @@
 import { useUserStore } from "~/stores/UserStore";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore";
 import { suggestColumnMap } from "~/utils/upload/suggestColumnMap";
+import {
+    REQUIRED_FIELDS,
+    missingRequiredFields,
+} from "~/utils/upload/requiredFields";
 import axios from "axios";
 const fileInfo = ref({});
 const fileInput = ref(null);
@@ -404,7 +408,7 @@ watch(
             return;
         }
 
-        const hasRequiredFields = requiredFields.every(
+        const hasRequiredFields = REQUIRED_FIELDS.every(
             (field) => field.value in colMap.value,
         );
         const hasEffectSize =
@@ -447,15 +451,8 @@ const colOptions = [
     { name: "maf", value: "maf" },
     { name: "zScore", value: "zScore" },
 ];
-const requiredFields = [
-    { name: "chromosome", value: "chromosome" },
-    { name: "position", value: "position" },
-    { name: "rsID", value: "rsid" },
-    { name: "other_allele", value: "reference" },
-    { name: "effect_allele", value: "alt" },
-    { name: "pValue", value: "pValue" },
-    { name: "se", value: "se" },
-];
+// REQUIRED_FIELDS lives in utils/ so the rule -- in particular the deliberate
+// absence of `se` -- is covered by tests rather than buried in this component.
 
 const tableRows = computed(() => {
     return fileInfo.value.columns
@@ -496,9 +493,7 @@ const missingRequirementsMessages = computed(() => {
         messages.push("Genome build is required");
     }
 
-    const missingFields = requiredFields.filter(
-        (field) => !(field.value in colMap.value),
-    );
+    const missingFields = missingRequiredFields(colMap.value);
     if (missingFields.length > 0) {
         messages.push(
             `Map required fields: ${missingFields.map((f) => f.name).join(", ")}`,
@@ -532,7 +527,7 @@ const formIncomplete = computed(() => {
     return (
         !file.value ||
         !dataSetName.value ||
-        !requiredFields.every(
+        !REQUIRED_FIELDS.every(
             (field) => field.value in colMap.value && colMap.value[field.value],
         ) ||
         !("beta" in colMap.value || "oddsRatio" in colMap.value) ||
