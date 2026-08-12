@@ -141,38 +141,11 @@ Resources:
                   - logs:PutLogEvents
                 Resource: '*'
 
-  FalconJobDefinition:
-    Type: AWS::Batch::JobDefinition
-    Properties:
-      Type: container
-      JobDefinitionName: falcon-job
-      PlatformCapabilities:
-        - FARGATE
-      PropagateTags: true
-      Tags:
-        Project: falcon
-        ManagedBy: cloudformation
-      Timeout:
-        AttemptDurationSeconds: 86400
-      Parameters:
-        s3_config: ''
-      ContainerProperties:
-        Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepository}'
-        Command:
-          - 'Ref::s3_config'
-        JobRoleArn: !GetAtt FalconJobRole.Arn
-        ExecutionRoleArn: !GetAtt FalconJobRole.Arn
-        ResourceRequirements:
-          - Type: VCPU
-            Value: '8'
-          - Type: MEMORY
-            Value: '32768'
-        EphemeralStorage:
-          SizeInGiB: 200
-        NetworkConfiguration:
-          AssignPublicIp: ENABLED
-        FargatePlatformConfiguration:
-          PlatformVersion: LATEST
+# The FALCON job definition is NOT defined here. job_server/batch.py submits to
+# `falcon-rs-dataset-job`, which deploy/falcon/deploy.sh registers (VCPU=16,
+# MEMORY=32768). This stack used to also define an unused `falcon-job` at a
+# different size; two definitions describing the same job invited reading the
+# sizing off whichever one you found first, so the orphan was removed.
 
 Outputs:
   EcrRepositoryUri:
@@ -180,8 +153,6 @@ Outputs:
     Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepository}'
   JobQueueName:
     Value: !Ref FalconJobQueue
-  JobDefinitionName:
-    Value: !Ref FalconJobDefinition
   ResultsBucketName:
     Value: !Ref ResultsBucket
   JobRoleArn:
