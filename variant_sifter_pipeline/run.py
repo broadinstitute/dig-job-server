@@ -22,6 +22,7 @@ import boto3
 
 from .associations import build_associations
 from .canonicalize import canonicalize
+from .credible_sets import build_and_index_credible_sets
 from .index_build import associations_key, index_associations
 from .reference import ReferenceGenome, ensure_local_reference, orient_records
 
@@ -96,6 +97,20 @@ def run(username: str, dataset: str, guid: str) -> int:
 
     index_associations(guid)
     print(f"indexed associations into the gwas-ce bioindex as associations-{guid}")
+
+    # Credible sets are derived from the records just built (PLINK clumping +
+    # ABF, the portal's own bottom-line recipe). They are an enhancement: any
+    # failure here must not take down the associations the user came for.
+    try:
+        n_cred = build_and_index_credible_sets(
+            s3, GWAS_CE_BUCKET, records, guid,
+            dataset=dataset, ancestry=meta.get("ancestry"))
+        print(f"indexed {n_cred} credible-set variants as "
+              f"credible-variants-{guid} / credible-sets-{guid}")
+    except Exception as exc:
+        print(f"WARNING: credible-set derivation failed; "
+              f"associations are unaffected: {exc}")
+
     return len(records)
 
 

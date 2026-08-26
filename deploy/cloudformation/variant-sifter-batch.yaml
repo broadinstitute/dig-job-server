@@ -55,6 +55,12 @@ Parameters:
     Type: String
     Default: gwas_ce
     Description: MySQL schema on the Aurora cluster holding the bioindex tables.
+  ClumpingAssetsBucket:
+    Type: String
+    Default: dig-analysis-bin
+    Description: >-
+      Bucket with the aggregator's clumping assets the credible-set step
+      downloads at run time (PLINK 1.9, 1000G bfile panels, dbSNP-common map).
 
 Resources:
   Repository:
@@ -105,6 +111,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::${UploadBucket}/*'
                   - !Sub 'arn:aws:s3:::${BioindexBucket}/*'
+                  - !Sub 'arn:aws:s3:::${ClumpingAssetsBucket}/*'
         # Write the built associations/<guid>/ records (only to the bioindex bucket).
         - PolicyName: S3Write
           PolicyDocument:

@@ -64,18 +64,52 @@ def associations_key(guid: str) -> str:
     return f"{associations_prefix(guid)}associations.json"
 
 
-def index_associations(guid: str) -> None:
-    """Create (idempotent) then build this dataset's own associations index."""
-    name = associations_index_name(guid)
-    table = associations_table_name(guid)
-    prefix = associations_prefix(guid)
+# Credible-set indexes mirror the main portal's `credible-sets` (region/locus
+# query) and `credible-variants` (members of one set) definitions, per-dataset.
+CREDIBLE_SETS_SCHEMA = "phenotype,chromosome:start-end"
+CREDIBLE_VARIANTS_SCHEMA = "phenotype,credibleSetId"
+
+
+def credible_sets_index_name(guid: str) -> str:
+    return f"credible-sets-{guid}"
+
+
+def credible_sets_table_name(guid: str) -> str:
+    return f"credset_{guid[:_TABLE_GUID_CHARS]}"
+
+
+def credible_sets_prefix(guid: str) -> str:
+    return f"credible-sets/{guid}/"
+
+
+def credible_sets_key(guid: str) -> str:
+    return f"{credible_sets_prefix(guid)}sets.json"
+
+
+def credible_variants_index_name(guid: str) -> str:
+    return f"credible-variants-{guid}"
+
+
+def credible_variants_table_name(guid: str) -> str:
+    return f"credvar_{guid[:_TABLE_GUID_CHARS]}"
+
+
+def credible_variants_prefix(guid: str) -> str:
+    return f"credible-variants/{guid}/"
+
+
+def credible_variants_key(guid: str) -> str:
+    return f"{credible_variants_prefix(guid)}variants.json"
+
+
+def _create_and_build(name: str, table: str, prefix: str, schema: str) -> None:
     base = [sys.executable, "-m", "bioindex.main"]
 
     # `create` logs "Failed to create index ..." and STILL EXITS 0, so check=True
     # alone lets a bad prefix or schema through; it then surfaces from the next
     # command as a misleading `KeyError: No such index`. Inspect the output.
     created = subprocess.run(
-        base + ["create", name, table, prefix, _SCHEMA, "--yes"],
+        base + ["create", name, table, prefix, schema, "--yes"],
         check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
     )
     print(created.stdout, end="")
@@ -85,3 +119,20 @@ def index_associations(guid: str) -> None:
     # Not captured: this is the long step and its progress belongs in the job
     # log as it happens, not buffered until it finishes.
     subprocess.run(base + ["index", name, "--yes"], check=True)
+
+
+def index_associations(guid: str) -> None:
+    """Create (idempotent) then build this dataset's own associations index."""
+    _create_and_build(associations_index_name(guid), associations_table_name(guid),
+                      associations_prefix(guid), _SCHEMA)
+
+
+def index_credible_sets(guid: str) -> None:
+    _create_and_build(credible_sets_index_name(guid), credible_sets_table_name(guid),
+                      credible_sets_prefix(guid), CREDIBLE_SETS_SCHEMA)
+
+
+def index_credible_variants(guid: str) -> None:
+    _create_and_build(credible_variants_index_name(guid),
+                      credible_variants_table_name(guid),
+                      credible_variants_prefix(guid), CREDIBLE_VARIANTS_SCHEMA)

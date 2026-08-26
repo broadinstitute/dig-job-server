@@ -28,8 +28,11 @@ def test_run_reads_upload_builds_writes_and_indexes():
 
     # Orientation is exercised by test_run_orients_alleles below; these two cover
     # the read/build/write/index wiring and must not reach for a reference genome.
+    # The credible-set step is stubbed for the same reason: unpatched it would
+    # reach for real S3 clumping assets (its own wiring has dedicated tests).
     with patch.object(run_mod.boto3, "client", return_value=s3), \
          patch.object(run_mod, "ORIENT_ALLELES", False), \
+         patch.object(run_mod, "build_and_index_credible_sets"), \
          patch.object(run_mod, "index_associations") as idx:
         n = run_mod.run("u", "d", "guidX")
 
@@ -63,6 +66,7 @@ def test_run_decompresses_gzipped_upload():
 
     with patch.object(run_mod.boto3, "client", return_value=s3), \
          patch.object(run_mod, "ORIENT_ALLELES", False), \
+         patch.object(run_mod, "build_and_index_credible_sets"), \
          patch.object(run_mod, "index_associations"):
         n = run_mod.run("u", "d", "guidG")
 
@@ -71,6 +75,57 @@ def test_run_decompresses_gzipped_upload():
     rec = json.loads(kwargs["Body"].decode().strip())
     assert (rec["chromosome"], rec["position"]) == ("8", 100)
     assert rec["pValue"] == 1e-9
+
+
+def test_run_builds_credible_sets_after_indexing_associations():
+    """The same job that indexes associations also derives + indexes the
+    dataset's credible sets, keyed by the same GUID."""
+    meta = {
+        "file": "gwas.tsv", "separator": "\t", "ancestry": "EU",
+        "col_map": {"chromosome": "CHR", "position": "POS", "reference": "REF",
+                    "alt": "ALT", "pValue": "P"},
+    }
+    gwas = b"CHR\tPOS\tREF\tALT\tP\n8\t100\tA\tG\t1e-9\n"
+
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gwas)]
+
+    with patch.object(run_mod.boto3, "client", return_value=s3), \
+         patch.object(run_mod, "ORIENT_ALLELES", False), \
+         patch.object(run_mod, "index_associations"), \
+         patch.object(run_mod, "build_and_index_credible_sets") as cred:
+        run_mod.run("u", "myGwas", "guidC")
+
+    (s3_arg, bucket, records, guid), kwargs = cred.call_args
+    assert (s3_arg, bucket, guid) == (s3, run_mod.GWAS_CE_BUCKET, "guidC")
+    assert kwargs == {"dataset": "myGwas", "ancestry": "EU"}
+    assert [r["position"] for r in records] == [100]
+
+
+def test_run_survives_a_credible_set_failure(capsys):
+    """Credible sets are an enhancement: if derivation blows up (plink asset
+    missing, panel mismatch, ...), the associations index must still ship and
+    the job must not fail."""
+    meta = {
+        "file": "gwas.tsv", "separator": "\t",
+        "col_map": {"chromosome": "CHR", "position": "POS", "reference": "REF",
+                    "alt": "ALT", "pValue": "P"},
+    }
+    gwas = b"CHR\tPOS\tREF\tALT\tP\n8\t100\tA\tG\t1e-9\n"
+
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gwas)]
+
+    with patch.object(run_mod.boto3, "client", return_value=s3), \
+         patch.object(run_mod, "ORIENT_ALLELES", False), \
+         patch.object(run_mod, "index_associations") as idx, \
+         patch.object(run_mod, "build_and_index_credible_sets",
+                      side_effect=RuntimeError("no panel")):
+        n = run_mod.run("u", "d", "guidF")
+
+    assert n == 1
+    idx.assert_called_once()
+    assert "credible-set derivation failed" in capsys.readouterr().out
 
 
 def test_run_orients_alleles_against_the_reference(tmp_path, monkeypatch):
@@ -96,6 +151,7 @@ def test_run_orients_alleles_against_the_reference(tmp_path, monkeypatch):
     s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gwas)]
 
     with patch.object(run_mod.boto3, "client", return_value=s3), \
+         patch.object(run_mod, "build_and_index_credible_sets"), \
          patch.object(run_mod, "index_associations"):
         run_mod.run("u", "d", "guidO")
 

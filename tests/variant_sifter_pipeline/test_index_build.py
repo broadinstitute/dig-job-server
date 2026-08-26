@@ -56,3 +56,54 @@ def test_index_name_matches_what_the_frontend_composes():
     """frontend/utils/sifter/associationsApi.js builds `associations-<guid>`.
     The two are joined only by this string; they must be changed together."""
     assert index_build.associations_index_name(GUID) == f"associations-{GUID}"
+
+
+# --- credible-set indexes: same constraints, two more index families ------
+
+
+def test_credible_index_names_follow_the_portal_convention():
+    """The main portal serves `credible-sets` / `credible-variants`; the
+    per-dataset flavors append the GUID exactly like associations does."""
+    assert index_build.credible_sets_index_name(GUID) == f"credible-sets-{GUID}"
+    assert index_build.credible_variants_index_name(GUID) == f"credible-variants-{GUID}"
+
+
+def test_credible_table_names_fit_mysql_and_stay_distinct():
+    """Same 64-char identifier cap; the two families and associations must
+    never collide with each other for the same GUID."""
+    names = {index_build.associations_table_name(GUID),
+             index_build.credible_sets_table_name(GUID),
+             index_build.credible_variants_table_name(GUID)}
+    assert len(names) == 3
+    assert all(len(n) <= 64 for n in names)
+
+
+def test_credible_written_keys_live_under_their_indexed_prefixes():
+    """The writer/indexer invariant again, per family — and the families must
+    not shadow each other's prefixes (`credible-sets/` vs `credible-variants/`
+    differ, but a rename could silently cross-ingest)."""
+    for prefix_fn, key_fn in [
+        (index_build.credible_sets_prefix, index_build.credible_sets_key),
+        (index_build.credible_variants_prefix, index_build.credible_variants_key),
+    ]:
+        prefix, key = prefix_fn(GUID), key_fn(GUID)
+        assert prefix.endswith("/")
+        assert key.startswith(prefix)
+        assert key != prefix
+    assert not index_build.credible_variants_prefix(GUID).startswith(
+        index_build.credible_sets_prefix(GUID))
+
+
+def test_credible_prefixes_never_match_another_dataset():
+    for prefix_fn in (index_build.credible_sets_prefix,
+                      index_build.credible_variants_prefix):
+        a, b = prefix_fn("aaa"), prefix_fn("aaabbb")
+        assert not b.startswith(a)
+        assert not a.startswith(b)
+
+
+def test_credible_schemas_match_the_main_portal():
+    """The frontend queries these shapes: sets by region (locus query), the
+    set's variants by id. They mirror bioindex's main-portal definitions."""
+    assert index_build.CREDIBLE_SETS_SCHEMA == "phenotype,chromosome:start-end"
+    assert index_build.CREDIBLE_VARIANTS_SCHEMA == "phenotype,credibleSetId"
