@@ -2,6 +2,8 @@
 import { useUserStore } from "~/stores/UserStore.js";
 import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 import { falconEligibility } from "~/utils/falcon/eligibility.js";
+import { buildFormData, isReady, describeUploadError } from "~/utils/upload/credibleSetForm.js";
+import { statusTag, hasFailed } from "~/utils/credibleSets/statusTag.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -22,6 +24,11 @@ const helpPopover = ref(null);
 // Select is rendered per table row from the same template.
 const selectedAnalysis = reactive({});
 const selectedBedAnalysis = reactive({});
+// Credible sets attached to a GWAS: row expansion + Attach dialog.
+const expandedRows = ref({}); // keyed by dataset id (DataTable dataKey="id")
+const attachTarget = ref(null); // the dataset row the dialog is attaching to
+const attachModel = ref(null); // CredibleSetForm's v-model
+const attaching = ref(false);
 
 async function runFalcon(data) {
     const { job_id } = await userStore.startAnalysis(data.dataset, "falcon");
@@ -197,6 +204,16 @@ const listenForJobStatus = (jobId, data) => {
                 status: status,
                 updated_at: new Date().toISOString(),
             };
+
+            // The derived status lives server-side: refresh the row's list
+            // when an ingesting job finishes so Pending/Indexing flip correctly.
+            if (
+                status !== "RUNNING" &&
+                ["credible-sets", "variant-sifter"].includes(method) &&
+                Array.isArray(data.credible_sets)
+            ) {
+                refreshCredibleSets(data);
+            }
         }
 
         if (statusData.status.endsWith("SUCCEEDED")) {
@@ -1022,6 +1039,96 @@ async function handleDeleteBedFile(datasetName, filename) {
     });
 }
 
+// ---- credible sets ----
+async function refreshCredibleSets(row) {
+    try {
+        row.credible_sets = await userStore.listCredibleSets(row.dataset);
+    } catch (error) {
+        console.error("Could not refresh credible sets:", error);
+    }
+}
+
+function openAttach(row) {
+    attachModel.value = null;
+    attachTarget.value = row;
+}
+
+function closeAttach() {
+    attachTarget.value = null;
+    attachModel.value = null;
+}
+
+function startIngestJob(row) {
+    row.status = "RUNNING credible-sets";
+    listenForJobStatus(row.id, row);
+}
+
+async function submitAttach() {
+    if (!isReady(attachModel.value) || !attachTarget.value) return;
+    const row = attachTarget.value;
+    attaching.value = true;
+    try {
+        const record = await userStore.uploadCredibleSet(row.dataset, buildFormData(attachModel.value));
+        row.credible_sets = [...(row.credible_sets || []), record];
+        expandedRows.value = { ...expandedRows.value, [row.id]: true };
+        if (record.job_id) startIngestJob(row);
+        toast.add({
+            severity: "success",
+            summary: "Credible set attached",
+            detail: record.job_id
+                ? `${record.name} is being indexed`
+                : `${record.name} will be indexed when you run Variant Sifter`,
+            life: 6000,
+        });
+        closeAttach();
+    } catch (error) {
+        toast.add({ severity: "error", summary: "Attach failed", detail: describeUploadError(error), life: 8000 });
+    } finally {
+        attaching.value = false;
+    }
+}
+
+function handleDeleteCredibleSet(row, cs) {
+    confirm.require({
+        message: `Remove the credible set "${cs.name}" from ${row.dataset}?`,
+        header: "Delete Confirmation",
+        icon: "pi pi-exclamation-triangle",
+        acceptClass: "p-button-danger",
+        accept: async () => {
+            try {
+                const { job_id } = await userStore.deleteCredibleSet(row.dataset, cs.slug);
+                row.credible_sets = row.credible_sets.filter((c) => c.slug !== cs.slug);
+                if (job_id) startIngestJob(row);
+                toast.add({ severity: "success", summary: "Deleted", detail: `${cs.name} removed`, life: 4000 });
+            } catch (error) {
+                toast.add({ severity: "error", summary: "Error", detail: describeUploadError(error), life: 6000 });
+            }
+        },
+    });
+}
+
+async function downloadCredibleSet(row, cs) {
+    try {
+        await userStore.downloadCredibleSet(row.dataset, cs.slug);
+    } catch (error) {
+        toast.add({ severity: "error", summary: "Error", detail: "Failed to download file", life: 5000 });
+    }
+}
+
+async function retryCredibleSets(row) {
+    try {
+        await userStore.reindexCredibleSets(row.dataset);
+        startIngestJob(row);
+        toast.add({ severity: "success", summary: "Indexing restarted", life: 4000 });
+    } catch (error) {
+        toast.add({ severity: "error", summary: "Error", detail: describeUploadError(error), life: 6000 });
+    }
+}
+
+function openCredibleSetLog(row) {
+    router.push(`/log/${row.id}?method=credible-sets`);
+}
+
 // BED File Workflow Functions
 function getBedWorkflowOptions(data) {
     const options = [];
@@ -1255,6 +1362,30 @@ function openBedResultsInNewTab(dataset) {
         <div id="gwas" class="col-span-12">
             <Toast position="top-center" />
             <ConfirmDialog />
+            <Dialog
+                :visible="attachTarget !== null"
+                @update:visible="(open) => { if (!open) closeAttach(); }"
+                modal
+                :header="`Attach a credible set to ${attachTarget?.dataset ?? ''}`"
+                :style="{ width: '50rem' }"
+                :breakpoints="{ '960px': '95vw' }"
+            >
+                <CredibleSetForm
+                    v-if="attachTarget"
+                    :dataset="attachTarget.dataset"
+                    v-model="attachModel"
+                />
+                <template #footer>
+                    <Button label="Cancel" severity="secondary" outlined @click="closeAttach" />
+                    <Button
+                        label="Upload"
+                        icon="pi pi-upload"
+                        :disabled="!isReady(attachModel) || attaching"
+                        :loading="attaching"
+                        @click="submitAttach"
+                    />
+                </template>
+            </Dialog>
             <ConfirmDialog group="workflow-confirmation">
                 <template #message="slotProps">
                     <div class="flex flex-col gap-4 p-4">
@@ -1545,7 +1676,10 @@ function openBedResultsInNewTab(dataset) {
                         size="small"
                         sortField="uploaded_at"
                         :sortOrder="-1"
+                        v-model:expandedRows="expandedRows"
+                        dataKey="id"
                     >
+                        <Column expander :style="{ width: '3rem' }" />
                         <Column field="dataset" header="Dataset">
                             <template #body="{ data }">
                                 <span
@@ -1596,6 +1730,22 @@ function openBedResultsInNewTab(dataset) {
                         <Column field="genome_build" header="Genome Build">
                             <template #body="{ data }">
                                 {{ data.genome_build }}
+                            </template>
+                        </Column>
+                        <Column header="Credible sets" :style="{ width: '9rem' }">
+                            <template #body="{ data }">
+                                <div class="flex items-center gap-2">
+                                    <span>{{ (data.credible_sets || []).length }}</span>
+                                    <Button
+                                        icon="pi pi-plus"
+                                        label="Attach"
+                                        size="small"
+                                        outlined
+                                        severity="secondary"
+                                        @click="openAttach(data)"
+                                        v-tooltip.top="'Attach a credible set to this GWAS'"
+                                    />
+                                </div>
                             </template>
                         </Column>
                         <Column
@@ -1890,6 +2040,69 @@ function openBedResultsInNewTab(dataset) {
                                 />
                             </template>
                         </Column>
+                        <template #expansion="{ data }">
+                            <div class="p-3">
+                                <div v-if="!(data.credible_sets || []).length" class="text-surface-500 text-sm">
+                                    No credible sets attached. Use <b>Attach</b> to add fine-mapping output for this GWAS.
+                                </div>
+                                <DataTable v-else :value="data.credible_sets" size="small" class="w-full">
+                                    <Column field="name" header="Name" />
+                                    <Column field="filename" header="File" />
+                                    <Column header="Sets · variants">
+                                        <template #body="{ data: cs }">{{ cs.set_count }} · {{ cs.row_count }}</template>
+                                    </Column>
+                                    <Column header="Uploaded">
+                                        <template #body="{ data: cs }">{{ new Date(cs.uploaded_at).toLocaleString() }}</template>
+                                    </Column>
+                                    <Column header="Status">
+                                        <template #body="{ data: cs }">
+                                            <Tag
+                                                :severity="statusTag(cs.status).severity"
+                                                :icon="statusTag(cs.status).icon"
+                                                :value="statusTag(cs.status).label"
+                                                rounded
+                                                v-tooltip.top="statusTag(cs.status).tooltip"
+                                                :class="{ 'cursor-pointer': cs.status === 'failed' }"
+                                                @click="cs.status === 'failed' && openCredibleSetLog(data)"
+                                            />
+                                        </template>
+                                    </Column>
+                                    <Column header="Actions" :style="{ width: '8rem' }">
+                                        <template #body="{ data: cs }">
+                                            <div class="flex gap-2">
+                                                <Button
+                                                    icon="pi pi-download"
+                                                    size="small"
+                                                    outlined
+                                                    severity="secondary"
+                                                    @click="downloadCredibleSet(data, cs)"
+                                                    v-tooltip.top="'Download file'"
+                                                />
+                                                <Button
+                                                    v-if="userStore.user.username !== 'demo'"
+                                                    icon="pi pi-trash"
+                                                    size="small"
+                                                    outlined
+                                                    severity="danger"
+                                                    @click="handleDeleteCredibleSet(data, cs)"
+                                                    v-tooltip.top="'Delete credible set'"
+                                                />
+                                            </div>
+                                        </template>
+                                    </Column>
+                                </DataTable>
+                                <div v-if="hasFailed(data.credible_sets)" class="mt-2">
+                                    <Button
+                                        label="Retry indexing"
+                                        icon="pi pi-refresh"
+                                        size="small"
+                                        severity="warn"
+                                        outlined
+                                        @click="retryCredibleSets(data)"
+                                    />
+                                </div>
+                            </div>
+                        </template>
                     </DataTable>
                 </template>
                 <template #footer v-if="datasets.length > 0"
