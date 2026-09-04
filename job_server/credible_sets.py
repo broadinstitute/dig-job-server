@@ -48,6 +48,24 @@ def validate_name(name: str) -> str:
     return name
 
 
+FILENAME_MAX_LEN = 255
+
+
+def validate_filename(filename) -> str:
+    """The trimmed upload filename, or ValueError with a user-facing message."""
+    filename = (filename or "").strip()
+    if not filename:
+        raise ValueError("a file name is required")
+    if len(filename) > FILENAME_MAX_LEN:
+        raise ValueError(f"file name must be at most {FILENAME_MAX_LEN} characters")
+    if "/" in filename or "\\" in filename or "\x00" in filename:
+        raise ValueError("file name may not contain path separators")
+    # 'metadata' is reserved: s3.put_credible_set writes its sidecar object into the same folder under that name.
+    if filename.lower() == "metadata":
+        raise ValueError("'metadata' is a reserved file name")
+    return filename
+
+
 def derive_status(uploaded_at: datetime, jobs: "list[dict]") -> str:
     """One of pending | indexing | indexed | failed for an upload made at
     `uploaded_at`, given the dataset's workflow_jobs rows
@@ -229,6 +247,9 @@ def validate_file(raw: bytes, filename: str, separator: "str | None", col_map: d
 
     if len(raw) > MAX_BYTES:
         errors.add(None, f"File is larger than {MAX_BYTES // (1024 * 1024)} MB")
+        return finish()
+    if separator is not None and len(separator) != 1:
+        errors.add(None, "separator must be a single character")
         return finish()
     missing = [f for f in REQUIRED_FIELDS if not col_map.get(f)]
     if missing:

@@ -872,6 +872,14 @@ def _parse_col_map(col_map: str) -> dict:
     return parsed
 
 
+def _parse_separator(separator: Optional[str]) -> Optional[str]:
+    if not separator:
+        return None
+    if len(separator) == 1:
+        return separator
+    raise fastapi.HTTPException(status_code=400, detail="separator must be a single character")
+
+
 def _dataset_is_sifted(username: str, dataset: str) -> bool:
     """True once `variant-sifter SUCCEEDED`: only then does a credible-sets-only
     job have a dataset index to add to."""
@@ -909,7 +917,7 @@ async def validate_credible_set(file: UploadFile, col_map: str = Form(...),
                                 user: User = Depends(get_current_user)):
     """Dry run with no dataset: the upload wizard validates before the GWAS exists."""
     raw = await file.read()
-    return credible_sets.validate_file(raw, file.filename, separator or None, _parse_col_map(col_map))
+    return credible_sets.validate_file(raw, file.filename, _parse_separator(separator), _parse_col_map(col_map))
 
 
 @router.post("/credible-sets/{dataset}")
@@ -920,16 +928,18 @@ async def create_credible_set(dataset: str, background_tasks: BackgroundTasks, f
     _require_owned_dataset(user, dataset)
     try:
         clean_name = credible_sets.validate_name(name)
+        clean_filename = credible_sets.validate_filename(file.filename)
     except ValueError as exc:
         raise fastapi.HTTPException(status_code=400, detail=str(exc))
     parsed = _parse_col_map(col_map)
+    parsed_separator = _parse_separator(separator)
     raw = await file.read()
-    report = credible_sets.validate_file(raw, file.filename, separator or None, parsed)
+    report = credible_sets.validate_file(raw, clean_filename, parsed_separator, parsed)
     if not report["ok"]:
         raise fastapi.HTTPException(status_code=400, detail=report)
 
     info = CredibleSetInfo(
-        name=clean_name, slug=credible_sets.slugify(clean_name), file=file.filename,
+        name=clean_name, slug=credible_sets.slugify(clean_name), file=clean_filename,
         separator=report["separator"], col_map=parsed,
         uploaded_at=datetime.now(timezone.utc).isoformat(),
     )
@@ -973,9 +983,18 @@ async def download_credible_set(dataset: str, slug: str, user: User = Depends(ge
 async def remove_credible_set(dataset: str, slug: str, background_tasks: BackgroundTasks,
                               user: User = Depends(get_current_user)):
     _require_owned_dataset(user, dataset)
-    if not database_utils.delete_credible_set(get_db(), user.username, dataset, slug):
+    row = next((r for r in database_utils.get_credible_sets_for_dataset(get_db(), user.username, dataset)
+                if r["slug"] == slug), None)
+    if row is None:
         raise fastapi.HTTPException(status_code=404, detail="credible set not found")
-    s3.delete_credible_set_dir(user.username, dataset, slug)
+    # S3 first: it's idempotent, so a failure here leaves a consistent
+    # "still exists" state (surfaced as a 500) instead of orphaning objects
+    # under a prefix a later re-upload of the same slug would share.
+    try:
+        s3.delete_credible_set_dir(user.username, dataset, slug)
+    except ClientError as exc:
+        raise fastapi.HTTPException(status_code=500, detail="Failed to delete the credible set") from exc
+    database_utils.delete_credible_set(get_db(), user.username, dataset, slug)
     # The pipeline's reconcile step removes the indexed objects for uploads that
     # no longer exist, so a sifted dataset gets a job to make the delete visible.
     job_id = None

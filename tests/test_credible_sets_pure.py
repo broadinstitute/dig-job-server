@@ -46,6 +46,23 @@ def test_validate_name_trims_and_bounds_length():
     assert cs.validate_name("x" * 30) == "x" * 30
 
 
+@pytest.mark.parametrize("filename,expected", [
+    ("cs.tsv", "cs.tsv"),
+    ("  cs.tsv  ", "cs.tsv"),
+    ("", ValueError),
+    ("metadata", ValueError),
+    ("METADATA", ValueError),
+    ("a/b.tsv", ValueError),
+    ("x" * 256, ValueError),
+])
+def test_validate_filename(filename, expected):
+    if expected is ValueError:
+        with pytest.raises(ValueError):
+            cs.validate_filename(filename)
+    else:
+        assert cs.validate_filename(filename) == expected
+
+
 # ---- derive_status ----
 
 def test_status_pending_when_nothing_ran():
@@ -142,6 +159,12 @@ def test_required_field_unmapped_is_an_error_before_parsing():
     rep = _validate(_tsv("1\t100\tA\tG\t1\t0.6"), col_map={k: v for k, v in COL_MAP.items() if k != "alt"})
     assert rep["ok"] is False
     assert "alt" in rep["errors"][0]["message"]
+
+
+def test_multi_character_separator_is_a_report_error():
+    rep = cs.validate_file(_tsv("1\t100\tA\tG\t1\t0.6"), "cs.tsv", ";;", COL_MAP)
+    assert rep["ok"] is False
+    assert "single character" in rep["errors"][0]["message"]
 
 
 def test_mapped_column_missing_from_header_is_an_error():

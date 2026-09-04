@@ -83,6 +83,23 @@ def test_validate_rejects_malformed_col_map(api_client: TestClient):
     assert res.status_code == 400
 
 
+def test_multi_character_separator_is_a_400(api_client: TestClient):
+    token = _token(api_client)
+    payload = _multipart()
+    payload["data"]["separator"] = ";;"
+    res = api_client.post("/api/credible-sets/validate", **payload, headers=_auth(token))
+    assert res.status_code == 400
+
+    ds = _ds("csapi_sep")
+    _dataset(ds)
+    put, delete_dir, _, submit = _patched()
+    payload2 = _multipart()
+    payload2["data"]["separator"] = ";;"
+    with put, delete_dir, submit:
+        res2 = api_client.post(f"/api/credible-sets/{ds}", **payload2, headers=_auth(token))
+    assert res2.status_code == 400
+
+
 # ---- create ----
 
 def test_create_404s_for_a_dataset_the_user_does_not_own(api_client: TestClient):
@@ -152,6 +169,22 @@ def test_create_400s_on_a_bad_name(api_client: TestClient):
     assert res.status_code == 400
 
 
+def test_create_400s_on_a_reserved_or_bad_filename(api_client: TestClient):
+    ds = _ds("csapi_fname")
+    _dataset(ds)
+    token = _token(api_client)
+    put, delete_dir, _, submit = _patched()
+    with put as put_mock, delete_dir, submit:
+        res1 = api_client.post(f"/api/credible-sets/{ds}", **_multipart(filename="metadata"),
+                               headers=_auth(token))
+        res2 = api_client.post(f"/api/credible-sets/{ds}", **_multipart(filename="x" * 300),
+                               headers=_auth(token))
+    assert res1.status_code == 400
+    assert res2.status_code == 400
+    put_mock.assert_not_called()
+    assert database_utils.get_credible_sets_for_dataset(get_db(), USER, ds) == []
+
+
 def test_create_409s_on_a_duplicate_name(api_client: TestClient):
     ds = _ds("csapi_dupe")
     _dataset(ds)
@@ -215,6 +248,21 @@ def test_delete_reconciles_the_index_when_sifted(api_client: TestClient):
         res = api_client.delete(f"/api/credible-sets/{ds}/susie-v1", headers=_auth(token))
     assert res.json() == {"job_id": dataset_id}
     assert submit_mock.await_count == 2      # one for create, one for delete
+
+
+def test_delete_keeps_the_row_when_s3_fails(api_client: TestClient):
+    from botocore.exceptions import ClientError
+    ds = _ds("csapi_delfail")
+    _dataset(ds)
+    token = _token(api_client)
+    put, delete_dir, _, submit = _patched()
+    with put, delete_dir, submit:
+        api_client.post(f"/api/credible-sets/{ds}", **_multipart(), headers=_auth(token))
+    err = ClientError({"Error": {"Code": "500", "Message": "boom"}}, "DeleteObjects")
+    with patch("job_server.s3.delete_credible_set_dir", side_effect=err):
+        res = api_client.delete(f"/api/credible-sets/{ds}/susie-v1", headers=_auth(token))
+    assert res.status_code == 500
+    assert [r["slug"] for r in database_utils.get_credible_sets_for_dataset(get_db(), USER, ds)] == ["susie-v1"]
 
 
 def test_reindex_409s_unless_sifted_and_idle(api_client: TestClient):
