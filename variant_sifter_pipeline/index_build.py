@@ -20,6 +20,7 @@ The frontend must agree on the index NAME — see
 composes it (`ASSOCIATIONS_INDEX_LAYOUT`).
 """
 
+import re
 import subprocess
 import sys
 
@@ -136,3 +137,23 @@ def index_credible_variants(guid: str) -> None:
     _create_and_build(credible_variants_index_name(guid),
                       credible_variants_table_name(guid),
                       credible_variants_prefix(guid), CREDIBLE_VARIANTS_SCHEMA)
+
+
+# User-uploaded credible sets are written as extra objects under the SAME
+# per-dataset prefixes, so the derived and uploaded sets share one index each.
+# The slug is recoverable from the key so a sync can delete orphaned uploads.
+_UPLOAD_KEY_RE = re.compile(r"/upload-([a-z0-9-]+)\.json\Z")
+
+
+def upload_sets_key(guid: str, slug: str) -> str:
+    return f"{credible_sets_prefix(guid)}upload-{slug}.json"
+
+
+def upload_variants_key(guid: str, slug: str) -> str:
+    return f"{credible_variants_prefix(guid)}upload-{slug}.json"
+
+
+def upload_slug_of_key(key: str) -> "str | None":
+    """The upload slug an object key belongs to, or None for derived objects."""
+    m = _UPLOAD_KEY_RE.search(key)
+    return m.group(1) if m else None

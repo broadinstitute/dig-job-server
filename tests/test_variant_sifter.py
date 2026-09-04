@@ -83,7 +83,7 @@ def test_sifter_job_config_shape():
     assert cfg["jobQueue"] == "indexer-job-queue"
     assert cfg["jobDefinition"] == "gwas-ce-variant-sifter"
     assert cfg["parameters"] == {
-        "username": "testuser", "dataset": "myds", "guid": "guid123",
+        "username": "testuser", "dataset": "myds", "guid": "guid123", "mode": "full",
     }
 
 

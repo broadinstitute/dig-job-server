@@ -15,7 +15,8 @@
                     <Step value="1">Enter Metadata</Step>
                     <Step value="2">Select File</Step>
                     <Step value="3">Map Columns</Step>
-                    <Step value="4">Upload</Step>
+                    <Step value="4">Credible set (optional)</Step>
+                    <Step value="5">Upload</Step>
                 </StepList>
             </Stepper>
             <!-- Improved flex container with more explicit responsive control -->
@@ -243,80 +244,30 @@
                                     />
                                     <Chip v-else label="n" />
                                 </div>
-                                <div v-if="fileInfo.columns" class="flex">
-                                    <Button
-                                        type="button"
-                                        label="Reset Mapping"
-                                        icon="pi pi-refresh"
-                                        @click="resetMapping"
-                                        severity="help"
-                                        variant="outlined"
-                                        size="small"
-                                    ></Button>
-                                </div>
-                                <DataTable
-                                    :value="tableRows"
-                                    v-if="fileInfo.columns"
-                                    rowHover
-                                    class="w-full"
-                                    responsiveLayout="scroll"
-                                >
-                                    <Column
-                                        field="column"
-                                        header="Column from data"
-                                        class="col-span-4"
-                                        style="width: 35%"
-                                    ></Column>
-                                    <Column
-                                        header=">>"
-                                        style="width: 5%"
-                                    ></Column>
-                                    <Column
-                                        header="Required field"
-                                        style="width: 60%"
-                                    >
-                                        <template #body="{ data }">
-                                            <Select
-                                                data-cy="column-dropdown"
-                                                class="w-full"
-                                                :options="colOptions"
-                                                option-label="name"
-                                                option-value="value"
-                                                :option-disabled="
-                                                    (option) => {
-                                                        return (
-                                                            Object.values(
-                                                                selectedFields,
-                                                            ).includes(
-                                                                option.value,
-                                                            ) &&
-                                                            option.value !==
-                                                                selectedFields[
-                                                                    data.column
-                                                                ]
-                                                        );
-                                                    }
-                                                "
-                                                v-model="
-                                                    selectedFields[data.column]
-                                                "
-                                                showClear
-                                                placeholder="select field"
-                                            />
-                                        </template>
-                                    </Column>
-                                </DataTable>
-                                <div
-                                    v-if="!fileInfo.columns"
-                                    class="p-4 text-center text-gray-500"
-                                >
-                                    <i class="pi pi-file text-3xl mb-2"></i>
-                                    <p>Upload a file to map columns</p>
-                                </div>
+                                <ColumnMappingTable
+                                    :columns="fileInfo.columns || []"
+                                    :options="colOptions"
+                                    v-model="selectedFields"
+                                />
+                            </Fieldset>
+                            <Fieldset
+                                legend="Credible set (optional)"
+                                class="mb-4"
+                                :class="{
+                                    'border-primary-500 border-2':
+                                        currentStep === '4',
+                                }"
+                            >
+                                <small class="block mb-2">
+                                    Attach fine-mapping output (SuSiE, FINEMAP, …) for this
+                                    GWAS. It is uploaded together with the dataset. You can
+                                    also attach one later from the datasets page.
+                                </small>
+                                <CredibleSetForm v-model="credibleSet" />
                             </Fieldset>
                             <div class="field">
                                 <Button
-                                    label="Upload Dataset"
+                                    :label="uploadLabel"
                                     class="w-full mt-4"
                                     icon="pi pi-upload"
                                     :disabled="formIncomplete"
@@ -358,6 +309,8 @@ import {
     REQUIRED_FIELDS,
     missingRequiredFields,
 } from "~/utils/upload/requiredFields";
+import { selectedFieldsToColMap } from "~/utils/upload/colMap";
+import { buildFormData, isReady, describeUploadError } from "~/utils/upload/credibleSetForm";
 import axios from "axios";
 const fileInfo = ref({});
 const fileInput = ref(null);
@@ -377,26 +330,19 @@ const genomeBuild = ref("");
 const phenotype = ref(null);
 const filteredPhenotypes = ref([]);
 const currentStep = ref("1");
+const credibleSet = ref(null); // model emitted by CredibleSetForm
+const uploadLabel = computed(() =>
+    isReady(credibleSet.value) ? "Upload Dataset + Credible Set" : "Upload Dataset",
+);
+// A chosen-but-not-yet-valid credible set is the only thing that blocks on step 4.
+const credibleSetPending = computed(
+    () => !!credibleSet.value?.file && !credibleSet.value?.report?.ok,
+);
 
-const colMap = computed(() => {
-    //remove any null values from selectedFields
-    const filteredSelectedFields = Object.fromEntries(
-        Object.entries(selectedFields.value).filter(
-            ([key, value]) => value !== null,
-        ),
-    );
-    //transpose the object to have the value as the key and the key as the value
-    //this is the format that the backend expects
-    return Object.fromEntries(
-        Object.entries(filteredSelectedFields).map(([key, value]) => [
-            value,
-            key,
-        ]),
-    );
-});
+const colMap = computed(() => selectedFieldsToColMap(selectedFields.value));
 
 watch(
-    [dataSetName, ancestry, genomeBuild, file, colMap, effectiveN],
+    [dataSetName, ancestry, genomeBuild, file, colMap, effectiveN, credibleSet],
     () => {
         if (!dataSetName.value || !ancestry.value || !genomeBuild.value) {
             currentStep.value = "1";
@@ -422,7 +368,7 @@ watch(
             return;
         }
 
-        currentStep.value = "4";
+        currentStep.value = credibleSetPending.value ? "4" : "5";
     },
     { immediate: true },
 );
@@ -453,14 +399,6 @@ const colOptions = [
 ];
 // REQUIRED_FIELDS lives in utils/ so the rule -- in particular the deliberate
 // absence of `se` -- is covered by tests rather than buried in this component.
-
-const tableRows = computed(() => {
-    return fileInfo.value.columns
-        ? fileInfo.value.columns.map((value) => ({
-              column: value,
-          }))
-        : [];
-});
 
 const requiredEffectFields = computed(() => {
     return (
@@ -508,6 +446,10 @@ const missingRequirementsMessages = computed(() => {
         messages.push("Map n field or provide effective N");
     }
 
+    if (credibleSetPending.value) {
+        messages.push("Validate the credible set (or remove it)");
+    }
+
     return messages;
 });
 
@@ -533,7 +475,8 @@ const formIncomplete = computed(() => {
         !("beta" in colMap.value || "oddsRatio" in colMap.value) ||
         !ancestry.value ||
         !genomeBuild.value ||
-        !("n" in colMap.value || effectiveN.value)
+        !("n" in colMap.value || effectiveN.value) ||
+        credibleSetPending.value
     );
 });
 
@@ -569,6 +512,22 @@ async function uploadData() {
             phenotype: phenotypeName,
             col_map,
         });
+        if (isReady(credibleSet.value)) {
+            try {
+                await store.uploadCredibleSet(
+                    dataSetName.value,
+                    buildFormData(credibleSet.value),
+                );
+            } catch (error) {
+                // The GWAS is already finalized; do not fail the whole upload.
+                toast.add({
+                    severity: "warn",
+                    summary: "Dataset uploaded, credible set not attached",
+                    detail: `${describeUploadError(error)} — attach it from the datasets page.`,
+                    life: 10000,
+                });
+            }
+        }
         console.log("File uploaded successfully");
         await route.push("/datasets");
     } catch (error) {
@@ -650,13 +609,6 @@ async function searchPhenotypes(event) {
     } else {
         filteredPhenotypes.value = phenotypeStore.phenotypes;
     }
-}
-
-function resetMapping() {
-    //reset all values in selectedFields to null
-    Object.keys(selectedFields.value).forEach((key) => {
-        selectedFields.value[key] = null;
-    });
 }
 
 // Initialize phenotype data when component is mounted

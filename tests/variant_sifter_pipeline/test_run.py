@@ -3,6 +3,8 @@ import io
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from variant_sifter_pipeline import run as run_mod
 
 
@@ -32,7 +34,10 @@ def test_run_reads_upload_builds_writes_and_indexes():
     # reach for real S3 clumping assets (its own wiring has dedicated tests).
     with patch.object(run_mod.boto3, "client", return_value=s3), \
          patch.object(run_mod, "ORIENT_ALLELES", False), \
-         patch.object(run_mod, "build_and_index_credible_sets"), \
+         patch.object(run_mod, "write_derived_credible_sets"), \
+         patch.object(run_mod, "sync_uploaded_credible_sets"), \
+         patch.object(run_mod, "index_credible_sets"), \
+         patch.object(run_mod, "index_credible_variants"), \
          patch.object(run_mod, "index_associations") as idx:
         n = run_mod.run("u", "d", "guidX")
 
@@ -66,7 +71,10 @@ def test_run_decompresses_gzipped_upload():
 
     with patch.object(run_mod.boto3, "client", return_value=s3), \
          patch.object(run_mod, "ORIENT_ALLELES", False), \
-         patch.object(run_mod, "build_and_index_credible_sets"), \
+         patch.object(run_mod, "write_derived_credible_sets"), \
+         patch.object(run_mod, "sync_uploaded_credible_sets"), \
+         patch.object(run_mod, "index_credible_sets"), \
+         patch.object(run_mod, "index_credible_variants"), \
          patch.object(run_mod, "index_associations"):
         n = run_mod.run("u", "d", "guidG")
 
@@ -93,7 +101,10 @@ def test_run_builds_credible_sets_after_indexing_associations():
     with patch.object(run_mod.boto3, "client", return_value=s3), \
          patch.object(run_mod, "ORIENT_ALLELES", False), \
          patch.object(run_mod, "index_associations"), \
-         patch.object(run_mod, "build_and_index_credible_sets") as cred:
+         patch.object(run_mod, "sync_uploaded_credible_sets"), \
+         patch.object(run_mod, "index_credible_sets"), \
+         patch.object(run_mod, "index_credible_variants"), \
+         patch.object(run_mod, "write_derived_credible_sets") as cred:
         run_mod.run("u", "myGwas", "guidC")
 
     (s3_arg, bucket, records, guid), kwargs = cred.call_args
@@ -119,7 +130,10 @@ def test_run_survives_a_credible_set_failure(capsys):
     with patch.object(run_mod.boto3, "client", return_value=s3), \
          patch.object(run_mod, "ORIENT_ALLELES", False), \
          patch.object(run_mod, "index_associations") as idx, \
-         patch.object(run_mod, "build_and_index_credible_sets",
+         patch.object(run_mod, "sync_uploaded_credible_sets"), \
+         patch.object(run_mod, "index_credible_sets"), \
+         patch.object(run_mod, "index_credible_variants"), \
+         patch.object(run_mod, "write_derived_credible_sets",
                       side_effect=RuntimeError("no panel")):
         n = run_mod.run("u", "d", "guidF")
 
@@ -151,7 +165,10 @@ def test_run_orients_alleles_against_the_reference(tmp_path, monkeypatch):
     s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(gwas)]
 
     with patch.object(run_mod.boto3, "client", return_value=s3), \
-         patch.object(run_mod, "build_and_index_credible_sets"), \
+         patch.object(run_mod, "write_derived_credible_sets"), \
+         patch.object(run_mod, "sync_uploaded_credible_sets"), \
+         patch.object(run_mod, "index_credible_sets"), \
+         patch.object(run_mod, "index_credible_variants"), \
          patch.object(run_mod, "index_associations"):
         run_mod.run("u", "d", "guidO")
 
@@ -161,3 +178,80 @@ def test_run_orients_alleles_against_the_reference(tmp_path, monkeypatch):
     assert rec["beta"] == -0.4                            # sign follows the new alt
     assert rec["stdErr"] == 0.1                           # direction-free, unchanged
     assert rec["pValue"] == 1e-9
+
+
+# ---- modes -----------------------------------------------------------------
+
+_META = {
+    "file": "gwas.tsv", "separator": "\t", "ancestry": "EU",
+    "col_map": {"chromosome": "CHR", "position": "POS", "reference": "REF",
+                "alt": "ALT", "pValue": "P"},
+}
+_GWAS = b"CHR\tPOS\tREF\tALT\tP\n8\t100\tA\tG\t1e-9\n"
+
+
+def _full_patches(s3):
+    return (patch.object(run_mod.boto3, "client", return_value=s3),
+            patch.object(run_mod, "ORIENT_ALLELES", False),
+            patch.object(run_mod, "index_associations"),
+            patch.object(run_mod, "write_derived_credible_sets", return_value=0),
+            patch.object(run_mod, "sync_uploaded_credible_sets", return_value={}),
+            patch.object(run_mod, "index_credible_sets"),
+            patch.object(run_mod, "index_credible_variants"))
+
+
+def test_full_mode_syncs_uploads_then_indexes_credible_sets_once():
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(_META).encode()), _body(_GWAS)]
+    client, orient, idx_assoc, derived, sync, idx_sets, idx_vars = _full_patches(s3)
+    with client, orient, idx_assoc, derived, sync as sync_mock, idx_sets as sets_mock, idx_vars as vars_mock:
+        run_mod.run("u", "d", "guidM")
+    (s3_arg, up_bucket, bio_bucket, user, ds, guid), kwargs = sync_mock.call_args
+    assert (s3_arg, up_bucket, bio_bucket, user, ds, guid) == \
+        (s3, run_mod.USER_DATA_BUCKET, run_mod.GWAS_CE_BUCKET, "u", "d", "guidM")
+    assert kwargs == {"ancestry": "EU", "genome": None}
+    sets_mock.assert_called_once_with("guidM")
+    vars_mock.assert_called_once_with("guidM")
+
+
+def test_credible_sets_mode_skips_associations_and_derived_sets():
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(_META).encode())]
+    client, orient, idx_assoc, derived, sync, idx_sets, idx_vars = _full_patches(s3)
+    with client, orient, idx_assoc as assoc_mock, derived as derived_mock, sync as sync_mock, \
+         idx_sets as sets_mock, idx_vars as vars_mock:
+        n = run_mod.run("u", "d", "guidC", mode="credible-sets")
+    assert n == 0
+    assoc_mock.assert_not_called()
+    derived_mock.assert_not_called()
+    s3.put_object.assert_not_called()          # no associations written
+    sync_mock.assert_called_once()
+    sets_mock.assert_called_once_with("guidC")
+    vars_mock.assert_called_once_with("guidC")
+
+
+def test_an_upload_sync_failure_fails_the_job():
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(_META).encode()), _body(_GWAS)]
+    client, orient, idx_assoc, derived, sync, idx_sets, idx_vars = _full_patches(s3)
+    with client, orient, idx_assoc, derived, idx_sets as sets_mock, idx_vars, \
+         patch.object(run_mod, "sync_uploaded_credible_sets", side_effect=RuntimeError("bad upload")):
+        with pytest.raises(RuntimeError, match="bad upload"):
+            run_mod.run("u", "d", "guidE")
+    sets_mock.assert_not_called()
+
+
+def test_unknown_mode_is_rejected_before_touching_aws():
+    with patch.object(run_mod.boto3, "client") as client:
+        with pytest.raises(ValueError):
+            run_mod.run("u", "d", "g", mode="nope")
+    client.assert_not_called()
+
+
+def test_cli_accepts_mode(monkeypatch):
+    calls = []
+    monkeypatch.setattr(run_mod, "run", lambda *a, **kw: calls.append((a, kw)) or 0)
+    run_mod.main(["--username", "u", "--dataset", "d", "--guid", "g", "--mode", "credible-sets"])
+    assert calls == [(("u", "d", "g"), {"mode": "credible-sets"})]
+    run_mod.main(["--username", "u", "--dataset", "d", "--guid", "g"])
+    assert calls[-1] == (("u", "d", "g"), {"mode": "full"})

@@ -21,6 +21,19 @@ class DatasetInfo(BaseModel):
     effective_n: Union[float, None]
     col_map: dict
 
+class CredibleSetInfo(BaseModel):
+    """The `metadata` object stored beside an uploaded credible set in S3.
+
+    This is what the pipeline reads (name for display, slug for keys and set
+    ids, col_map to canonicalise the file). The DB row exists for the UI.
+    """
+    name: str
+    slug: str
+    file: str
+    separator: str
+    col_map: dict
+    uploaded_at: str  # ISO 8601, informational; status derivation uses the DB row
+
 class AnalysisMethod(str, Enum):
     sldsc = "sldsc"
     magma = "magma"
