@@ -3,7 +3,7 @@
 // credible-sets/credibleSets.py::convert_credible_set) minus the fields we take
 // from the parent GWAS (phenotype, ancestry, dataset). Mirrored server-side in
 // job_server/credible_sets.py REQUIRED_FIELDS / OPTIONAL_FIELDS.
-import { GWAS_COLUMN_ALIASES, suggestColumnMap } from "./suggestColumnMap";
+import { GWAS_COLUMN_ALIASES, suggestColumnMap, NEVER_FUZZY_MATCH } from "./suggestColumnMap";
 
 export const CS_REQUIRED_FIELDS = [
   { name: "chromosome", value: "chromosome" },
@@ -40,7 +40,7 @@ const CS_ONLY_ALIASES = {
   posterior: "posteriorProbability", posterior_prob: "posteriorProbability",
   posterior_probability: "posteriorProbability", prob: "posteriorProbability",
   posteriorprobability: "posteriorProbability", cs_pip: "posteriorProbability",
-  pip_cs: "posteriorProbability",
+  pip_cs: "posteriorProbability", probability: "posteriorProbability",
 };
 
 export const CREDIBLE_SET_COLUMN_ALIASES = {
@@ -52,6 +52,13 @@ export const CREDIBLE_SET_COLUMN_ALIASES = {
 
 const CS_TARGETS = CS_COL_OPTIONS.map((o) => o.value);
 
+// A wrong guess here silently reshuffles which variants belong to which
+// credible set, or corrupts the reported posterior probability; server
+// validation cannot detect a plausible-looking wrong column. Alias only.
+export const CS_NEVER_FUZZY_MATCH = new Set([
+  ...NEVER_FUZZY_MATCH, "credibleSetId", "posteriorProbability",
+]);
+
 /** The required fields a col_map has not mapped yet, in display order. */
 export function missingCredibleSetFields(colMap) {
   return CS_REQUIRED_FIELDS.filter((field) => !(field.value in (colMap || {})));
@@ -59,5 +66,5 @@ export function missingCredibleSetFields(colMap) {
 
 /** Best-guess {column: field} for a credible-set file's headers. */
 export function suggestCredibleSetMap(columns) {
-  return suggestColumnMap(columns, CS_TARGETS, CREDIBLE_SET_COLUMN_ALIASES);
+  return suggestColumnMap(columns, CS_TARGETS, CREDIBLE_SET_COLUMN_ALIASES, CS_NEVER_FUZZY_MATCH);
 }

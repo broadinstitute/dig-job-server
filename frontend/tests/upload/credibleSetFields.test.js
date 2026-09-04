@@ -54,6 +54,17 @@ describe("suggestCredibleSetMap", () => {
     expect(CREDIBLE_SET_COLUMN_ALIASES.pval).toBe("pValue");
     expect(CREDIBLE_SET_COLUMN_ALIASES.maf).toBeUndefined();
   });
+  it("never fuzzy-matches the set id or the probability", () => {
+    // Neither header is an alias; both would otherwise fuzzy-match their
+    // field. A wrong guess here silently reshuffles sets or corrupts
+    // probabilities, so both must be alias-only.
+    expect(suggestCredibleSetMap(["credibleset_identifier", "posterior_probs"])).toEqual({});
+  });
+  it("still maps explicit aliases for both", () => {
+    expect(suggestCredibleSetMap(["probability", "cs_id"])).toEqual({
+      probability: "posteriorProbability", cs_id: "credibleSetId",
+    });
+  });
 });
 
 describe("missingCredibleSetFields", () => {
