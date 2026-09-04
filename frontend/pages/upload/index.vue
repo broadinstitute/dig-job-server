@@ -243,76 +243,11 @@
                                     />
                                     <Chip v-else label="n" />
                                 </div>
-                                <div v-if="fileInfo.columns" class="flex">
-                                    <Button
-                                        type="button"
-                                        label="Reset Mapping"
-                                        icon="pi pi-refresh"
-                                        @click="resetMapping"
-                                        severity="help"
-                                        variant="outlined"
-                                        size="small"
-                                    ></Button>
-                                </div>
-                                <DataTable
-                                    :value="tableRows"
-                                    v-if="fileInfo.columns"
-                                    rowHover
-                                    class="w-full"
-                                    responsiveLayout="scroll"
-                                >
-                                    <Column
-                                        field="column"
-                                        header="Column from data"
-                                        class="col-span-4"
-                                        style="width: 35%"
-                                    ></Column>
-                                    <Column
-                                        header=">>"
-                                        style="width: 5%"
-                                    ></Column>
-                                    <Column
-                                        header="Required field"
-                                        style="width: 60%"
-                                    >
-                                        <template #body="{ data }">
-                                            <Select
-                                                data-cy="column-dropdown"
-                                                class="w-full"
-                                                :options="colOptions"
-                                                option-label="name"
-                                                option-value="value"
-                                                :option-disabled="
-                                                    (option) => {
-                                                        return (
-                                                            Object.values(
-                                                                selectedFields,
-                                                            ).includes(
-                                                                option.value,
-                                                            ) &&
-                                                            option.value !==
-                                                                selectedFields[
-                                                                    data.column
-                                                                ]
-                                                        );
-                                                    }
-                                                "
-                                                v-model="
-                                                    selectedFields[data.column]
-                                                "
-                                                showClear
-                                                placeholder="select field"
-                                            />
-                                        </template>
-                                    </Column>
-                                </DataTable>
-                                <div
-                                    v-if="!fileInfo.columns"
-                                    class="p-4 text-center text-gray-500"
-                                >
-                                    <i class="pi pi-file text-3xl mb-2"></i>
-                                    <p>Upload a file to map columns</p>
-                                </div>
+                                <ColumnMappingTable
+                                    :columns="fileInfo.columns || []"
+                                    :options="colOptions"
+                                    v-model="selectedFields"
+                                />
                             </Fieldset>
                             <div class="field">
                                 <Button
@@ -358,6 +293,7 @@ import {
     REQUIRED_FIELDS,
     missingRequiredFields,
 } from "~/utils/upload/requiredFields";
+import { selectedFieldsToColMap } from "~/utils/upload/colMap";
 import axios from "axios";
 const fileInfo = ref({});
 const fileInput = ref(null);
@@ -378,22 +314,7 @@ const phenotype = ref(null);
 const filteredPhenotypes = ref([]);
 const currentStep = ref("1");
 
-const colMap = computed(() => {
-    //remove any null values from selectedFields
-    const filteredSelectedFields = Object.fromEntries(
-        Object.entries(selectedFields.value).filter(
-            ([key, value]) => value !== null,
-        ),
-    );
-    //transpose the object to have the value as the key and the key as the value
-    //this is the format that the backend expects
-    return Object.fromEntries(
-        Object.entries(filteredSelectedFields).map(([key, value]) => [
-            value,
-            key,
-        ]),
-    );
-});
+const colMap = computed(() => selectedFieldsToColMap(selectedFields.value));
 
 watch(
     [dataSetName, ancestry, genomeBuild, file, colMap, effectiveN],
@@ -453,14 +374,6 @@ const colOptions = [
 ];
 // REQUIRED_FIELDS lives in utils/ so the rule -- in particular the deliberate
 // absence of `se` -- is covered by tests rather than buried in this component.
-
-const tableRows = computed(() => {
-    return fileInfo.value.columns
-        ? fileInfo.value.columns.map((value) => ({
-              column: value,
-          }))
-        : [];
-});
 
 const requiredEffectFields = computed(() => {
     return (
@@ -650,13 +563,6 @@ async function searchPhenotypes(event) {
     } else {
         filteredPhenotypes.value = phenotypeStore.phenotypes;
     }
-}
-
-function resetMapping() {
-    //reset all values in selectedFields to null
-    Object.keys(selectedFields.value).forEach((key) => {
-        selectedFields.value[key] = null;
-    });
 }
 
 // Initialize phenotype data when component is mounted
