@@ -261,17 +261,15 @@ def test_panel_defaults_to_eur_for_missing_or_unknown_ancestry():
     assert cs.g1000_panel("martian") == "eur"
 
 
-# --- build_and_index_credible_sets: write both objects, build both indexes -
+# --- write_derived_credible_sets: write both objects; indexing is run.py's job
 
 
-def test_build_and_index_writes_both_objects_where_the_indexers_look():
+def test_write_derived_writes_both_objects_where_the_indexers_look():
     records = [_rec(500, 1e-9)]     # singleton set via the rsID-less path
     s3 = MagicMock()
     with patch.object(cs, "make_plink_runner", return_value=_plink_stub(None)), \
-         patch.object(cs, "dbsnp_rsid_lookup", return_value={}), \
-         patch.object(cs, "index_credible_variants") as idx_var, \
-         patch.object(cs, "index_credible_sets") as idx_set:
-        n = cs.build_and_index_credible_sets(
+         patch.object(cs, "dbsnp_rsid_lookup", return_value={}):
+        n = cs.write_derived_credible_sets(
             s3, "bkt", records, "guidX", dataset="d", ancestry="EU")
 
     assert n == 1
@@ -282,23 +280,16 @@ def test_build_and_index_writes_both_objects_where_the_indexers_look():
     assert variant["posteriorProbability"] == 1.0
     set_rec = json.loads(writes["credible-sets/guidX/sets.json"].decode().strip())
     assert (set_rec["start"], set_rec["end"]) == (500, 501)
-    idx_var.assert_called_once_with("guidX")
-    idx_set.assert_called_once_with("guidX")
 
 
-def test_build_and_index_still_creates_empty_indexes_without_a_signal():
-    """No genome-wide-significant hit: write empty objects and build both
-    indexes anyway, so frontend queries return cleanly instead of 404ing."""
+def test_write_derived_still_writes_empty_objects_without_a_signal():
+    """No genome-wide-significant hit: write empty objects anyway, so the
+    indexes run.py builds return cleanly instead of 404ing."""
     s3 = MagicMock()
     with patch.object(cs, "make_plink_runner", return_value=_plink_stub(None)), \
-         patch.object(cs, "dbsnp_rsid_lookup", return_value={}), \
-         patch.object(cs, "index_credible_variants") as idx_var, \
-         patch.object(cs, "index_credible_sets") as idx_set:
-        n = cs.build_and_index_credible_sets(
-            s3, "bkt", [_rec(100, 1e-4)], "guidX", dataset="d")
+         patch.object(cs, "dbsnp_rsid_lookup", return_value={}):
+        n = cs.write_derived_credible_sets(s3, "bkt", [_rec(100, 1e-4)], "guidX", dataset="d")
 
     assert n == 0
     bodies = [kw["Body"] for _, kw in s3.put_object.call_args_list]
     assert len(bodies) == 2 and all(b == b"" for b in bodies)
-    idx_var.assert_called_once()
-    idx_set.assert_called_once()
