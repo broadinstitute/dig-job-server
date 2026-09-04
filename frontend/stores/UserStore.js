@@ -284,6 +284,55 @@ export const useUserStore = defineStore("UserStore", {
                 throw error;
             }
         },
+        // ---- credible sets attached to a GWAS ----
+        async validateCredibleSet(formData) {
+            const { data } = await this.axios.post(
+                "/api/credible-sets/validate",
+                formData,
+                { headers: { "Content-Type": "multipart/form-data" } },
+            );
+            return data;
+        },
+        async uploadCredibleSet(dataset, formData) {
+            const { data } = await this.axios.post(
+                `/api/credible-sets/${encodeURIComponent(dataset)}`,
+                formData,
+                { headers: { "Content-Type": "multipart/form-data" } },
+            );
+            return data;
+        },
+        async listCredibleSets(dataset) {
+            const { data } = await this.axios.get(
+                `/api/credible-sets/${encodeURIComponent(dataset)}`,
+            );
+            return data;
+        },
+        async deleteCredibleSet(dataset, slug) {
+            const { data } = await this.axios.delete(
+                `/api/credible-sets/${encodeURIComponent(dataset)}/${encodeURIComponent(slug)}`,
+            );
+            return data;
+        },
+        async downloadCredibleSet(dataset, slug) {
+            const { data } = await this.axios.get(
+                `/api/credible-sets/${encodeURIComponent(dataset)}/${encodeURIComponent(slug)}/download`,
+            );
+            // Same trick as downloadBedFile: a real anchor so the browser
+            // follows the presigned URL itself (no CORS, no blob).
+            const link = document.createElement("a");
+            link.href = data.url;
+            link.setAttribute("download", data.filename);
+            link.target = "_blank";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        },
+        async reindexCredibleSets(dataset) {
+            const { data } = await this.axios.post(
+                `/api/credible-sets/${encodeURIComponent(dataset)}/reindex`,
+            );
+            return data;
+        },
         async getFalconResultUrls(dataset) {
             // Returns: { files: { [name]: { url, etag, size } } }
             const { data } = await this.axios.get(
