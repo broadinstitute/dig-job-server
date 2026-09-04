@@ -4,6 +4,7 @@ import { usePhenotypeStore } from "~/stores/PhenotypeStore.js";
 import { falconEligibility } from "~/utils/falcon/eligibility.js";
 import { buildFormData, isReady, describeUploadError } from "~/utils/upload/credibleSetForm.js";
 import { statusTag, hasFailed } from "~/utils/credibleSets/statusTag.js";
+import { createRefreshGuard } from "~/utils/credibleSets/refreshGuard.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -29,6 +30,7 @@ const expandedRows = ref({}); // keyed by dataset id (DataTable dataKey="id")
 const attachTarget = ref(null); // the dataset row the dialog is attaching to
 const attachModel = ref(null); // CredibleSetForm's v-model
 const attaching = ref(false);
+const csRefresh = createRefreshGuard();
 
 async function runFalcon(data) {
     const { job_id } = await userStore.startAnalysis(data.dataset, "falcon");
@@ -1041,8 +1043,11 @@ async function handleDeleteBedFile(datasetName, filename) {
 
 // ---- credible sets ----
 async function refreshCredibleSets(row) {
+    const token = csRefresh.begin(row.id);
     try {
-        row.credible_sets = await userStore.listCredibleSets(row.dataset);
+        const list = await userStore.listCredibleSets(row.dataset);
+        // A newer attach/delete (or a newer refresh) wins over this snapshot.
+        if (csRefresh.isCurrent(row.id, token)) row.credible_sets = list;
     } catch (error) {
         console.error("Could not refresh credible sets:", error);
     }
@@ -1070,6 +1075,7 @@ async function submitAttach() {
     try {
         const record = await userStore.uploadCredibleSet(row.dataset, buildFormData(attachModel.value));
         row.credible_sets = [...(row.credible_sets || []), record];
+        csRefresh.bump(row.id);
         expandedRows.value = { ...expandedRows.value, [row.id]: true };
         if (record.job_id) startIngestJob(row);
         toast.add({
@@ -1098,6 +1104,7 @@ function handleDeleteCredibleSet(row, cs) {
             try {
                 const { job_id } = await userStore.deleteCredibleSet(row.dataset, cs.slug);
                 row.credible_sets = row.credible_sets.filter((c) => c.slug !== cs.slug);
+                csRefresh.bump(row.id);
                 if (job_id) startIngestJob(row);
                 toast.add({ severity: "success", summary: "Deleted", detail: `${cs.name} removed`, life: 4000 });
             } catch (error) {
