@@ -125,3 +125,87 @@ def build_uploaded_credible_sets(rows, guid: str, dataset: str, *, slug: str, na
             set_row["ancestry"] = ancestry
         set_rows.append(set_row)
     return sort_variant_rows(variant_rows), sort_set_rows(set_rows)
+
+
+# ---- S3: read uploads, write objects, reconcile ------------------------------
+
+
+def uploads_prefix(username: str, dataset: str) -> str:
+    """Mirror of job_server.s3.get_credible_set_s3_prefix's parent folder."""
+    return f"userdata/{username}/genetic/{dataset}/credible_sets/"
+
+
+def _list_keys(s3, bucket: str, prefix: str):
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            yield obj["Key"]
+
+
+def list_upload_metadata(s3, bucket: str, username: str, dataset: str) -> "list[dict]":
+    """Every attached upload's metadata (job_server.model.CredibleSetInfo as a
+    dict), sorted by slug for stable logs."""
+    metas = []
+    for key in _list_keys(s3, bucket, uploads_prefix(username, dataset)):
+        if key.endswith("/raw/metadata"):
+            body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+            metas.append(json.loads(body))
+    return sorted(metas, key=lambda m: m["slug"])
+
+
+def read_upload_rows(s3, bucket: str, username: str, dataset: str, meta: dict):
+    """Raw rows (upload column names) of one credible-set file. Files are small
+    (the API caps them at 20 MB) so this reads the object whole; gzip is
+    detected by magic bytes, as the validator does, not by file name."""
+    key = f'{uploads_prefix(username, dataset)}{meta["slug"]}/raw/{meta["file"]}'
+    raw = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    yield from csv.DictReader(io.StringIO(raw.decode("utf-8")), delimiter=meta.get("separator") or "\t")
+
+
+def existing_upload_keys(s3, bucket: str, guid: str) -> "dict[str, list[str]]":
+    """{slug: [object keys]} for every upload object currently under the
+    dataset's two credible-set prefixes."""
+    found: "dict[str, list[str]]" = {}
+    for prefix in (credible_sets_prefix(guid), credible_variants_prefix(guid)):
+        for key in _list_keys(s3, bucket, prefix):
+            slug = upload_slug_of_key(key)
+            if slug:
+                found.setdefault(slug, []).append(key)
+    return found
+
+
+def sync_uploaded_credible_sets(s3, upload_bucket: str, bioindex_bucket: str, username: str,
+                                dataset: str, guid: str, *, ancestry: "str | None" = None,
+                                genome=None) -> dict:
+    """Write `upload-<slug>.json` objects for every attached upload and delete
+    the objects of uploads that were detached. Does NOT index: the caller
+    rebuilds the two credible-set indexes once after all writers have run.
+
+    Any exception propagates: an upload the API accepted but the pipeline
+    cannot read is a bug that must fail the job, not vanish silently.
+    """
+    counts: dict = {}
+    metas = list_upload_metadata(s3, upload_bucket, username, dataset)
+    for meta in metas:
+        rows = (canonicalize(r, meta["col_map"]) for r in read_upload_rows(s3, upload_bucket, username, dataset, meta))
+        variants, sets_ = build_uploaded_credible_sets(
+            rows, guid, dataset, slug=meta["slug"], name=meta["name"], ancestry=ancestry)
+        if genome is not None:
+            variants, _ = orient_records(variants, genome)   # re-sorts by locus
+            variants = sort_variant_rows(refresh_var_ids(variants))
+        add_alignment(variants)
+        for key, out_rows in ((upload_variants_key(guid, meta["slug"]), variants),
+                              (upload_sets_key(guid, meta["slug"]), sets_)):
+            body = "".join(json.dumps(r) + "\n" for r in out_rows)
+            s3.put_object(Bucket=bioindex_bucket, Key=key, Body=body.encode())
+        counts[meta["slug"]] = {"variants": len(variants), "sets": len(sets_)}
+
+    live = {m["slug"] for m in metas}
+    for slug, keys in existing_upload_keys(s3, bioindex_bucket, guid).items():
+        if slug not in live:
+            for key in keys:
+                s3.delete_object(Bucket=bioindex_bucket, Key=key)
+            counts[slug] = "removed"
+    return counts

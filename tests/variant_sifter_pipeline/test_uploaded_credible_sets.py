@@ -102,3 +102,111 @@ def test_alignment_is_the_sign_against_the_lead_beta():
     ]
     ucs.add_alignment(rows)
     assert [r.get("alignment") for r in rows] == [1.0, -1.0, 1.0, None, None, None]
+
+
+# ---- S3 sync -----------------------------------------------------------------
+
+import gzip
+import io
+import json
+from unittest.mock import MagicMock
+
+META = {"name": "SuSiE v1", "slug": "susie-v1", "file": "cs.tsv", "separator": "\t",
+        "col_map": {"chromosome": "CHR", "position": "POS", "reference": "REF", "alt": "ALT",
+                    "credibleSetId": "CS", "posteriorProbability": "PIP", "beta": "B"},
+        "uploaded_at": "2026-09-03T12:00:00"}
+CS_TSV = b"CHR\tPOS\tREF\tALT\tCS\tPIP\tB\n1\t100\tA\tG\t1\t0.6\t0.1\n1\t200\tC\tT\t1\t0.4\t-0.2\n"
+UP = "userdata/u/genetic/d/credible_sets/"
+
+
+def _fake_s3(objects: dict):
+    """A MagicMock S3 whose list/get answer from `objects` ({key: bytes})."""
+    s3 = MagicMock()
+
+    def paginate(Bucket, Prefix):
+        return [{"Contents": [{"Key": k} for k in sorted(objects) if k.startswith(Prefix)]}]
+
+    s3.get_paginator.return_value.paginate.side_effect = paginate
+    s3.get_object.side_effect = lambda Bucket, Key: {"Body": io.BytesIO(objects[Key])}
+    return s3
+
+
+class _Genome:
+    """base_at answers from a dict; anything else is 'no reference base'."""
+
+    def __init__(self, bases):
+        self.bases = bases
+
+    def base_at(self, chromosome, position):
+        return self.bases.get((chromosome, position))
+
+
+def test_list_upload_metadata_reads_only_metadata_objects():
+    s3 = _fake_s3({
+        f"{UP}susie-v1/raw/metadata": json.dumps(META).encode(),
+        f"{UP}susie-v1/raw/cs.tsv": CS_TSV,
+        f"{UP}finemap/raw/metadata": json.dumps({**META, "slug": "finemap", "name": "FINEMAP"}).encode(),
+    })
+    metas = ucs.list_upload_metadata(s3, "bkt", "u", "d")
+    assert [m["slug"] for m in metas] == ["finemap", "susie-v1"]
+
+
+def test_read_upload_rows_handles_gzip_by_content_not_by_name():
+    s3 = _fake_s3({f"{UP}susie-v1/raw/cs.tsv": gzip.compress(CS_TSV)})
+    rows = list(ucs.read_upload_rows(s3, "bkt", "u", "d", META))
+    assert [r["POS"] for r in rows] == ["100", "200"]
+
+
+def test_sync_writes_both_objects_per_upload_and_reports_counts():
+    s3 = _fake_s3({f"{UP}susie-v1/raw/metadata": json.dumps(META).encode(),
+                   f"{UP}susie-v1/raw/cs.tsv": CS_TSV})
+    counts = ucs.sync_uploaded_credible_sets(s3, "bkt", "bio", "u", "d", "guidX", ancestry="EUR")
+    assert counts == {"susie-v1": {"variants": 2, "sets": 1}}
+    writes = {kw["Key"]: kw for _, kw in s3.put_object.call_args_list}
+    assert set(writes) == {"credible-variants/guidX/upload-susie-v1.json",
+                           "credible-sets/guidX/upload-susie-v1.json"}
+    assert all(kw["Bucket"] == "bio" for kw in writes.values())
+    variants = [json.loads(l) for l in writes["credible-variants/guidX/upload-susie-v1.json"]["Body"].decode().splitlines()]
+    assert [v["varId"] for v in variants] == ["1:100:A:G", "1:200:C:T"]
+    assert variants[0]["leadSNP"] is True and variants[0]["alignment"] == 1.0 and variants[1]["alignment"] == -1.0
+    set_rec = json.loads(writes["credible-sets/guidX/upload-susie-v1.json"]["Body"].decode().strip())
+    assert set_rec["uploadName"] == "SuSiE v1" and set_rec["ancestry"] == "EUR"
+
+
+def test_sync_orients_alleles_and_keeps_var_ids_and_alignment_consistent():
+    """Reference base at 1:100 is G, so the upload's REF=A/ALT=G is flipped:
+    alleles swap, beta negates, varId follows, alignment is recomputed."""
+    s3 = _fake_s3({f"{UP}susie-v1/raw/metadata": json.dumps(META).encode(),
+                   f"{UP}susie-v1/raw/cs.tsv": CS_TSV})
+    genome = _Genome({("1", 100): "G", ("1", 200): "C"})
+    ucs.sync_uploaded_credible_sets(s3, "bkt", "bio", "u", "d", "guidX", genome=genome)
+    body = next(kw["Body"] for _, kw in s3.put_object.call_args_list
+                if kw["Key"].startswith("credible-variants/"))
+    variants = [json.loads(l) for l in body.decode().splitlines()]
+    flipped = next(v for v in variants if v["position"] == 100)
+    kept = next(v for v in variants if v["position"] == 200)
+    assert (flipped["reference"], flipped["alt"], flipped["varId"], flipped["beta"]) == ("G", "A", "1:100:G:A", -0.1)
+    assert (kept["reference"], kept["alt"], kept["beta"]) == ("C", "T", -0.2)
+    # lead (pos 100) beta is now -0.1; pos 200 beta -0.2 -> same sign -> aligned
+    assert flipped["alignment"] == 1.0 and kept["alignment"] == 1.0
+
+
+def test_sync_deletes_objects_of_uploads_that_no_longer_exist():
+    s3 = _fake_s3({
+        f"{UP}susie-v1/raw/metadata": json.dumps(META).encode(),
+        f"{UP}susie-v1/raw/cs.tsv": CS_TSV,
+        "credible-sets/guidX/sets.json": b"", "credible-variants/guidX/variants.json": b"",
+        "credible-sets/guidX/upload-gone.json": b"", "credible-variants/guidX/upload-gone.json": b"",
+        "credible-sets/guidX/upload-susie-v1.json": b"",
+    })
+    counts = ucs.sync_uploaded_credible_sets(s3, "bkt", "bio", "u", "d", "guidX")
+    deleted = {kw["Key"] for _, kw in s3.delete_object.call_args_list}
+    assert deleted == {"credible-sets/guidX/upload-gone.json", "credible-variants/guidX/upload-gone.json"}
+    assert counts["gone"] == "removed"
+
+
+def test_sync_with_no_uploads_writes_nothing_and_touches_no_derived_objects():
+    s3 = _fake_s3({"credible-sets/guidX/sets.json": b"", "credible-variants/guidX/variants.json": b""})
+    assert ucs.sync_uploaded_credible_sets(s3, "bkt", "bio", "u", "d", "guidX") == {}
+    s3.put_object.assert_not_called()
+    s3.delete_object.assert_not_called()
