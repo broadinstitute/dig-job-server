@@ -135,3 +135,34 @@ def get_falcon_s3_prefix(user: str, dataset: str, filename: str = None) -> str:
     """
     base = f"userdata/{user}/genetic/{dataset}/falcon"
     return f"{base}/{filename}" if filename else base
+
+
+def get_credible_set_s3_prefix(user: str, dataset: str, slug: str, filename: str | None = None) -> str:
+    """Raw upload location for one attached credible set. Deliberately under the
+    dataset's genetic prefix so api.delete_dataset's clear_dir removes it."""
+    base = f"userdata/{user}/genetic/{dataset}/credible_sets/{slug}/raw"
+    return f"{base}/{filename}" if filename else base
+
+
+def put_credible_set(user: str, dataset: str, info, raw: bytes) -> None:
+    """Store the file exactly as uploaded (gzip stays gzip) plus its metadata."""
+    client = boto3.client('s3')
+    prefix = get_credible_set_s3_prefix(user, dataset, info.slug)
+    client.put_object(Bucket=BUCKET_NAME, Key=f"{prefix}/{info.file}", Body=raw)
+    client.put_object(Bucket=BUCKET_NAME, Key=f"{prefix}/metadata",
+                      Body=info.model_dump_json().encode('utf-8'),
+                      ContentType='application/json')
+
+
+def delete_credible_set_dir(user: str, dataset: str, slug: str) -> None:
+    # Trailing slash: clear_dir matches by string prefix, so without it slug
+    # "a" would also delete "a-b".
+    clear_dir(f"userdata/{user}/genetic/{dataset}/credible_sets/{slug}/")
+
+
+def credible_set_download_url(user: str, dataset: str, slug: str, filename: str,
+                              expires_in: int = 900) -> str:
+    return generate_presigned_url(
+        'get_object',
+        params={'Bucket': BUCKET_NAME, 'Key': get_credible_set_s3_prefix(user, dataset, slug, filename)},
+        expires_in=expires_in)
