@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from job_server.compress import LogCompressor
-from job_server.model import DatasetInfo
+from job_server.model import CredibleSetInfo, DatasetInfo
 from job_server.variant_sifter import SIFTER_METHOD
 
 
@@ -361,3 +361,76 @@ def record_falcon_success(db, username: str, dataset: str) -> None:
             "username": username,
         })
         connection.commit()
+
+
+# ---- credible sets (user uploads attached to a GWAS) ----------------------
+
+def insert_credible_set(db, username: str, dataset: str, info: CredibleSetInfo,
+                        row_count: int, set_count: int) -> bool:
+    """False on a name or slug collision for this dataset (the UNIQUE keys)."""
+    try:
+        with db as connection:
+            connection.execute(text(
+                "INSERT INTO credible_sets (dataset_id, user, name, slug, filename, `separator`, "
+                "col_map, row_count, set_count, uploaded_at) "
+                "VALUES (:dataset_id, :user, :name, :slug, :filename, :separator, "
+                ":col_map, :row_count, :set_count, NOW())"
+            ), {
+                "dataset_id": get_dataset_hash(dataset, username), "user": username,
+                "name": info.name, "slug": info.slug, "filename": info.file,
+                "separator": info.separator, "col_map": json.dumps(info.col_map),
+                "row_count": row_count, "set_count": set_count,
+            })
+            connection.commit()
+            return True
+    except IntegrityError:
+        return False
+
+
+_CREDIBLE_SET_COLUMNS = "dataset_id, name, slug, filename, row_count, set_count, uploaded_at"
+
+
+def _credible_set_row(row) -> dict:
+    return {"name": row[1], "slug": row[2], "filename": row[3], "row_count": row[4],
+            "set_count": row[5], "uploaded_at": row[6]}
+
+
+def get_credible_sets_for_dataset(db, username: str, dataset: str) -> list:
+    with db as connection:
+        rows = connection.execute(text(
+            f"SELECT {_CREDIBLE_SET_COLUMNS} FROM credible_sets "
+            "WHERE dataset_id = :id AND user = :user ORDER BY uploaded_at, id"
+        ), {"id": get_dataset_hash(dataset, username), "user": username}).fetchall()
+        return [_credible_set_row(r) for r in rows]
+
+
+def get_credible_sets_for_user(db, username: str) -> dict:
+    """{dataset_id: [row, ...]} for every credible set the user has attached."""
+    with db as connection:
+        rows = connection.execute(text(
+            f"SELECT {_CREDIBLE_SET_COLUMNS} FROM credible_sets "
+            "WHERE user = :user ORDER BY uploaded_at, id"
+        ), {"user": username}).fetchall()
+    grouped: dict = {}
+    for r in rows:
+        grouped.setdefault(r[0], []).append(_credible_set_row(r))
+    return grouped
+
+
+def delete_credible_set(db, username: str, dataset: str, slug: str) -> bool:
+    with db as connection:
+        result = connection.execute(text(
+            "DELETE FROM credible_sets WHERE dataset_id = :id AND user = :user AND slug = :slug"
+        ), {"id": get_dataset_hash(dataset, username), "user": username, "slug": slug})
+        connection.commit()
+        return result.rowcount > 0
+
+
+def get_workflow_jobs_for_dataset(db, dataset_id: str) -> list:
+    """Every workflow_jobs row for one dataset, in the shape
+    job_server.credible_sets.derive_status consumes."""
+    with db as connection:
+        rows = connection.execute(text(
+            "SELECT method, status, updated_at FROM workflow_jobs WHERE id = :id"
+        ), {"id": dataset_id}).fetchall()
+        return [{"method": r[0], "status": r[1], "updated_at": r[2]} for r in rows]
