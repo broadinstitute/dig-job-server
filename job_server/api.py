@@ -8,6 +8,7 @@ import numpy as np
 import os
 import re
 from asyncio import Queue
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, TextIO
@@ -16,18 +17,18 @@ import fastapi
 import httpx
 import pandas as pd
 from botocore.exceptions import ClientError
-from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks
+from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks, Form
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from job_server import s3, file_utils, batch, database_utils, falcon_tokens, variant_sifter
+from job_server import s3, file_utils, batch, database_utils, falcon_tokens, variant_sifter, credible_sets
 from job_server.auth_backend import AuthBackend
 from job_server.database import get_db
 from job_server.falcon_tokens import FalconPrincipal
 from job_server.jwt_utils import create_access_token, get_decoded_jwt_data
-from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod
+from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod, CredibleSetInfo
 
 router = fastapi.APIRouter()
 JOB_SERVER_AUTH_COOKIE = 'js_auth'
@@ -103,6 +104,7 @@ async def get_datasets(user: User = Depends(get_current_user),
     jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
     workflow_jobs_for_user = database_utils.get_workflow_jobs_for_user(get_db(), user.username)
     data_set_metadata = database_utils.get_dataset_metadata(get_db(), user.username)
+    credible_sets_by_dataset = database_utils.get_credible_sets_for_user(get_db(), user.username)
 
     # Create the dataset list
     datasets = []
@@ -120,7 +122,10 @@ async def get_datasets(user: User = Depends(get_current_user),
             'uploaded_by': user.username,
             'status': jobs_for_user.get(dataset_id, {}).get('status'),
             'workflows': workflows,  # New: detailed workflow status
-            'id': dataset_id
+            'id': dataset_id,
+            'credible_sets': credible_sets.records_with_status(
+                credible_sets_by_dataset.get(dataset_id, []),
+                credible_sets.jobs_from_workflows(workflows)),
         })
 
     # Sort datasets only if orderBy parameter is provided
@@ -852,6 +857,144 @@ async def run_variant_sifter(dataset: str, background_tasks: BackgroundTasks,
         job_queues[job_id] = Queue()
     await start_sifter_job(user, dataset, background_tasks)
     return {"job_id": job_id}
+
+
+# ---- credible sets: user uploads attached to a GWAS ------------------------
+
+def _parse_col_map(col_map: str) -> dict:
+    try:
+        parsed = json.loads(col_map)
+    except json.JSONDecodeError:
+        raise fastapi.HTTPException(status_code=400, detail="col_map must be a JSON object")
+    if not isinstance(parsed, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()):
+        raise fastapi.HTTPException(status_code=400, detail="col_map must map field names to column names")
+    return parsed
+
+
+def _dataset_is_sifted(username: str, dataset: str) -> bool:
+    """True once `variant-sifter SUCCEEDED`: only then does a credible-sets-only
+    job have a dataset index to add to."""
+    guid = database_utils.get_dataset_hash(dataset, username)
+    return database_utils.get_indexed_dataset_metadata(get_db(), guid) is not None
+
+
+def _credible_set_records(username: str, dataset: str) -> list:
+    dataset_id = database_utils.get_dataset_hash(dataset, username)
+    rows = database_utils.get_credible_sets_for_dataset(get_db(), username, dataset)
+    jobs = database_utils.get_workflow_jobs_for_dataset(get_db(), dataset_id)
+    return credible_sets.records_with_status(rows, jobs)
+
+
+async def start_credible_sets_job(user: User, dataset: str, background_tasks: BackgroundTasks) -> str:
+    """Submit the sifter job in `credible-sets` mode. Mirrors start_sifter_job and
+    streams on the same job_queues key (the dataset hash), so the datasets page's
+    existing status listener picks it up. Returns the job id."""
+    database_utils.log_job_start(
+        get_db(), user.username, dataset, f"RUNNING {credible_sets.CREDIBLE_SETS_METHOD}")
+    guid = database_utils.get_dataset_hash(dataset, user.username)
+    if guid not in job_queues:
+        job_queues[guid] = Queue()
+    background_tasks.add_task(
+        batch.submit_and_await_job,
+        variant_sifter.sifter_job_config(user.username, dataset, guid, mode="credible-sets"),
+        user.username, dataset, credible_sets.CREDIBLE_SETS_METHOD, job_queues, "",
+    )
+    return guid
+
+
+@router.post("/credible-sets/validate")
+async def validate_credible_set(file: UploadFile, col_map: str = Form(...),
+                                separator: Optional[str] = Form(None),
+                                user: User = Depends(get_current_user)):
+    """Dry run with no dataset: the upload wizard validates before the GWAS exists."""
+    raw = await file.read()
+    return credible_sets.validate_file(raw, file.filename, separator or None, _parse_col_map(col_map))
+
+
+@router.post("/credible-sets/{dataset}")
+async def create_credible_set(dataset: str, background_tasks: BackgroundTasks, file: UploadFile,
+                              name: str = Form(...), col_map: str = Form(...),
+                              separator: Optional[str] = Form(None),
+                              user: User = Depends(get_current_user)):
+    _require_owned_dataset(user, dataset)
+    try:
+        clean_name = credible_sets.validate_name(name)
+    except ValueError as exc:
+        raise fastapi.HTTPException(status_code=400, detail=str(exc))
+    parsed = _parse_col_map(col_map)
+    raw = await file.read()
+    report = credible_sets.validate_file(raw, file.filename, separator or None, parsed)
+    if not report["ok"]:
+        raise fastapi.HTTPException(status_code=400, detail=report)
+
+    info = CredibleSetInfo(
+        name=clean_name, slug=credible_sets.slugify(clean_name), file=file.filename,
+        separator=report["separator"], col_map=parsed,
+        uploaded_at=datetime.now(timezone.utc).isoformat(),
+    )
+    # DB first: the UNIQUE keys are the cheap collision check. S3 second, and
+    # the row is removed again if the store fails so no row points at nothing.
+    if not database_utils.insert_credible_set(
+            get_db(), user.username, dataset, info, report["row_count"], report["set_count"]):
+        raise fastapi.HTTPException(
+            status_code=409, detail=f"A credible set named {clean_name!r} already exists on this dataset")
+    try:
+        s3.put_credible_set(user.username, dataset, info, raw)
+    except ClientError as exc:
+        database_utils.delete_credible_set(get_db(), user.username, dataset, info.slug)
+        raise fastapi.HTTPException(status_code=500, detail="Failed to store the credible set") from exc
+
+    job_id = None
+    if _dataset_is_sifted(user.username, dataset):
+        job_id = await start_credible_sets_job(user, dataset, background_tasks)
+    record = next(r for r in _credible_set_records(user.username, dataset) if r["slug"] == info.slug)
+    return {**record, "job_id": job_id}
+
+
+@router.get("/credible-sets/{dataset}")
+async def list_credible_sets(dataset: str, user: User = Depends(get_current_user)):
+    _require_owned_dataset(user, dataset)
+    return _credible_set_records(user.username, dataset)
+
+
+@router.get("/credible-sets/{dataset}/{slug}/download")
+async def download_credible_set(dataset: str, slug: str, user: User = Depends(get_current_user)):
+    _require_owned_dataset(user, dataset)
+    row = next((r for r in database_utils.get_credible_sets_for_dataset(get_db(), user.username, dataset)
+                if r["slug"] == slug), None)
+    if row is None:
+        raise fastapi.HTTPException(status_code=404, detail="credible set not found")
+    return {"url": s3.credible_set_download_url(user.username, dataset, slug, row["filename"]),
+            "filename": row["filename"]}
+
+
+@router.delete("/credible-sets/{dataset}/{slug}")
+async def remove_credible_set(dataset: str, slug: str, background_tasks: BackgroundTasks,
+                              user: User = Depends(get_current_user)):
+    _require_owned_dataset(user, dataset)
+    if not database_utils.delete_credible_set(get_db(), user.username, dataset, slug):
+        raise fastapi.HTTPException(status_code=404, detail="credible set not found")
+    s3.delete_credible_set_dir(user.username, dataset, slug)
+    # The pipeline's reconcile step removes the indexed objects for uploads that
+    # no longer exist, so a sifted dataset gets a job to make the delete visible.
+    job_id = None
+    if _dataset_is_sifted(user.username, dataset):
+        job_id = await start_credible_sets_job(user, dataset, background_tasks)
+    return {"job_id": job_id}
+
+
+@router.post("/credible-sets/{dataset}/reindex")
+async def reindex_credible_sets(dataset: str, background_tasks: BackgroundTasks,
+                                user: User = Depends(get_current_user)):
+    _require_owned_dataset(user, dataset)
+    if not _dataset_is_sifted(user.username, dataset):
+        raise fastapi.HTTPException(status_code=409, detail="Run Variant Sifter on this dataset first")
+    dataset_id = database_utils.get_dataset_hash(dataset, user.username)
+    jobs = database_utils.get_workflow_jobs_for_dataset(get_db(), dataset_id)
+    if any(j["status"] == "RUNNING" and j["method"] in credible_sets.INGEST_METHODS for j in jobs):
+        raise fastapi.HTTPException(status_code=409, detail="An indexing job is already running")
+    return {"job_id": await start_credible_sets_job(user, dataset, background_tasks)}
 
 
 # datasets.id is a sha256 hex digest. Rejecting anything else up front keeps a
