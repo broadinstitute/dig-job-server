@@ -149,9 +149,17 @@ class _Capped:
         return self.items
 
 
+class TooLarge(Exception):
+    """Raised by _decode when a gzip payload would decompress past MAX_BYTES
+    (a compressed-size check alone does not bound a gzip bomb)."""
+
+
 def _decode(raw: bytes) -> str:
     if raw[:2] == b"\x1f\x8b":
-        raw = gzip.decompress(raw)
+        with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
+            raw = gz.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            raise TooLarge(f"Decompressed file is larger than {MAX_BYTES // (1024 * 1024)} MB")
     return raw.decode("utf-8")
 
 
@@ -228,6 +236,9 @@ def validate_file(raw: bytes, filename: str, separator: "str | None", col_map: d
         return finish()
     try:
         text = _decode(raw)
+    except TooLarge as exc:
+        errors.add(None, str(exc))
+        return finish()
     except (OSError, EOFError, UnicodeDecodeError) as exc:
         errors.add(None, f"Could not read the file as UTF-8 text (gzip is allowed): {exc}")
         return finish()

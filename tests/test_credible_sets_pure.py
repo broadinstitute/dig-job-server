@@ -204,6 +204,18 @@ def test_gzip_input_and_delimiter_inference():
     assert rep["separator"] == ","
 
 
+def test_gzip_decompressed_size_is_capped():
+    # Identical rows compress far smaller than they decompress (a gzip
+    # bomb's shape): compressed stays well under MAX_BYTES=64 while the
+    # decompressed payload is well over it, so this exercises the
+    # decompressed-size cap rather than the pre-decode raw-length check.
+    raw = gzip.compress(_tsv(*(["1\t100\tA\tG\t1\t0.5"] * 30)))
+    with patch.object(cs, "MAX_BYTES", 64):
+        rep = _validate(raw, separator=None, filename="cs.tsv.gz")
+    assert rep["ok"] is False
+    assert "MB" in rep["errors"][0]["message"]
+
+
 def test_undetectable_delimiter_is_an_error():
     rep = _validate(b"CHR|POS|REF|ALT|CS|PIP\n1|100|A|G|1|0.6\n", separator=None)
     assert rep["ok"] is False
