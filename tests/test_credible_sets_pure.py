@@ -10,8 +10,10 @@ from job_server.model import CredibleSetInfo
 T0 = datetime(2026, 9, 3, 12, 0, 0)
 
 
-def _job(method, status, minutes):
-    return {"method": method, "status": status, "updated_at": T0 + timedelta(minutes=minutes)}
+def _job(method, status, started, updated):
+    return {"method": method, "status": status,
+            "started_at": T0 + timedelta(minutes=started),
+            "updated_at": T0 + timedelta(minutes=updated)}
 
 
 # ---- names and slugs ----
@@ -70,46 +72,55 @@ def test_status_pending_when_nothing_ran():
 
 
 def test_status_pending_when_only_older_jobs_succeeded():
-    assert cs.derive_status(T0, [_job("variant-sifter", "SUCCEEDED", -5)]) == "pending"
+    assert cs.derive_status(T0, [_job("variant-sifter", "SUCCEEDED", -5, -5)]) == "pending"
+
+
+def test_status_stays_pending_when_the_job_started_before_the_upload_even_if_it_finished_after():
+    assert cs.derive_status(T0, [_job("variant-sifter", "SUCCEEDED", -5, 5)]) == "pending"
 
 
 def test_status_indexing_while_either_ingest_method_runs():
-    assert cs.derive_status(T0, [_job("credible-sets", "RUNNING", 1)]) == "indexing"
-    assert cs.derive_status(T0, [_job("variant-sifter", "RUNNING", 1),
-                                 _job("credible-sets", "SUCCEEDED", -1)]) == "indexing"
+    assert cs.derive_status(T0, [_job("credible-sets", "RUNNING", 1, 1)]) == "indexing"
+    assert cs.derive_status(T0, [_job("variant-sifter", "RUNNING", 1, 1),
+                                 _job("credible-sets", "SUCCEEDED", -1, -1)]) == "indexing"
 
 
 def test_status_indexed_when_a_later_job_of_either_method_succeeded():
-    assert cs.derive_status(T0, [_job("credible-sets", "SUCCEEDED", 2)]) == "indexed"
-    assert cs.derive_status(T0, [_job("variant-sifter", "SUCCEEDED", 2)]) == "indexed"
+    assert cs.derive_status(T0, [_job("credible-sets", "SUCCEEDED", 2, 2)]) == "indexed"
+    assert cs.derive_status(T0, [_job("variant-sifter", "SUCCEEDED", 2, 2)]) == "indexed"
     # exactly at the upload time counts (the job could not have missed the file)
-    assert cs.derive_status(T0, [_job("credible-sets", "SUCCEEDED", 0)]) == "indexed"
+    assert cs.derive_status(T0, [_job("credible-sets", "SUCCEEDED", 0, 0)]) == "indexed"
 
 
 def test_status_failed_when_the_latest_job_after_upload_failed():
-    assert cs.derive_status(T0, [_job("credible-sets", "FAILED", 3),
-                                 _job("variant-sifter", "SUCCEEDED", -10)]) == "failed"
+    assert cs.derive_status(T0, [_job("credible-sets", "FAILED", 3, 3),
+                                 _job("variant-sifter", "SUCCEEDED", -10, -10)]) == "failed"
+
+
+def test_status_failed_only_when_the_failed_job_started_after_the_upload():
+    assert cs.derive_status(T0, [_job("credible-sets", "FAILED", -5, 5)]) == "pending"
+    assert cs.derive_status(T0, [_job("credible-sets", "FAILED", 1, 5)]) == "failed"
 
 
 def test_status_indexed_wins_over_an_older_failure():
-    assert cs.derive_status(T0, [_job("credible-sets", "FAILED", 1),
-                                 _job("variant-sifter", "SUCCEEDED", 2)]) == "indexed"
+    assert cs.derive_status(T0, [_job("credible-sets", "FAILED", 1, 1),
+                                 _job("variant-sifter", "SUCCEEDED", 2, 2)]) == "indexed"
 
 
 def test_status_ignores_unrelated_methods():
-    assert cs.derive_status(T0, [_job("magma", "RUNNING", 1), _job("sldsc", "FAILED", 2)]) == "pending"
+    assert cs.derive_status(T0, [_job("magma", "RUNNING", 1, 1), _job("sldsc", "FAILED", 2, 2)]) == "pending"
 
 
 # ---- adapters ----
 
 def test_jobs_from_workflows_flattens_the_datasets_endpoint_shape():
     workflows = {
-        "variant-sifter": {"variant-sifter": {"status": "SUCCEEDED", "updated_at": T0}},
-        "magma": {"magma": {"status": "RUNNING", "updated_at": T0}},
+        "variant-sifter": {"variant-sifter": {"status": "SUCCEEDED", "started_at": T0, "updated_at": T0}},
+        "magma": {"magma": {"status": "RUNNING", "started_at": T0, "updated_at": T0}},
     }
     assert cs.jobs_from_workflows(workflows) == [
-        {"method": "variant-sifter", "status": "SUCCEEDED", "updated_at": T0},
-        {"method": "magma", "status": "RUNNING", "updated_at": T0},
+        {"method": "variant-sifter", "status": "SUCCEEDED", "started_at": T0, "updated_at": T0},
+        {"method": "magma", "status": "RUNNING", "started_at": T0, "updated_at": T0},
     ]
     assert cs.jobs_from_workflows({}) == []
 
@@ -117,7 +128,7 @@ def test_jobs_from_workflows_flattens_the_datasets_endpoint_shape():
 def test_records_with_status_adds_status_without_mutating_input():
     rows = [{"name": "a", "slug": "a", "filename": "a.tsv", "row_count": 1,
              "set_count": 1, "uploaded_at": T0}]
-    out = cs.records_with_status(rows, [_job("credible-sets", "SUCCEEDED", 1)])
+    out = cs.records_with_status(rows, [_job("credible-sets", "SUCCEEDED", 1, 1)])
     assert out[0]["status"] == "indexed"
     assert "status" not in rows[0]
 

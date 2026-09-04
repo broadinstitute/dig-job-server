@@ -69,26 +69,32 @@ def validate_filename(filename) -> str:
 def derive_status(uploaded_at: datetime, jobs: "list[dict]") -> str:
     """One of pending | indexing | indexed | failed for an upload made at
     `uploaded_at`, given the dataset's workflow_jobs rows
-    ({"method", "status", "updated_at"}; other methods are ignored).
+    ({"method", "status", "started_at", "updated_at"}; other methods are
+    ignored).
 
-    Both timestamps come from MySQL NOW() so they compare directly.
+    A job counts for an upload only if it STARTED at or after the upload -- a
+    run that was already past its metadata listing cannot have indexed it.
+
+    All timestamps come from MySQL NOW() so they compare directly.
     """
     relevant = [j for j in jobs if j["method"] in INGEST_METHODS]
     if any(j["status"] == "RUNNING" for j in relevant):
         return "indexing"
-    if any(j["status"] == "SUCCEEDED" and j["updated_at"] >= uploaded_at for j in relevant):
+    if any(j["status"] == "SUCCEEDED" and j["started_at"] >= uploaded_at for j in relevant):
         return "indexed"
     latest = max(relevant, key=lambda j: j["updated_at"], default=None)
-    if latest and latest["status"] == "FAILED" and latest["updated_at"] >= uploaded_at:
+    if latest and latest["status"] == "FAILED" and latest["started_at"] >= uploaded_at:
         return "failed"
     return "pending"
 
 
 def jobs_from_workflows(workflows: dict) -> "list[dict]":
     """Flatten database_utils.get_workflow_jobs_for_user's per-dataset value
-    ({method: {method: {status, updated_at}}}) into derive_status's job list."""
+    ({method: {method: {status, started_at, updated_at}}}) into
+    derive_status's job list."""
     return [
-        {"method": method, "status": inner[method]["status"], "updated_at": inner[method]["updated_at"]}
+        {"method": method, "status": inner[method]["status"],
+         "started_at": inner[method]["started_at"], "updated_at": inner[method]["updated_at"]}
         for method, inner in workflows.items()
         if method in inner
     ]

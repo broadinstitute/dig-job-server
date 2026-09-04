@@ -3,6 +3,7 @@ import time
 from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from starlette.testclient import TestClient
 
 from job_server import database_utils
@@ -14,6 +15,22 @@ COL_MAP = {"chromosome": "CHR", "position": "POS", "reference": "REF", "alt": "A
            "credibleSetId": "CS", "posteriorProbability": "PIP"}
 GOOD = b"CHR\tPOS\tREF\tALT\tCS\tPIP\n1\t100\tA\tG\t1\t0.6\n1\t200\tC\tT\t1\t0.4\n"
 BAD = b"CHR\tPOS\tREF\tALT\tCS\tPIP\n1\t0\tA\tG\t1\t0.6\n"
+
+
+def _big_valid_tsv(min_bytes=300):
+    """A valid TSV comfortably over the MAX_BYTES=64 patched in the
+    oversized-body tests, so it's the byte cap -- not some other early exit --
+    that gets exercised."""
+    header = "CHR\tPOS\tREF\tALT\tCS\tPIP"
+    lines = [header]
+    total = len(header) + 1
+    i = 1
+    while total < min_bytes:
+        row = f"1\t{i}\tA\tG\t1\t0.5"
+        lines.append(row)
+        total += len(row) + 1
+        i += 1
+    return ("\n".join(lines) + "\n").encode()
 
 
 def _auth(token):
@@ -58,19 +75,19 @@ def _ds(prefix):
 # ---- validate ----
 
 def test_validate_requires_auth(api_client: TestClient):
-    res = api_client.post("/api/credible-sets/validate", **_multipart())
+    res = api_client.post("/api/validate-credible-set", **_multipart())
     assert res.status_code == 401
 
 
 def test_validate_needs_no_dataset_and_returns_a_report(api_client: TestClient):
-    res = api_client.post("/api/credible-sets/validate", **_multipart(), headers=_auth(_token(api_client)))
+    res = api_client.post("/api/validate-credible-set", **_multipart(), headers=_auth(_token(api_client)))
     assert res.status_code == 200
     body = res.json()
     assert body["ok"] is True and body["row_count"] == 2 and body["set_count"] == 1
 
 
 def test_validate_reports_errors_with_200(api_client: TestClient):
-    res = api_client.post("/api/credible-sets/validate", **_multipart(content=BAD),
+    res = api_client.post("/api/validate-credible-set", **_multipart(content=BAD),
                           headers=_auth(_token(api_client)))
     assert res.status_code == 200
     assert res.json()["ok"] is False and res.json()["errors"][0]["line"] == 2
@@ -79,7 +96,7 @@ def test_validate_reports_errors_with_200(api_client: TestClient):
 def test_validate_rejects_malformed_col_map(api_client: TestClient):
     payload = _multipart()
     payload["data"]["col_map"] = "not json"
-    res = api_client.post("/api/credible-sets/validate", **payload, headers=_auth(_token(api_client)))
+    res = api_client.post("/api/validate-credible-set", **payload, headers=_auth(_token(api_client)))
     assert res.status_code == 400
 
 
@@ -87,7 +104,7 @@ def test_multi_character_separator_is_a_400(api_client: TestClient):
     token = _token(api_client)
     payload = _multipart()
     payload["data"]["separator"] = ";;"
-    res = api_client.post("/api/credible-sets/validate", **payload, headers=_auth(token))
+    res = api_client.post("/api/validate-credible-set", **payload, headers=_auth(token))
     assert res.status_code == 400
 
     ds = _ds("csapi_sep")
@@ -98,6 +115,48 @@ def test_multi_character_separator_is_a_400(api_client: TestClient):
     with put, delete_dir, submit:
         res2 = api_client.post(f"/api/credible-sets/{ds}", **payload2, headers=_auth(token))
     assert res2.status_code == 400
+
+
+def test_oversized_body_is_rejected_with_400_not_500(api_client: TestClient):
+    """UploadFile.read() is capped at MAX_BYTES + 1 in both routes: a huge body
+    must never be fully materialised in memory, and the report's own size
+    branch is what rejects it (not an unhandled MemoryError)."""
+    token = _token(api_client)
+    big = _big_valid_tsv()
+    with patch("job_server.credible_sets.MAX_BYTES", 64):
+        res = api_client.post("/api/validate-credible-set", **_multipart(content=big), headers=_auth(token))
+    assert res.status_code == 200
+    assert res.json()["ok"] is False
+    assert "MB" in res.json()["errors"][0]["message"]
+
+    ds = _ds("csapi_oversized")
+    _dataset(ds)
+    put, delete_dir, _, submit = _patched()
+    with put as put_mock, delete_dir, submit, patch("job_server.credible_sets.MAX_BYTES", 64):
+        res2 = api_client.post(f"/api/credible-sets/{ds}", **_multipart(content=big), headers=_auth(token))
+    assert res2.status_code == 400
+    assert res2.json()["detail"]["ok"] is False
+    put_mock.assert_not_called()
+    assert database_utils.get_credible_sets_for_dataset(get_db(), USER, ds) == []
+
+
+def test_a_dataset_named_validate_can_receive_an_upload(api_client: TestClient):
+    """/validate-credible-set lives outside /credible-sets/{dataset}, so a
+    dataset literally named 'validate' is never shadowed by the dry-run route."""
+    ds = "validate"
+    # before_each_test truncates `datasets` but not `credible_sets`, and this
+    # test deliberately uses a fixed (not timestamp-suffixed) dataset name, so
+    # a prior run of this exact test would otherwise leave a row that collides
+    # on the (dataset_id, slug) unique key.
+    database_utils.delete_credible_set(get_db(), USER, ds, "susie-v1")
+    _dataset(ds)
+    token = _token(api_client)
+    put, delete_dir, _, submit = _patched()
+    with put, delete_dir, submit:
+        res = api_client.post(f"/api/credible-sets/{ds}", **_multipart(), headers=_auth(token))
+    assert res.status_code == 200, res.text
+    assert res.json()["slug"] == "susie-v1"
+    assert [r["slug"] for r in database_utils.get_credible_sets_for_dataset(get_db(), USER, ds)] == ["susie-v1"]
 
 
 # ---- create ----
@@ -144,6 +203,21 @@ def test_create_submits_the_credible_sets_job_when_sifted(api_client: TestClient
         row = conn.execute(text("SELECT status FROM workflow_jobs WHERE id=:id AND method='credible-sets'"),
                            {"id": dataset_id}).fetchone()
     assert row[0] == "RUNNING"
+
+
+def test_create_does_not_submit_while_an_ingest_job_is_running(api_client: TestClient):
+    ds = _ds("csapi_create_busy")
+    _dataset(ds)
+    _sifted(ds)
+    database_utils.log_job_start(get_db(), USER, ds, "RUNNING credible-sets")
+    put, delete_dir, _, submit = _patched()
+    with put, delete_dir, submit as submit_mock:
+        res = api_client.post(f"/api/credible-sets/{ds}", **_multipart(), headers=_auth(_token(api_client)))
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["job_id"] is None
+    assert body["status"] == "indexing"
+    submit_mock.assert_not_awaited()
 
 
 def test_create_400s_with_the_report_and_stores_nothing(api_client: TestClient):
@@ -245,9 +319,28 @@ def test_delete_reconciles_the_index_when_sifted(api_client: TestClient):
     put, delete_dir, _, submit = _patched()
     with put, delete_dir, submit as submit_mock:
         api_client.post(f"/api/credible-sets/{ds}", **_multipart(), headers=_auth(token))
+        # The mocked batch job never reports back, so the create's own ingest
+        # job is finished here by hand -- otherwise Fix 3's single-running-job
+        # rule would (correctly) hold the delete's reconcile job back.
+        database_utils.log_job_end(get_db(), USER, ds, "credible-sets SUCCEEDED", "log")
         res = api_client.delete(f"/api/credible-sets/{ds}/susie-v1", headers=_auth(token))
     assert res.json() == {"job_id": dataset_id}
     assert submit_mock.await_count == 2      # one for create, one for delete
+
+
+def test_delete_does_not_submit_while_an_ingest_job_is_running(api_client: TestClient):
+    ds = _ds("csapi_delete_busy")
+    _dataset(ds)
+    _sifted(ds)
+    token = _token(api_client)
+    put, delete_dir, _, submit = _patched()
+    with put, delete_dir, submit as submit_mock:
+        api_client.post(f"/api/credible-sets/{ds}", **_multipart(), headers=_auth(token))
+        # the create call above already left a RUNNING credible-sets job in place
+        res = api_client.delete(f"/api/credible-sets/{ds}/susie-v1", headers=_auth(token))
+    assert res.status_code == 200
+    assert res.json() == {"job_id": None}
+    submit_mock.assert_awaited_once()      # only the create call submitted a job
 
 
 def test_delete_keeps_the_row_when_s3_fails(api_client: TestClient):
@@ -292,3 +385,18 @@ def test_datasets_listing_carries_credible_sets_with_status(api_client: TestClie
     row = next(r for r in res.json() if r["dataset"] == ds)
     assert [c["slug"] for c in row["credible_sets"]] == ["susie-v1"]
     assert row["credible_sets"][0]["status"] == "pending"
+
+
+def test_datasets_listing_survives_a_missing_credible_sets_table(api_client: TestClient):
+    """An API deployed ahead of the credible_sets migration must degrade to an
+    empty column, not 500 the whole datasets page."""
+    ds = _ds("csapi_no_migration")
+    _dataset(ds)
+    token = _token(api_client)
+    with patch("job_server.database_utils.get_credible_sets_for_user",
+               side_effect=ProgrammingError("SELECT", {}, Exception("no such table"))), \
+         patch("job_server.s3.get_datasets", return_value=[ds]):
+        res = api_client.get("/api/datasets", headers=_auth(token))
+    assert res.status_code == 200
+    row = next(r for r in res.json() if r["dataset"] == ds)
+    assert row["credible_sets"] == []

@@ -287,7 +287,7 @@ export const useUserStore = defineStore("UserStore", {
         // ---- credible sets attached to a GWAS ----
         async validateCredibleSet(formData) {
             const { data } = await this.axios.post(
-                "/api/credible-sets/validate",
+                "/api/validate-credible-set",
                 formData,
                 { headers: { "Content-Type": "multipart/form-data" } },
             );

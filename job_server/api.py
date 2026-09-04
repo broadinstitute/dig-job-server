@@ -19,6 +19,7 @@ import pandas as pd
 from botocore.exceptions import ClientError
 from fastapi import Depends, HTTPException, Header, UploadFile, Query, BackgroundTasks, Form
 from pydantic import BaseModel
+from sqlalchemy.exc import ProgrammingError
 from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
@@ -104,7 +105,14 @@ async def get_datasets(user: User = Depends(get_current_user),
     jobs_for_user = database_utils.get_jobs_for_user(get_db(), user.username)
     workflow_jobs_for_user = database_utils.get_workflow_jobs_for_user(get_db(), user.username)
     data_set_metadata = database_utils.get_dataset_metadata(get_db(), user.username)
-    credible_sets_by_dataset = database_utils.get_credible_sets_for_user(get_db(), user.username)
+    try:
+        credible_sets_by_dataset = database_utils.get_credible_sets_for_user(get_db(), user.username)
+    except ProgrammingError:
+        # The credible_sets table is created by an Alembic migration that ships
+        # with this feature; an API deployed ahead of it must degrade to an
+        # empty column, not take down the datasets page.
+        logging.warning("credible_sets table unavailable; is the migration applied?")
+        credible_sets_by_dataset = {}
 
     # Create the dataset list
     datasets = []
@@ -887,6 +895,15 @@ def _dataset_is_sifted(username: str, dataset: str) -> bool:
     return database_utils.get_indexed_dataset_metadata(get_db(), guid) is not None
 
 
+def _ingest_job_running(username: str, dataset: str) -> bool:
+    """True while a `credible-sets` or `variant-sifter` job is RUNNING for the
+    dataset. Two builds of the same bioindex tables at once double-insert rows
+    and fight over the single-slot workflow_jobs status, so only one may run."""
+    dataset_id = database_utils.get_dataset_hash(dataset, username)
+    jobs = database_utils.get_workflow_jobs_for_dataset(get_db(), dataset_id)
+    return any(j["status"] == "RUNNING" and j["method"] in credible_sets.INGEST_METHODS for j in jobs)
+
+
 def _credible_set_records(username: str, dataset: str) -> list:
     dataset_id = database_utils.get_dataset_hash(dataset, username)
     rows = database_utils.get_credible_sets_for_dataset(get_db(), username, dataset)
@@ -911,12 +928,18 @@ async def start_credible_sets_job(user: User, dataset: str, background_tasks: Ba
     return guid
 
 
-@router.post("/credible-sets/validate")
+@router.post("/validate-credible-set")
 async def validate_credible_set(file: UploadFile, col_map: str = Form(...),
                                 separator: Optional[str] = Form(None),
                                 user: User = Depends(get_current_user)):
-    """Dry run with no dataset: the upload wizard validates before the GWAS exists."""
-    raw = await file.read()
+    """Dry run with no dataset: the upload wizard validates before the GWAS exists.
+
+    Lives outside the `/credible-sets/{dataset}` path space so no dataset name
+    can shadow it; mirrors `/validate-bed-file`.
+    """
+    # Read at most one byte over the cap: validate_file's own size branch then
+    # rejects the file, and a multi-GB body is never materialised in memory.
+    raw = await file.read(credible_sets.MAX_BYTES + 1)
     return credible_sets.validate_file(raw, file.filename, _parse_separator(separator), _parse_col_map(col_map))
 
 
@@ -933,7 +956,9 @@ async def create_credible_set(dataset: str, background_tasks: BackgroundTasks, f
         raise fastapi.HTTPException(status_code=400, detail=str(exc))
     parsed = _parse_col_map(col_map)
     parsed_separator = _parse_separator(separator)
-    raw = await file.read()
+    # Read at most one byte over the cap: validate_file's own size branch then
+    # rejects the file, and a multi-GB body is never materialised in memory.
+    raw = await file.read(credible_sets.MAX_BYTES + 1)
     report = credible_sets.validate_file(raw, clean_filename, parsed_separator, parsed)
     if not report["ok"]:
         raise fastapi.HTTPException(status_code=400, detail=report)
@@ -956,7 +981,9 @@ async def create_credible_set(dataset: str, background_tasks: BackgroundTasks, f
         raise fastapi.HTTPException(status_code=500, detail="Failed to store the credible set") from exc
 
     job_id = None
-    if _dataset_is_sifted(user.username, dataset):
+    # A running job usually lists the new metadata itself; when it does not,
+    # the status stays pending and Retry indexing covers it.
+    if _dataset_is_sifted(user.username, dataset) and not _ingest_job_running(user.username, dataset):
         job_id = await start_credible_sets_job(user, dataset, background_tasks)
     record = next(r for r in _credible_set_records(user.username, dataset) if r["slug"] == info.slug)
     return {**record, "job_id": job_id}
@@ -998,7 +1025,9 @@ async def remove_credible_set(dataset: str, slug: str, background_tasks: Backgro
     # The pipeline's reconcile step removes the indexed objects for uploads that
     # no longer exist, so a sifted dataset gets a job to make the delete visible.
     job_id = None
-    if _dataset_is_sifted(user.username, dataset):
+    # A running job usually lists the new metadata itself; when it does not,
+    # the status stays pending and Retry indexing covers it.
+    if _dataset_is_sifted(user.username, dataset) and not _ingest_job_running(user.username, dataset):
         job_id = await start_credible_sets_job(user, dataset, background_tasks)
     return {"job_id": job_id}
 
@@ -1009,9 +1038,7 @@ async def reindex_credible_sets(dataset: str, background_tasks: BackgroundTasks,
     _require_owned_dataset(user, dataset)
     if not _dataset_is_sifted(user.username, dataset):
         raise fastapi.HTTPException(status_code=409, detail="Run Variant Sifter on this dataset first")
-    dataset_id = database_utils.get_dataset_hash(dataset, user.username)
-    jobs = database_utils.get_workflow_jobs_for_dataset(get_db(), dataset_id)
-    if any(j["status"] == "RUNNING" and j["method"] in credible_sets.INGEST_METHODS for j in jobs):
+    if _ingest_job_running(user.username, dataset):
         raise fastapi.HTTPException(status_code=409, detail="An indexing job is already running")
     return {"job_id": await start_credible_sets_job(user, dataset, background_tasks)}
 

@@ -40,7 +40,7 @@ def log_job_start(db, username, dataset, status, prefix=""):
         with db as connection:
             query = text("INSERT INTO workflow_jobs (id, user, method, status, started_at, updated_at) "
                          "VALUES (:id, :username, :method, 'RUNNING', NOW(), NOW()) "
-                         "ON DUPLICATE KEY UPDATE status='RUNNING', updated_at=NOW(), job_log=NULL")
+                         "ON DUPLICATE KEY UPDATE status='RUNNING', started_at=NOW(), updated_at=NOW(), job_log=NULL")
             connection.execute(query, {
                 "id": get_dataset_hash(dataset, username, prefix=prefix),
                 "username": username,
@@ -89,11 +89,11 @@ def get_jobs_for_user(db, username):
 def get_workflow_jobs_for_user(db, username):
     """Returns detailed job information organized by method"""
     with db as connection:
-        query = text("SELECT id, method, status, updated_at FROM workflow_jobs WHERE user = :username ORDER BY updated_at DESC")
+        query = text("SELECT id, method, status, started_at, updated_at FROM workflow_jobs WHERE user = :username ORDER BY updated_at DESC")
         results = connection.execute(query, {"username": username}).fetchall()
         jobs_by_dataset = {}
         for row in results:
-            dataset_id, method, status, updated_at = row
+            dataset_id, method, status, started_at, updated_at = row
             if dataset_id not in jobs_by_dataset:
                 jobs_by_dataset[dataset_id] = {}
             # Use method as both workflow and method for frontend compatibility
@@ -101,6 +101,7 @@ def get_workflow_jobs_for_user(db, username):
                 jobs_by_dataset[dataset_id][method] = {}
             jobs_by_dataset[dataset_id][method][method] = {
                 "status": status,
+                "started_at": started_at,
                 "updated_at": updated_at
             }
         return jobs_by_dataset
@@ -431,6 +432,6 @@ def get_workflow_jobs_for_dataset(db, dataset_id: str) -> list:
     job_server.credible_sets.derive_status consumes."""
     with db as connection:
         rows = connection.execute(text(
-            "SELECT method, status, updated_at FROM workflow_jobs WHERE id = :id"
+            "SELECT method, status, started_at, updated_at FROM workflow_jobs WHERE id = :id"
         ), {"id": dataset_id}).fetchall()
-        return [{"method": r[0], "status": r[1], "updated_at": r[2]} for r in rows]
+        return [{"method": r[0], "status": r[1], "started_at": r[2], "updated_at": r[3]} for r in rows]

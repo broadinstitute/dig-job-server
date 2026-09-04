@@ -91,3 +91,18 @@ def test_workflow_jobs_for_dataset_lists_every_method():
     assert {(j["method"], j["status"]) for j in jobs} == {
         ("variant-sifter", "SUCCEEDED"), ("credible-sets", "RUNNING")}
     assert all(j["updated_at"] is not None for j in jobs)
+    assert all(j["started_at"] is not None for j in jobs)
+
+
+def test_log_job_start_refreshes_started_at_on_rerun():
+    ds = f"csdb_rerun_{int(time.time() * 1000)}"
+    dataset_id = _dataset(ds)
+    database_utils.log_job_start(get_db(), USER, ds, "RUNNING variant-sifter")
+    database_utils.log_job_end(get_db(), USER, ds, "variant-sifter SUCCEEDED", "log")
+    first = next(j for j in database_utils.get_workflow_jobs_for_dataset(get_db(), dataset_id)
+                 if j["method"] == "variant-sifter")
+    time.sleep(1)
+    database_utils.log_job_start(get_db(), USER, ds, "RUNNING variant-sifter")
+    second = next(j for j in database_utils.get_workflow_jobs_for_dataset(get_db(), dataset_id)
+                  if j["method"] == "variant-sifter")
+    assert second["started_at"] > first["started_at"]

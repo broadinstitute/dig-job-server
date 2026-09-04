@@ -2,7 +2,7 @@
 // Pure so Vitest covers it without mounting the component.
 import { missingCredibleSetFields } from "./credibleSetFields";
 
-/** Everything needed to call POST /api/credible-sets/validate. */
+/** Everything needed to call POST /api/validate-credible-set. */
 export function canValidate(model) {
   if (!model || !model.file) return false;
   if (!String(model.name || "").trim()) return false;
