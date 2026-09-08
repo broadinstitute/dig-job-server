@@ -102,6 +102,15 @@ describe("claiming", () => {
   });
 });
 
+describe("neverFuzzy parameter", () => {
+  it("defaults to NEVER_FUZZY_MATCH, leaving GWAS behaviour unchanged, but a caller can widen it", () => {
+    expect(suggestColumnMap(["chromosom"], TARGETS)).toEqual({ chromosom: "chromosome" });
+    expect(
+      suggestColumnMap(["chromosom"], TARGETS, GWAS_COLUMN_ALIASES, new Set([...NEVER_FUZZY_MATCH, "chromosome"])),
+    ).toEqual({});
+  });
+});
+
 describe("similarity", () => {
   it("scores identical strings 1 and unrelated strings low", () => {
     expect(similarity("position", "position")).toBe(1);

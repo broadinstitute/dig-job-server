@@ -12,8 +12,7 @@ import tempfile
 import zipfile
 from statistics import NormalDist
 
-from .index_build import (credible_sets_key, credible_variants_key,
-                          index_credible_sets, index_credible_variants)
+from .index_build import credible_sets_key, credible_variants_key
 from .loci import chrom_rank
 
 # Where the aggregator keeps the clumping assets this port reuses: PLINK 1.9,
@@ -318,13 +317,15 @@ def dbsnp_rsid_lookup(varids: "set[str]") -> "dict[str, str]":
         return {}
 
 
-def build_and_index_credible_sets(s3, bucket: str, records, guid: str, *,
-                                  dataset: str,
-                                  ancestry: "str | None" = None) -> int:
-    """Derive, write, and index this dataset's credible sets. Both objects are
-    written (and both indexes built) even when empty, so frontend queries get
-    clean empty results instead of a missing index. Returns the number of
-    credible-set variant rows."""
+def write_derived_credible_sets(s3, bucket: str, records, guid: str, *,
+                                dataset: str,
+                                ancestry: "str | None" = None) -> int:
+    """Derive and write this dataset's credible sets. Both objects are written
+    even when empty, so the indexes run.py builds afterwards give frontend
+    queries clean empty results instead of a missing index. Indexing is NOT
+    done here: run.py builds the two credible-set indexes once, after the
+    uploaded sets (uploaded_credible_sets.sync_uploaded_credible_sets) have
+    been written next to these. Returns the number of variant rows."""
     variants, sets_ = derive_credible_sets(
         records, guid, dataset, ancestry=ancestry,
         run_plink=make_plink_runner(ancestry),
@@ -334,7 +335,4 @@ def build_and_index_credible_sets(s3, bucket: str, records, guid: str, *,
                       (credible_sets_key(guid), sets_)):
         body = "".join(json.dumps(r) + "\n" for r in rows)
         s3.put_object(Bucket=bucket, Key=key, Body=body.encode())
-
-    index_credible_variants(guid)
-    index_credible_sets(guid)
     return len(variants)

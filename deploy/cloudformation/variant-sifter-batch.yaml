@@ -32,7 +32,8 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   GWAS-CE Variant Sifter Batch runtime: ECR repo, least-privilege task/execution
   role, and the Fargate Batch job definition that builds + indexes one uploaded
-  GWAS's p-value-filtered associations into the gwas_ce bioindex.
+  GWAS's associations and credible sets (derived + user-uploaded) into the
+  gwas_ce bioindex.
 
 Parameters:
   ImageTag:
@@ -137,6 +138,11 @@ Resources:
     Properties:
       JobDefinitionName: gwas-ce-variant-sifter
       Type: container
+      # Batch-parameter defaults. `mode` is overridden per submission by
+      # job_server.variant_sifter.sifter_job_config; `full` keeps a submission
+      # from an older API (which sends no mode) behaving as before.
+      Parameters:
+        mode: full
       PlatformCapabilities:
         - FARGATE
       ContainerProperties:
@@ -158,6 +164,8 @@ Resources:
           - Ref::dataset
           - --guid
           - Ref::guid
+          - --mode
+          - Ref::mode
         Environment:
           # Python block-buffers stdout when it isn't a TTY, so without this the
           # job's progress lines only reach CloudWatch when the process exits --

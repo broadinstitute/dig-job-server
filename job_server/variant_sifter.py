@@ -36,20 +36,30 @@ def build_sifter_url(base_url: str, guid: str, region: str | None = None) -> str
     return url
 
 
-def sifter_job_config(username: str, dataset: str, guid: str) -> dict:
+# `full` = associations + derived credible sets + every attached upload;
+# `credible-sets` = attached uploads only, rebuilding just the two credible-set
+# indexes. Both run the same job definition; the mode is a Batch parameter.
+SIFTER_MODES = ("full", "credible-sets")
+
+
+def sifter_job_config(username: str, dataset: str, guid: str, mode: str = "full") -> dict:
     """AWS Batch submit_job kwargs for the variant-sifter prep pipeline.
 
     Submitted onto the shared `indexer-job-queue` (its compute env reaches the
     aurora-giant-bioindex cluster); the job definition + IAM role are declared in
-    deploy/cloudformation/variant-sifter-batch.yaml.
+    deploy/cloudformation/variant-sifter-batch.yaml, whose Command passes
+    `--mode Ref::mode`.
     """
+    if mode not in SIFTER_MODES:
+        raise ValueError(f"unknown sifter mode {mode!r}")
     return {
-        "jobName": "gwas-ce-variant-sifter",
+        "jobName": "gwas-ce-variant-sifter" if mode == "full" else "gwas-ce-credible-sets",
         "jobQueue": "indexer-job-queue",
         "jobDefinition": "gwas-ce-variant-sifter",
         "parameters": {
             "username": username,
             "dataset": dataset,
             "guid": guid,
+            "mode": mode,
         },
     }

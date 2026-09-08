@@ -107,3 +107,20 @@ def test_credible_schemas_match_the_main_portal():
     set's variants by id. They mirror bioindex's main-portal definitions."""
     assert index_build.CREDIBLE_SETS_SCHEMA == "phenotype,chromosome:start-end"
     assert index_build.CREDIBLE_VARIANTS_SCHEMA == "phenotype,credibleSetId"
+
+
+# ---- uploaded credible sets live beside the derived objects ----------------
+
+def test_upload_objects_live_under_the_credible_set_prefixes():
+    """bioindex ingests everything under the prefix, so one per-dataset index
+    serves derived + uploaded sets with no new index definitions."""
+    assert index_build.upload_sets_key(GUID, "susie-v1") == \
+        index_build.credible_sets_prefix(GUID) + "upload-susie-v1.json"
+    assert index_build.upload_variants_key(GUID, "susie-v1") == \
+        index_build.credible_variants_prefix(GUID) + "upload-susie-v1.json"
+
+
+def test_upload_slug_is_recoverable_from_the_key_and_derived_objects_are_not_uploads():
+    assert index_build.upload_slug_of_key(index_build.upload_sets_key(GUID, "susie-v1")) == "susie-v1"
+    assert index_build.upload_slug_of_key(index_build.credible_sets_key(GUID)) is None
+    assert index_build.upload_slug_of_key(index_build.credible_variants_key(GUID)) is None

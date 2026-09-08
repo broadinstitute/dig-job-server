@@ -90,8 +90,11 @@ const normalize = (s) => String(s).toLowerCase().trim();
  * left, skipping the destructive fields. A target is claimed at most once, so
  * a file carrying both `A1` and `effect_allele` yields one effect-allele
  * mapping rather than two competing ones.
+ * `neverFuzzy` overrides which fields are alias-only; callers with their own
+ * destructive fields (e.g. credible-set id, posterior probability) pass a
+ * wider set without affecting this module's default GWAS behaviour.
  */
-export function suggestColumnMap(columns, targetFields, aliases = GWAS_COLUMN_ALIASES) {
+export function suggestColumnMap(columns, targetFields, aliases = GWAS_COLUMN_ALIASES, neverFuzzy = NEVER_FUZZY_MATCH) {
   const targets = new Set(targetFields);
   const suggested = {};
   const claimed = new Set();
@@ -117,7 +120,7 @@ export function suggestColumnMap(columns, targetFields, aliases = GWAS_COLUMN_AL
     let best = null;
     let bestScore = 0;
     targetFields.forEach((t) => {
-      if (claimed.has(t) || NEVER_FUZZY_MATCH.has(t)) return;
+      if (claimed.has(t) || neverFuzzy.has(t)) return;
       const score = similarity(key, normalize(t));
       if (score > bestScore) {
         bestScore = score;
