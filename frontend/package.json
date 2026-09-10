@@ -46,6 +46,6 @@
         "sass": "^1.99.0",
         "sass-loader": "^16.0.7",
         "tailwindcss": "^4.2.2",
-        "vitest": "^4.1.10"
+        "vitest": "^4.1.11"
     }
 }
