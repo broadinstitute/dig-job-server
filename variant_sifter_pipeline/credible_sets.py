@@ -47,13 +47,15 @@ P2 = 5e-6
 # aggregator): chosen so p=5e-8 lands near posterior probability 0.75.
 _K = 0.974
 # norm.ppf overflows to infinity below this; the aggregator clamps identically.
-_MIN_P = 1e-323
+# Also the value an uploaded pValue of 0 is stored as (uploaded_credible_sets),
+# mirrored by job_server.credible_sets.MIN_P_VALUE.
+MIN_P = 1e-323
 
 _NORMAL = NormalDist()
 
 
 def _p_to_z(p_value: float) -> float:
-    return abs(_NORMAL.inv_cdf(max(p_value, _MIN_P) / 2.0))
+    return abs(_NORMAL.inv_cdf(max(p_value, MIN_P) / 2.0))
 
 
 def bayes_pp(pvalues: "list[float]") -> "list[float]":

@@ -208,9 +208,28 @@ def test_optional_fields_are_validated_when_mapped():
     header = HEADER + "\tP\tB\tSE\tN"
     ok = _validate(_tsv("1\t100\tA\tG\t1\t0.6\t1e-8\t0.1\t0.02\t1000", header=header), col_map)
     assert ok["ok"] is True
-    bad = _validate(_tsv("1\t100\tA\tG\t1\t0.6\t0\t0.1\t-1\t0", header=header), col_map)
+    bad = _validate(_tsv("1\t100\tA\tG\t1\t0.6\t2\t0.1\t-1\t0", header=header), col_map)
     messages = " | ".join(e["message"] for e in bad["errors"])
     assert "pValue" in messages and "se" in messages and "n" in messages
+
+
+@pytest.mark.parametrize("p", ["0", "0.0", "1e-400"])
+def test_zero_pvalue_is_accepted_with_a_floor_warning(p):
+    col_map = {**COL_MAP, "pValue": "P"}
+    header = HEADER + "\tP"
+    rep = _validate(_tsv(f"1\t100\tA\tG\t1\t0.6\t{p}", "1\t200\tC\tT\t1\t0.4\t1e-8", header=header), col_map)
+    assert rep["ok"] is True
+    assert rep["row_count"] == 2
+    floor_warnings = [w["message"] for w in rep["warnings"] if "pValue" in w["message"]]
+    assert len(floor_warnings) == 1
+    assert floor_warnings[0].startswith("1 pValue values of 0 will be stored as 1e-323")
+
+
+def test_negative_pvalue_is_still_an_error():
+    col_map = {**COL_MAP, "pValue": "P"}
+    rep = _validate(_tsv("1\t100\tA\tG\t1\t0.6\t-1e-8", header=HEADER + "\tP"), col_map)
+    assert rep["ok"] is False
+    assert "pValue" in rep["errors"][0]["message"]
 
 
 def test_duplicate_variant_within_a_set_is_an_error():

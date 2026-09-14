@@ -121,6 +121,10 @@ _CHROMOSOMES = {str(i) for i in range(1, 23)} | {"X", "Y", "MT"}
 # Sets whose posterior probabilities sum outside this band get a warning; the
 # pipeline renormalises to 1 regardless (as the aggregator does).
 _PP_SUM_BAND = (0.5, 1.5)
+# A pValue of 0 (an underflowed or rounded p) is accepted and stored as this
+# instead. A deliberate copy of variant_sifter_pipeline.credible_sets.MIN_P:
+# the app must not import the pipeline package (different runtime).
+MIN_P_VALUE = 1e-323
 
 
 def normalize_chromosome(value) -> "str | None":
@@ -220,10 +224,14 @@ def _row_problems(rec: dict, col_map: dict) -> "tuple[list[str], dict]":
         problems.append("posteriorProbability must be greater than 0")
     parsed["posteriorProbability"] = pp
 
+    parsed["pvalue_floored"] = False
     if col_map.get("pValue"):
         p = _to_float(rec.get("pValue"))
-        if p is None or not 0 < p <= 1:
-            problems.append(f"pValue {rec.get('pValue')!r} is not a number in (0, 1]")
+        if p is None or not 0 <= p <= 1:
+            problems.append(f"pValue {rec.get('pValue')!r} is not a number in [0, 1]")
+        else:
+            # 0 (and anything that underflows to it, e.g. 1e-400) is stored as MIN_P_VALUE.
+            parsed["pvalue_floored"] = p == 0
     if col_map.get("beta") and _to_float(rec.get("beta")) is None:
         problems.append(f"beta {rec.get('beta')!r} is not a number")
     if col_map.get("se"):
@@ -287,6 +295,7 @@ def validate_file(raw: bytes, filename: str, separator: "str | None", col_map: d
     seen = set()
     sets: "OrderedDict[str, dict]" = OrderedDict()
     normalised_chroms = 0
+    floored_pvalues = 0
     row_count = 0
     for line_no, row in enumerate(reader, start=2):
         if line_no - 1 > MAX_ROWS:
@@ -318,6 +327,7 @@ def validate_file(raw: bytes, filename: str, separator: "str | None", col_map: d
         entry["variants"] += 1
         entry["pp_sum"] += parsed["posteriorProbability"]
         normalised_chroms += parsed["chromosome_normalised"]
+        floored_pvalues += parsed["pvalue_floored"]
         row_count += 1
 
     if row_count == 0 and not errors.items:
@@ -331,6 +341,9 @@ def validate_file(raw: bytes, filename: str, separator: "str | None", col_map: d
             warnings.add(None, f"set {set_id!r} has a single variant")
     if normalised_chroms:
         warnings.add(None, f"{normalised_chroms} chromosome values were normalised (e.g. chr1 -> 1)")
+    if floored_pvalues:
+        warnings.add(None, f"{floored_pvalues} pValue values of 0 will be stored as {MIN_P_VALUE!r} "
+                           "(the smallest p-value the portal can represent)")
 
     report["row_count"] = row_count
     report["set_count"] = len(sets)

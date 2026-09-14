@@ -42,6 +42,15 @@ def test_record_shape_matches_the_derived_sets():
         (GUID, "myGwas", "1", 100, 101, "EUR")
 
 
+def test_zero_pvalue_is_floored_to_the_smallest_representable_p():
+    variants, _ = _build([_row("1", "100", "A", "G", "1", "0.6", pValue="0"),
+                          _row("1", "200", "C", "T", "1", "0.3", pValue="1e-400"),
+                          _row("1", "300", "G", "A", "1", "0.1", pValue="1e-8")])
+    by_pos = {v["position"]: v["pValue"] for v in variants}
+    assert by_pos[100] == 1e-323 and by_pos[200] == 1e-323 and by_pos[300] == 1e-8
+    assert all(p > 0 and math.isfinite(math.log10(p)) for p in by_pos.values())
+
+
 def test_optional_fields_are_absent_when_the_upload_lacks_them():
     variants, _ = _build([_row("1", "100", "A", "G", "1", "0.6")])
     assert not {"pValue", "beta", "stdErr", "n", "dbSNP", "ancestry"} & set(variants[0])

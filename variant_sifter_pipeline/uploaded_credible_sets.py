@@ -17,6 +17,7 @@ import json
 import math
 
 from .canonicalize import canonicalize
+from .credible_sets import MIN_P
 from .index_build import (credible_sets_prefix, credible_variants_prefix,
                           upload_sets_key, upload_slug_of_key, upload_variants_key)
 from .loci import chrom_rank
@@ -95,6 +96,9 @@ def build_uploaded_credible_sets(rows, guid: str, dataset: str, *, slug: str, na
             value = _to_float(r.get(src))
             if value is not None:
                 rec[dst] = value
+        # An underflowed/rounded p of 0 is floored so -log10(p) stays finite downstream.
+        if rec.get("pValue") is not None and rec["pValue"] <= 0:
+            rec["pValue"] = MIN_P
         if r.get("rsid"):
             rec["dbSNP"] = str(r["rsid"])
         by_set.setdefault(raw_id, []).append(rec)
