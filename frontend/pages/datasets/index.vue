@@ -5,6 +5,7 @@ import { falconEligibility } from "~/utils/falcon/eligibility.js";
 import { buildFormData, isReady, describeUploadError } from "~/utils/upload/credibleSetForm.js";
 import { statusTag, hasFailed } from "~/utils/credibleSets/statusTag.js";
 import { createRefreshGuard } from "~/utils/credibleSets/refreshGuard.js";
+import { portalSifterOrigin, buildPortalSifterUrl, createTokenHandoff } from "~/utils/sifter/portalHandoff.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -54,6 +55,32 @@ async function runVariantSifter(data) {
         detail: "Variant Sifter prep started",
         life: 5000,
     });
+}
+
+// Open the portal's Variant Sifter and hand it the dataset id over postMessage
+// (utils/sifter/portalHandoff.js) so the id never appears in a URL. The
+// handoff listens for the portal's `ready` BEFORE the window is opened, which
+// is why the window reaches it through a holder rather than a value. Hidden
+// entirely unless NUXT_PUBLIC_PORTAL_SIFTER_URL is configured.
+function openPortalSifter(data) {
+    const portalUrl = config.public.portalSifterUrl;
+    const holder = { win: null };
+    const handoff = createTokenHandoff({
+        getWin: () => holder.win,
+        origin: portalSifterOrigin(portalUrl),
+        payload: { token: data.id, dataset: data.dataset, ancestry: data.ancestry || null },
+    });
+    // No region: the user picks a locus on the portal's Welcome panel.
+    holder.win = window.open(buildPortalSifterUrl(portalUrl), "_blank");
+    if (!holder.win) {
+        handoff.cancel();
+        toast.add({
+            severity: "warn",
+            summary: "Pop-up blocked",
+            detail: "Allow pop-ups for this site to open the portal Variant Sifter",
+            life: 8000,
+        });
+    }
 }
 
 const toggleHelp = (event) => {
@@ -540,6 +567,17 @@ function getAllWorkflowOptions(data) {
                 ),
             disabled: false,
         });
+        if (config.public.portalSifterUrl) {
+            options.push({
+                label: "Open in Portal Sifter",
+                icon: "pi pi-external-link",
+                method: "variant-sifter",
+                status: "succeeded",
+                severity: "success",
+                command: () => openPortalSifter(data),
+                disabled: false,
+            });
+        }
         // A SUCCEEDED dataset must stay re-runnable: the pipeline's output
         // changes underneath it (the per-dataset index layout did, the VEP join
         // will), and every such change needs existing datasets rebuilt. Without
