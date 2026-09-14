@@ -1,12 +1,22 @@
 # Custom
 .idea
 
+# Editor settings
+.vscode/
+vetur.config.js
+
 # Agent / AI assistant artifacts
 docs/superpowers/
 CLAUDE.md
 GEMINI.md
 WARP.md
+AGENTS.md
 .claude/
+.github/copilot-instructions.md
+
+# Local working notes and backups
+notes/
+*.backup
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
