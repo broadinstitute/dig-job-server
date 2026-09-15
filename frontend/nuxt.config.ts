@@ -72,7 +72,6 @@ export default defineNuxtConfig({
             apiBaseUrl: "",
             skipAuth: false,
             phenotypesUrl: process.env.NUXT_PUBLIC_PHENOTYPES_URL || "",
-            bioindexUrl: process.env.NUXT_PUBLIC_BIOINDEX_URL || "",
             // Portal Variant Sifter page for the postMessage token handoff
             // (utils/sifter/portalHandoff.js). Empty hides the datasets-page button.
             portalSifterUrl: process.env.NUXT_PUBLIC_PORTAL_SIFTER_URL || "",

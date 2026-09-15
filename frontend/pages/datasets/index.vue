@@ -554,19 +554,6 @@ function getAllWorkflowOptions(data) {
             disabled: true,
         });
     } else if (sifterStatus === "SUCCEEDED") {
-        options.push({
-            label: "View in Sifter",
-            icon: "pi pi-eye",
-            method: "variant-sifter",
-            status: "succeeded",
-            severity: "success",
-            command: () =>
-                router.push(
-                    `/sifter?dataset=${encodeURIComponent(data.dataset)}&guid=${encodeURIComponent(data.id)}` +
-                        (data.ancestry ? `&ancestry=${encodeURIComponent(data.ancestry)}` : ""),
-                ),
-            disabled: false,
-        });
         if (config.public.portalSifterUrl) {
             options.push({
                 label: "Open in Portal Sifter",
