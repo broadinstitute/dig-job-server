@@ -556,7 +556,7 @@ function getAllWorkflowOptions(data) {
     } else if (sifterStatus === "SUCCEEDED") {
         if (config.public.portalSifterUrl) {
             options.push({
-                label: "Open in Portal Sifter",
+                label: "Open in Variant Sifter",
                 icon: "pi pi-external-link",
                 method: "variant-sifter",
                 status: "succeeded",
