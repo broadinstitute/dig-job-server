@@ -27,6 +27,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (publicRoutes.includes(to.path)) {
         return;
     }
+    // Pages can also opt out with definePageMeta({ requiresAuth: false }),
+    // which covers dynamic routes such as /methods/[slug] that an exact-match
+    // list cannot express.
+    if (to.meta.requiresAuth === false) {
+        return;
+    }
 
     const userStore = useUserStore();
     const isLoggedIn = await userStore.isUserLoggedIn();

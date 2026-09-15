@@ -1,3 +1,10 @@
+import {
+    HUB_STATUS,
+    hubVerifyUrl,
+    isHubCacheFresh,
+    resolveHubStatus,
+} from "~/utils/auth/hubMembership";
+
 export const useUserStore = defineStore("UserStore", {
     state: () => {
         return {
@@ -5,9 +12,62 @@ export const useUserStore = defineStore("UserStore", {
             axios: null,
             loginError: null,
             isDefaultUser: false,
+            // GWAS-Hub membership for this session; see utils/auth/hubMembership.js
+            hubStatus: HUB_STATUS.UNKNOWN,
+            // The authToken hubStatus was resolved for. A different current
+            // token (e.g. account switched in another tab) invalidates it.
+            hubVerifiedToken: null,
         };
     },
+    getters: {
+        isHubMember: (state) => state.hubStatus === HUB_STATUS.MEMBER,
+    },
     actions: {
+        // ---- GWAS-Hub membership ----
+        // Verifies the current token against the hub group (a second KPN
+        // user-service group). Cached per session and per token: MEMBER/DENIED
+        // are stable for the token they were resolved with, UNKNOWN/ERROR are
+        // re-checked. This path never writes localStorage, so a hub 401 cannot
+        // log the user out of GWAS-CE.
+        async checkHubMembership({ force = false } = {}) {
+            const token = localStorage.getItem("authToken");
+            if (
+                isHubCacheFresh({
+                    status: this.hubStatus,
+                    verifiedToken: this.hubVerifiedToken,
+                    token,
+                    force,
+                })
+            ) {
+                return this.hubStatus;
+            }
+            const config = useRuntimeConfig();
+            const group = config.public.gwasHubGroup;
+            const verify = () =>
+                $fetch(hubVerifyUrl(config.public.userServiceUrl, group), {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+            const status = await resolveHubStatus({
+                skipAuth: config.public.skipAuth,
+                token,
+                group,
+                verify,
+            });
+            if (localStorage.getItem("authToken") !== token) {
+                // The identity changed while the request was in flight (another
+                // tab signed in/out). The answer belongs to the old token;
+                // discard it and resolve for the current one instead.
+                this.resetHubMembership();
+                return this.checkHubMembership({ force: true });
+            }
+            this.hubStatus = status;
+            this.hubVerifiedToken = token;
+            return status;
+        },
+        resetHubMembership() {
+            this.hubStatus = HUB_STATUS.UNKNOWN;
+            this.hubVerifiedToken = null;
+        },
         init() {
             const config = useRuntimeConfig();
             this.axios = useAxios(config);
@@ -56,6 +116,7 @@ export const useUserStore = defineStore("UserStore", {
                     // Clear invalid token
                     localStorage.removeItem("authToken");
                     this.user = null;
+                    this.resetHubMembership();
 
                     // For default user, try to login again automatically
                     // But only if they haven't explicitly signed out
@@ -167,6 +228,8 @@ export const useUserStore = defineStore("UserStore", {
                     localStorage.setItem("authToken", response.access);
                     this.user = response.user;
                     this.isDefaultUser = isDefault;
+                    // A new identity must not inherit a cached hub answer
+                    this.resetHubMembership();
 
                     if (isDefault) {
                         localStorage.setItem("isDefaultUser", "true");
@@ -191,6 +254,7 @@ export const useUserStore = defineStore("UserStore", {
             this.user = null;
             this.isDefaultUser = false;
             this.loginError = null;
+            this.resetHubMembership();
         },
         async getPresignedUrl(fileName, dataset) {
             const { data } = await this.axios.get(

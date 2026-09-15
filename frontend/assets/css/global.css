@@ -1,5 +1,14 @@
 /* Global styles for the application */
 
+/* Page shell shared by layouts/default.vue and layouts/gwas-hub.vue */
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: var(--p-content-background);
+    color: var(--p-text-color);
+}
+
 /* Tooltip styles */
 .p-tooltip.filename-tooltip .p-tooltip-text {
     white-space: nowrap !important;
