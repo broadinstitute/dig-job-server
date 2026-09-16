@@ -8,12 +8,18 @@
             :target="logo.href ? '_blank' : undefined"
             :rel="logo.href ? 'noopener' : undefined"
             class="flex items-center justify-center"
+            :class="logo.bgClass"
         >
+            <!--
+                Explicit height, not max-height: an SVG with only a viewBox
+                has no intrinsic size and would collapse to zero width in this
+                shrink-to-fit flex item. Width follows the aspect ratio.
+            -->
             <img
                 v-if="logo.src"
                 :src="logo.src"
                 :alt="logo.name"
-                class="max-h-16 w-auto object-contain"
+                class="h-16 w-auto object-contain"
             />
             <div
                 v-else
@@ -27,7 +33,8 @@
 
 <script setup>
 // Row of partner / funder logos. Entries without `src` render as labelled
-// placeholder tiles until the image files are provided.
+// placeholder tiles until the image files are provided. `bgClass` paints a
+// panel behind logos whose artwork assumes a coloured background.
 // See utils/partners/logos.js for the data shape.
 defineProps({
     logos: { type: Array, required: true },
