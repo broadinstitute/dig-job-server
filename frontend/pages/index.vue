@@ -1,173 +1,106 @@
 <template>
     <div
-        class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800"
+        class="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800"
     >
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div class="text-center">
-                <h1
-                    class="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6"
-                >
-                    Genomic Analysis
-                    <span
-                        class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600"
-                        >Made Simple</span
+        <div class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+            <div class="flex flex-col gap-10">
+                <div class="text-center">
+                    <p
+                        class="mb-3 text-sm font-semibold tracking-widest text-primary uppercase"
                     >
-                </h1>
-                <p
-                    class="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto"
-                >
-                    Run SLDSC and MAGMA analyses on your genomic datasets with
-                    ease. Upload your data, run your analysis, and get results
-                    in few easy steps.
-                </p>
-            </div>
-        </div>
+                        GWAS Collaborative Environment
+                    </p>
+                    <h1
+                        class="text-4xl font-bold text-gray-900 md:text-6xl dark:text-white"
+                    >
+                        Genomic Analysis
+                        <span
+                            class="bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"
+                            >Made Simple</span
+                        >
+                    </h1>
+                </div>
 
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <Card class="text-center h-full">
-                    <template #content>
-                        <div class="p-6">
-                            <div
-                                class="w-16 h-16 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
-                            >
-                                <i
-                                    class="pi pi-database text-2xl text-purple-600 dark:text-purple-400"
-                                ></i>
-                            </div>
-                            <h3
-                                class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
-                            >
-                                Data Management
-                            </h3>
-                            <p class="text-gray-600 dark:text-gray-300 mb-4">
-                                Upload, organize, and manage your genomic
-                                datasets with ease
-                            </p>
-                            <div class="flex flex-wrap gap-2 justify-center">
-                                <Tag value="Secure" severity="warn" />
-                                <Tag value="Organized" severity="info" />
-                            </div>
-                        </div>
-                    </template>
-                </Card>
+                <!-- GWAS-Hub -->
+                <FeatureCard
+                    title="GWAS-Hub"
+                    description="With GWAS-Hub, you can upload your own data to run quality control methods and conduct meta-analyses for your traits of interest"
+                    to="/gwas-hub"
+                    icon="pi pi-users"
+                />
 
-                <Card class="text-center h-full">
-                    <template #content>
-                        <div class="p-6">
-                            <div
-                                class="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
-                            >
-                                <i
-                                    class="pi pi-sitemap text-2xl text-green-600 dark:text-green-400"
-                                ></i>
-                            </div>
-                            <h3
-                                class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
-                            >
-                                MAGMA Analysis
-                            </h3>
-                            <p class="text-gray-600 dark:text-gray-300 mb-4">
-                                Multi-marker Analysis of GenoMic Annotation for
-                                gene-set analysis
-                            </p>
-                            <div class="flex flex-wrap gap-2 justify-center">
-                                <Tag value="Gene-based" severity="success" />
-                                <Tag value="Pathway" severity="info" />
-                            </div>
-                        </div>
-                    </template>
-                </Card>
-
-                <Card class="text-center h-full">
-                    <template #content>
-                        <div class="p-6">
-                            <div
-                                class="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
-                            >
-                                <i
-                                    class="pi pi-chart-line text-2xl text-blue-600 dark:text-blue-400"
-                                ></i>
-                            </div>
-                            <h3
-                                class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
-                            >
-                                SLDSC Analysis
-                            </h3>
-                            <p class="text-gray-600 dark:text-gray-300 mb-4">
-                                Stratified Linkage Disequilibrium Score
-                                Regression for heritability analysis
-                            </p>
-                            <div class="flex flex-wrap gap-2 justify-center">
-                                <Tag value="Heritability" severity="primary" />
-                                <Tag value="SNP-based" severity="info" />
-                            </div>
-                        </div>
-                    </template>
-                </Card>
-
-                <Card class="text-center h-full">
-                    <template #content>
-                        <div class="p-6">
-                            <div
-                                class="w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
-                            >
-                                <i
-                                    class="pi pi-sparkles text-2xl text-orange-600 dark:text-orange-400"
-                                ></i>
-                            </div>
-                            <h3
-                                class="text-xl font-semibold text-gray-900 dark:text-white mb-3"
-                            >
-                                PIGEAN Analysis
-                            </h3>
-                            <p class="text-gray-600 dark:text-gray-300 mb-4">
-                                Priors Inferred from GEne ANnotations for gene
-                                prioritization
-                            </p>
-                            <div class="flex flex-wrap gap-2 justify-center">
-                                <Tag value="Gene Priors" severity="warn" />
-                                <Tag value="Annotation" severity="info" />
-                            </div>
-                        </div>
-                    </template>
-                </Card>
-            </div>
-
-            <div class="text-center mt-16">
-                <div
-                    class="flex flex-col sm:flex-row gap-4 justify-center mb-8"
-                >
-                    <Button
-                        v-if="!isLoggedIn"
-                        label="Create Account"
-                        @click="$router.push('/signup')"
-                        icon="pi pi-user-plus"
-                        size="large"
+                <!-- Post-processing methods -->
+                <section class="flex flex-col gap-6">
+                    <FeatureCard
+                        title="GWAS Post-Processing Methods"
+                        description="Upload GWAS summary statistics and run the methods below"
+                        to="/upload"
+                        icon="pi pi-cog"
                     />
-                    <Button
-                        v-else
-                        label="Get Started"
-                        @click="handleGetStarted"
-                        icon="pi pi-arrow-right"
-                        size="large"
-                        :disabled="isCheckingUser"
+                    <div
+                        class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5"
+                    >
+                        <MethodCard
+                            v-for="method in METHODS"
+                            :key="method.slug"
+                            :method="method"
+                        />
+                    </div>
+                </section>
+
+                <!-- Genomic annotation -->
+                <FeatureCard
+                    title="Genomic Annotation"
+                    description="Annotate genomic regions for custom enrichment analysis"
+                    to="/bed-upload"
+                    icon="pi pi-map"
+                    iconWrapClass="bg-purple-100 dark:bg-purple-900/20"
+                    iconClass="text-purple-600 dark:text-purple-400"
+                />
+
+                <!-- CTA -->
+                <div class="mt-4 text-center">
+                    <div class="flex flex-col justify-center gap-4 sm:flex-row">
+                        <Button
+                            v-if="!isLoggedIn"
+                            label="Create Account"
+                            @click="$router.push('/signup')"
+                            icon="pi pi-user-plus"
+                            size="large"
+                        />
+                        <Button
+                            v-else
+                            label="Get Started"
+                            @click="handleGetStarted"
+                            icon="pi pi-arrow-right"
+                            size="large"
+                            :disabled="isCheckingUser"
+                        />
+                    </div>
+                </div>
+
+                <!-- About + funders -->
+                <div
+                    class="mt-6 border-t border-gray-200 pt-12 dark:border-gray-700"
+                >
+                    <WorkspaceAbout
+                        heading="About the workspace"
+                        text="GWAS-CE is your unified workspace for GWAS analysis. Run QC and meta-analyses, leverage cutting-edge post processing methods, and annotate your data for downstream dissemination."
+                        logosHeading="GWAS-CE is proudly supported by"
+                        :logos="FUNDER_LOGOS"
                     />
                 </div>
-                <h2
-                    class="text-3xl font-bold text-gray-900 dark:text-white mb-4"
-                >
-                    Powerful Analysis Tools
-                </h2>
-                <p class="text-lg text-gray-600 dark:text-gray-300">
-                    Everything you need for genomic analysis in one platform
-                </p>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
+import { METHODS } from "~/utils/methods/catalog";
+import { FUNDER_LOGOS } from "~/utils/partners/logos";
+
+definePageMeta({ requiresAuth: false });
+
 const router = useRouter();
 const userStore = useUserStore();
 const isCheckingUser = ref(false);
@@ -179,7 +112,7 @@ useHead({
         {
             name: "description",
             content:
-                "Run SLDSC and MAGMA analyses on your genomic datasets with ease.",
+                "GWAS-CE is your unified workspace for GWAS analysis: quality control, meta-analysis, post-processing methods, and genomic annotation.",
         },
     ],
 });

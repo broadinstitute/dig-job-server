@@ -75,6 +75,12 @@ export default defineNuxtConfig({
             // Portal Variant Sifter page for the postMessage token handoff
             // (utils/sifter/portalHandoff.js). Empty hides the datasets-page button.
             portalSifterUrl: process.env.NUXT_PUBLIC_PORTAL_SIFTER_URL || "",
+            // GWAS-Hub is gated by a second KPN user-service group
+            // (utils/auth/hubMembership.js). Empty means nobody is a member.
+            gwasHubGroup: process.env.NUXT_PUBLIC_GWAS_HUB_GROUP || "",
+            // mailto target for the hub "Contact admin" button
+            gwasHubContactEmail:
+                process.env.NUXT_PUBLIC_GWAS_HUB_CONTACT_EMAIL || "",
             defaultUsername: process.env.NUXT_PUBLIC_DEFAULT_USERNAME || "",
             defaultPassword: process.env.NUXT_PUBLIC_DEFAULT_PASSWORD || "",
             enableDefaultLogin:
