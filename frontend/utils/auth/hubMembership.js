@@ -1,25 +1,38 @@
-// GWAS-Hub membership, resolved against the KPN user service.
+// GWAS-Hub membership, resolved from the KPN user service.
 //
-// The app already verifies the session token with
+// Tokens are bound to the group they were minted for at login (gwas-ce);
+// verifying one against any other group answers 403 "Token was not issued
+// for group". Membership therefore cannot be a second group. Instead the
+// standard verify response
 //   GET {userServiceUrl}/api/auth/verify/?group={userGroup}
-// in UserStore.isUserLoggedIn(). GWAS-Hub is a shared workspace gated by a
-// SECOND group (config.public.gwasHubGroup). Membership is answered by the same
-// endpoint with that group instead.
+// carries `user.roles` and `user.permissions`, and a hub member is a user
+// holding the configured role (config.public.gwasHubRole, e.g.
+// "gwas-hub-user", alongside the existing "gwas-ce-user").
 //
 // This module is deliberately pure: the network call is injected as `verify`
-// so the status logic is unit-testable and, crucially, so a 401 from the hub
-// check can never fall into UserStore.isUserLoggedIn()'s catch block, which
-// clears the main authToken.
+// so the status logic is unit-testable and, crucially, so a failure here can
+// never fall into UserStore.isUserLoggedIn()'s catch block, which clears the
+// main authToken.
 
 export const HUB_STATUS = Object.freeze({
     UNKNOWN: "unknown", // not checked yet this session
     MEMBER: "member",
-    DENIED: "denied", // logged in, but not in the hub group (401/403)
+    DENIED: "denied", // signed in, but without the hub role
     ERROR: "error", // network / 5xx; retryable, never shown as "denied"
 });
 
 export const hubVerifyUrl = (userServiceUrl, group) =>
     `${userServiceUrl}/api/auth/verify/?group=${encodeURIComponent(group)}`;
+
+// True when the verified user carries the hub role, either as a role or as a
+// permission (the user service exposes both lists; admins may use either).
+export const hasHubRole = (user, role) => {
+    if (!user || !role) {
+        return false;
+    }
+    const has = (list) => Array.isArray(list) && list.includes(role);
+    return has(user.roles) || has(user.permissions);
+};
 
 // MEMBER and DENIED are stable answers for the session; UNKNOWN and ERROR
 // should be (re)checked.
@@ -45,28 +58,34 @@ const errorStatusCode = (error) =>
  * @param {object} opts
  * @param {boolean} opts.skipAuth  dev bypass (NUXT_PUBLIC_SKIP_AUTH)
  * @param {string|null} opts.token the session JWT, if any
- * @param {string} opts.group      the hub group name; empty disables the hub
- * @param {() => Promise<any>} opts.verify performs the verify request; must
- *                                  reject with an error carrying .status,
- *                                  .response.status or .statusCode on HTTP
- *                                  failure ($fetch does).
- * @returns {Promise<string>} one of HUB_STATUS
+ * @param {string} opts.role       the hub role name; empty disables the hub
+ * @param {() => Promise<object>} opts.verify performs the verify request and
+ *                                  resolves with the user object (roles,
+ *                                  permissions); must reject with an error
+ *                                  carrying .status, .response.status or
+ *                                  .statusCode on HTTP failure ($fetch does).
+ * @returns {Promise<{status: string, user: object|null}>}
  */
-export async function resolveHubStatus({ skipAuth, token, group, verify }) {
+export async function resolveHubStatus({ skipAuth, token, role, verify }) {
     if (skipAuth) {
-        return HUB_STATUS.MEMBER;
+        return { status: HUB_STATUS.MEMBER, user: null };
     }
-    if (!token || !group) {
-        return HUB_STATUS.DENIED;
+    if (!token || !role) {
+        return { status: HUB_STATUS.DENIED, user: null };
     }
     try {
-        await verify();
-        return HUB_STATUS.MEMBER;
+        const user = await verify();
+        return {
+            status: hasHubRole(user, role)
+                ? HUB_STATUS.MEMBER
+                : HUB_STATUS.DENIED,
+            user: user ?? null,
+        };
     } catch (error) {
         const code = errorStatusCode(error);
         if (code === 401 || code === 403) {
-            return HUB_STATUS.DENIED;
+            return { status: HUB_STATUS.DENIED, user: null };
         }
-        return HUB_STATUS.ERROR;
+        return { status: HUB_STATUS.ERROR, user: null };
     }
 }

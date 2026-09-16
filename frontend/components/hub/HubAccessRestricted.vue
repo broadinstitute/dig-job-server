@@ -28,7 +28,7 @@
                         <template v-else>
                             GWAS-Hub is a shared workspace for consortium
                             members. Your account is signed in to GWAS-CE but
-                            is not yet a member of the GWAS-Hub group.
+                            has not yet been granted GWAS-Hub access.
                         </template>
                     </p>
                     <Button

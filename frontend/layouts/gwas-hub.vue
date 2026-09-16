@@ -28,8 +28,8 @@
 
 <script setup>
 // The GWAS-Hub layout doubles as the access gate. auth.global.js has already
-// redirected anonymous users to /login; here we resolve membership in the hub
-// group and only render the page (and the tab bar) for members. Because the
+// redirected anonymous users to /login; here we resolve whether the user holds
+// the hub role and only render the page (and the tab bar) for members. Because the
 // slot is withheld, deep links to sub-pages are covered without a per-page
 // guard, and the URL stays put for the restricted view.
 //

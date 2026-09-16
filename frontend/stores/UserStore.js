@@ -25,11 +25,12 @@ export const useUserStore = defineStore("UserStore", {
     },
     actions: {
         // ---- GWAS-Hub membership ----
-        // Verifies the current token against the hub group (a second KPN
-        // user-service group). Cached per session and per token: MEMBER/DENIED
+        // A hub member is a gwas-ce user carrying the hub role
+        // (config.public.gwasHubRole) in the roles/permissions returned by the
+        // standard verify call. Cached per session and per token: MEMBER/DENIED
         // are stable for the token they were resolved with, UNKNOWN/ERROR are
-        // re-checked. This path never writes localStorage, so a hub 401 cannot
-        // log the user out of GWAS-CE.
+        // re-checked. This path never writes localStorage, so a failure here
+        // cannot log the user out of GWAS-CE.
         async checkHubMembership({ force = false } = {}) {
             const token = localStorage.getItem("authToken");
             if (
@@ -43,15 +44,20 @@ export const useUserStore = defineStore("UserStore", {
                 return this.hubStatus;
             }
             const config = useRuntimeConfig();
-            const group = config.public.gwasHubGroup;
-            const verify = () =>
-                $fetch(hubVerifyUrl(config.public.userServiceUrl, group), {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-            const status = await resolveHubStatus({
+            const verify = async () => {
+                const response = await $fetch(
+                    hubVerifyUrl(
+                        config.public.userServiceUrl,
+                        config.public.userGroup,
+                    ),
+                    { headers: { Authorization: `Bearer ${token}` } },
+                );
+                return response?.user ?? null;
+            };
+            const { status, user } = await resolveHubStatus({
                 skipAuth: config.public.skipAuth,
                 token,
-                group,
+                role: config.public.gwasHubRole,
                 verify,
             });
             if (localStorage.getItem("authToken") !== token) {
@@ -60,6 +66,11 @@ export const useUserStore = defineStore("UserStore", {
                 // discard it and resolve for the current one instead.
                 this.resetHubMembership();
                 return this.checkHubMembership({ force: true });
+            }
+            if (user) {
+                // Fresh verify payload (includes roles/permissions); keep the
+                // store's user in step with it.
+                this.user = user;
             }
             this.hubStatus = status;
             this.hubVerifiedToken = token;

@@ -2,20 +2,36 @@ import { describe, it, expect, vi } from "vitest";
 import {
     HUB_STATUS,
     hubVerifyUrl,
+    hasHubRole,
     shouldRecheckHub,
     isHubCacheFresh,
     resolveHubStatus,
 } from "../../utils/auth/hubMembership.js";
 
-const ok = () => vi.fn().mockResolvedValue({ user: { username: "u" } });
+const ROLE = "gwas-hub-user";
+
+// Shape of `user` in the KPN user-service verify response (observed live):
+// roles and permissions are both string arrays.
+const memberUser = {
+    username: "member",
+    roles: ["gwas-ce-user", ROLE],
+    permissions: ["run-analysis"],
+};
+const plainUser = {
+    username: "plain",
+    roles: ["gwas-ce-user"],
+    permissions: ["run-analysis"],
+};
+
+const resolving = (user) => vi.fn().mockResolvedValue(user);
 const failWith = (error) => vi.fn().mockRejectedValue(error);
 
-const base = { skipAuth: false, token: "jwt-abc", group: "gwas-hub" };
+const base = { skipAuth: false, token: "jwt-abc", role: ROLE };
 
 describe("hubVerifyUrl", () => {
-    it("targets the verify endpoint with the hub group", () => {
-        expect(hubVerifyUrl("https://users.example.org", "gwas-hub")).toBe(
-            "https://users.example.org/api/auth/verify/?group=gwas-hub",
+    it("targets the verify endpoint with the given group", () => {
+        expect(hubVerifyUrl("https://users.example.org", "gwas-ce")).toBe(
+            "https://users.example.org/api/auth/verify/?group=gwas-ce",
         );
     });
 
@@ -23,6 +39,34 @@ describe("hubVerifyUrl", () => {
         expect(hubVerifyUrl("https://u", "a b&c")).toBe(
             "https://u/api/auth/verify/?group=a%20b%26c",
         );
+    });
+});
+
+describe("hasHubRole", () => {
+    it("matches the role in roles", () => {
+        expect(hasHubRole(memberUser, ROLE)).toBe(true);
+    });
+
+    it("matches the role in permissions too", () => {
+        expect(
+            hasHubRole({ roles: [], permissions: [ROLE] }, ROLE),
+        ).toBe(true);
+    });
+
+    it("is false without the role", () => {
+        expect(hasHubRole(plainUser, ROLE)).toBe(false);
+    });
+
+    it("is false for a missing user, missing lists, or empty role", () => {
+        expect(hasHubRole(null, ROLE)).toBe(false);
+        expect(hasHubRole({ username: "x" }, ROLE)).toBe(false);
+        expect(hasHubRole(memberUser, "")).toBe(false);
+    });
+
+    // The login response's user object has no roles at all; only the verify
+    // response does. Never treat that as membership.
+    it("is false for a login-shaped user without role lists", () => {
+        expect(hasHubRole({ id: 6, username: "member" }, ROLE)).toBe(false);
     });
 });
 
@@ -76,8 +120,8 @@ describe("isHubCacheFresh", () => {
 
 describe("resolveHubStatus", () => {
     it("treats the skipAuth dev bypass as a member without calling verify", async () => {
-        const verify = ok();
-        const status = await resolveHubStatus({
+        const verify = resolving(plainUser);
+        const { status } = await resolveHubStatus({
             ...base,
             skipAuth: true,
             token: null,
@@ -88,29 +132,43 @@ describe("resolveHubStatus", () => {
     });
 
     it("denies when there is no session token", async () => {
-        const verify = ok();
-        expect(
-            await resolveHubStatus({ ...base, token: null, verify }),
-        ).toBe(HUB_STATUS.DENIED);
+        const verify = resolving(memberUser);
+        const { status } = await resolveHubStatus({ ...base, token: null, verify });
+        expect(status).toBe(HUB_STATUS.DENIED);
         expect(verify).not.toHaveBeenCalled();
     });
 
-    // An unconfigured hub group must never be sent as ?group= (the user
-    // service would reject or, worse, match nothing and answer 200).
-    it("denies when the hub group is not configured", async () => {
-        const verify = ok();
-        expect(await resolveHubStatus({ ...base, group: "", verify })).toBe(
-            HUB_STATUS.DENIED,
-        );
+    // An unconfigured role must fail closed rather than match everyone.
+    it("denies when the hub role is not configured", async () => {
+        const verify = resolving(memberUser);
+        const { status } = await resolveHubStatus({ ...base, role: "", verify });
+        expect(status).toBe(HUB_STATUS.DENIED);
         expect(verify).not.toHaveBeenCalled();
     });
 
-    it("is a member when verify succeeds", async () => {
-        const verify = ok();
-        expect(await resolveHubStatus({ ...base, verify })).toBe(
-            HUB_STATUS.MEMBER,
-        );
+    it("is a member when the verified user holds the role", async () => {
+        const verify = resolving(memberUser);
+        const result = await resolveHubStatus({ ...base, verify });
+        expect(result.status).toBe(HUB_STATUS.MEMBER);
+        expect(result.user).toBe(memberUser);
         expect(verify).toHaveBeenCalledTimes(1);
+    });
+
+    it("is denied when the verified user lacks the role", async () => {
+        const result = await resolveHubStatus({
+            ...base,
+            verify: resolving(plainUser),
+        });
+        expect(result.status).toBe(HUB_STATUS.DENIED);
+        expect(result.user).toBe(plainUser);
+    });
+
+    it("is denied when verify resolves with no user", async () => {
+        const { status } = await resolveHubStatus({
+            ...base,
+            verify: resolving(undefined),
+        });
+        expect(status).toBe(HUB_STATUS.DENIED);
     });
 
     it("is denied on 401 or 403, whichever shape the error takes", async () => {
@@ -120,22 +178,27 @@ describe("resolveHubStatus", () => {
             { response: { status: 403 } },
             { statusCode: 401 },
         ]) {
-            expect(
-                await resolveHubStatus({ ...base, verify: failWith(error) }),
-            ).toBe(HUB_STATUS.DENIED);
+            const { status } = await resolveHubStatus({
+                ...base,
+                verify: failWith(error),
+            });
+            expect(status).toBe(HUB_STATUS.DENIED);
         }
     });
 
     // Outages must not be presented as "you are not a member".
     it("is error (retryable) on 5xx or network failure", async () => {
         expect(
-            await resolveHubStatus({ ...base, verify: failWith({ status: 500 }) }),
+            (await resolveHubStatus({ ...base, verify: failWith({ status: 500 }) }))
+                .status,
         ).toBe(HUB_STATUS.ERROR);
         expect(
-            await resolveHubStatus({
-                ...base,
-                verify: failWith(new Error("network")),
-            }),
+            (
+                await resolveHubStatus({
+                    ...base,
+                    verify: failWith(new Error("network")),
+                })
+            ).status,
         ).toBe(HUB_STATUS.ERROR);
     });
 });

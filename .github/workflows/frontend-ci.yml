@@ -51,7 +51,7 @@ jobs:
                   echo "NUXT_PUBLIC_USER_SERVICE_TOKEN=47c5488c-1660-4133-8700-23c14e942788" >> .env
                   echo "NUXT_PUBLIC_FINAL_REDIRECT_URI=https://gwas-ce.kpndataregistry.org" >> .env
                   echo "NUXT_PUBLIC_USER_GROUP=gwas-ce" >> .env
-                  echo "NUXT_PUBLIC_GWAS_HUB_GROUP=gwas-hub" >> .env
+                  echo "NUXT_PUBLIC_GWAS_HUB_ROLE=gwas-hub-user" >> .env
                   echo "NUXT_PUBLIC_GWAS_HUB_CONTACT_EMAIL=help@kp4cd.org" >> .env
 
             - name: Build
