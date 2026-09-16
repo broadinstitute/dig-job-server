@@ -1,3 +1,5 @@
+import { isVerifyRejection } from "~/utils/auth/verifyFailure.js";
+
 export const useUserStore = defineStore("UserStore", {
     state: () => {
         return {
@@ -47,8 +49,10 @@ export const useUserStore = defineStore("UserStore", {
                 this.user = response.user;
                 return true;
             } catch (error) {
-                // Clear token if it has expired (401 response)
-                if (error.status === 401) {
+                // Clear the token on a 401 (expired/malformed JWT) or 403
+                // (token minted for a different group, or no longer a
+                // member) -- retrying with the same token can never succeed.
+                if (isVerifyRejection(error)) {
                     // If we were using default credentials, relogin automatically
                     const wasDefaultUser =
                         localStorage.getItem("isDefaultUser") === "true";
