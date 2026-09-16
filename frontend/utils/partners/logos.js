@@ -16,6 +16,14 @@ export const FUNDER_LOGOS = [
 ];
 
 export const PARTNER_LOGOS = [
-    { name: "Skin Genetics Consortium" },
-    { name: "HERMES" },
+    {
+        name: "Skin Genetics Consortium",
+        src: "/images/partners/skin-genetics-consortium.svg",
+        href: "https://kpndataregistry.org/sgc",
+    },
+    {
+        name: "HERMES",
+        src: "/images/partners/hermes.png",
+        href: "https://kpndataregistry.org/hermes",
+    },
 ];
