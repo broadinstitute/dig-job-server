@@ -2,6 +2,13 @@
     <div class="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <div class="flex flex-col gap-8">
             <div class="text-center">
+                <Tag
+                    v-if="isDemo"
+                    value="Demo preview"
+                    severity="secondary"
+                    icon="pi pi-eye"
+                    class="mb-3"
+                />
                 <h1
                     class="mb-4 text-4xl font-bold text-gray-900 md:text-5xl dark:text-white"
                 >
@@ -17,6 +24,7 @@
                 title="Quality Control"
                 description="High-level summary of the canonical quality control pipeline"
                 to="/gwas-hub/quality-control"
+                :disabled="isDemo"
                 icon="pi pi-check-square"
                 iconWrapClass="bg-green-100 dark:bg-green-900/20"
                 iconClass="text-green-600 dark:text-green-400"
@@ -26,6 +34,7 @@
                 title="Meta-Analysis"
                 description="High-level summary of the meta-analysis pipeline"
                 to="/gwas-hub/meta-analysis"
+                :disabled="isDemo"
                 icon="pi pi-objects-column"
                 iconWrapClass="bg-blue-100 dark:bg-blue-900/20"
                 iconClass="text-blue-600 dark:text-blue-400"
@@ -59,8 +68,14 @@
 
 <script setup>
 import { PARTNER_LOGOS } from "~/utils/partners/logos";
+import { isHubDemo } from "~/utils/hub/demoMode";
 
 definePageMeta({ layout: "gwas-hub" });
+
+// ?mode=demo: the layout skips the membership gate; here the pipeline cards
+// render inert so a demo viewer cannot navigate into gated sub-pages.
+const route = useRoute();
+const isDemo = computed(() => isHubDemo(route.query));
 
 useHead({ title: "GWAS-Hub - GWAS-CE" });
 </script>

@@ -1,7 +1,18 @@
 <template>
-    <NuxtLink :to="to" class="block h-full no-underline">
+    <component
+        :is="disabled ? 'div' : NuxtLink"
+        :to="disabled ? undefined : to"
+        class="block h-full no-underline"
+        :class="{ 'cursor-not-allowed': disabled }"
+        :aria-disabled="disabled || undefined"
+    >
         <Card
-            class="h-full cursor-pointer border-2 border-transparent transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-xl"
+            class="h-full border-2 border-transparent transition-all duration-300"
+            :class="
+                disabled
+                    ? 'opacity-60'
+                    : 'cursor-pointer hover:-translate-y-1 hover:border-primary hover:shadow-xl'
+            "
         >
             <template #content>
                 <div class="flex flex-col items-center p-4 text-center">
@@ -26,13 +37,16 @@
                 </div>
             </template>
         </Card>
-    </NuxtLink>
+    </component>
 </template>
 
 <script setup>
 // A large clickable card that routes somewhere in the app (GWAS-Hub,
 // Post-Processing Methods, Genomic Annotation, Quality Control, ...).
 // NuxtLink rather than @click so middle-click / open-in-new-tab work.
+// With `disabled` the card renders as a plain, dimmed block with no link.
+import { NuxtLink } from "#components";
+
 defineProps({
     title: { type: String, required: true },
     description: { type: String, default: "" },
@@ -43,5 +57,6 @@ defineProps({
         default: "bg-primary-100 dark:bg-primary-900/30",
     },
     iconClass: { type: String, default: "text-primary" },
+    disabled: { type: Boolean, default: false },
 });
 </script>
