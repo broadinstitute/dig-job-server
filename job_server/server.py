@@ -1,3 +1,5 @@
+import logging
+
 import fastapi
 import click
 from dotenv import load_dotenv
@@ -10,6 +12,7 @@ load_dotenv()
 
 from job_server.api import router, top_router
 from job_server.api import get_current_user
+from job_server.user_service_auth import log_user_service_config
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -67,6 +70,23 @@ def add_cors(app):
     )
 
 
+def configure_logging():
+    """Give the root logger a formatted stderr handler, and enable INFO for
+    this app's own loggers.
+
+    Without this, the module logger in user_service_auth inherits the
+    root's default WARNING level, so log_user_service_config()'s INFO line
+    is silently dropped -- nothing before this in the serve path configures
+    logging at all. basicConfig() is a no-op if the root logger already has
+    handlers, so this is safe to call unconditionally. Root itself stays at
+    WARNING (basicConfig's default) rather than INFO, so third-party INFO
+    output (httpx logs a line per request, botocore) doesn't get switched on
+    along with it -- only "job_server"'s own loggers are raised.
+    """
+    logging.basicConfig(format="%(levelname)s %(name)s %(message)s")
+    logging.getLogger("job_server").setLevel(logging.INFO)
+
+
 @click.command(name='serve')
 @click.option('--port', '-p', type=int, default=8000)
 def cli_serve(port):
@@ -74,6 +94,8 @@ def cli_serve(port):
     app = create_app()
     add_cors(app)
 
+    configure_logging()
+    log_user_service_config()
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 cli.add_command(cli_serve)

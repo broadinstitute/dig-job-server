@@ -30,6 +30,7 @@ from job_server.database import get_db
 from job_server.falcon_tokens import FalconPrincipal
 from job_server.jwt_utils import create_access_token, get_decoded_jwt_data
 from job_server.model import UserCredentials, User, DatasetInfo, AnalysisRequest, AnalysisMethod, CredibleSetInfo
+from job_server.user_service_auth import auth_failure_exception, user_group, user_service_url
 
 router = fastapi.APIRouter()
 JOB_SERVER_AUTH_COOKIE = 'js_auth'
@@ -75,8 +76,8 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{os.getenv('USER_SERVICE_URL', 'https://users.kpndataregistry.org')}/api/auth/verify/",
-                params={"group": os.getenv('USER_GROUP', 'gwas-ce')},
+                f"{user_service_url()}/api/auth/verify/",
+                params={"group": user_group()},
                 headers={"Authorization": f"Bearer {auth_token}"}
             )
             if response.status_code == 200:
@@ -84,7 +85,7 @@ async def get_current_user(authorization: Optional[str] = Header(None), token: O
                 user = user_data.get('user')
                 return User(username=user.get('username'))
             else:
-                raise fastapi.HTTPException(status_code=401, detail='Invalid token')
+                raise auth_failure_exception(response)
     except httpx.RequestError:
         raise fastapi.HTTPException(status_code=503, detail='User service unavailable')
 
