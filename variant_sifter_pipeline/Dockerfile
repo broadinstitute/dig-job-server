@@ -38,7 +38,13 @@ RUN set -eux; \
     cd /tmp; rm -rf gcta.zip "gcta-${GCTA_VERSION}-linux-x86_64"; \
     /opt/gcta/gcta 2>&1 | grep -q "version v${GCTA_VERSION}"
 
+RUN pip install --no-cache-dir "git+https://github.com/broadinstitute/dig-bioindex.git@master"
+
 COPY variant_sifter_pipeline /app/variant_sifter_pipeline
+
+# Smoke test: the entrypoint module must import (boto3 arrives via bioindex;
+# a Batch job that fails on import wastes a Fargate start).
+RUN python -c "import boto3, variant_sifter_pipeline.run"
 
 # Batch supplies the args:  --username <u> --dataset <d> --guid <g>
 # Config comes from env: BIOINDEX_S3_BUCKET, BIOINDEX_RDS_SECRET, BIOINDEX_BIO_SCHEMA.
