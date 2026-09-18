@@ -80,3 +80,19 @@ def test_zscore_from_the_file_is_used_when_there_is_no_standard_error():
     # But a derived z (beta/se) is preferred, since it matches the emitted beta.
     rows[0]["se"] = 0.05
     assert build_associations(rows, "g")[0]["zScore"] == 4.0
+
+
+def test_zero_pvalues_are_floored_to_the_smallest_representable_p():
+    """GWAS Catalog files report p = 0 for underflowed values (605 rows in the
+    Vitamin D upload); -log10(0) is Infinity in the portal's LocusZoom plot."""
+    rows = [
+        {"chromosome": "4", "position": 72618334, "reference": "A", "alt": "C",
+         "pValue": "0.0", "beta": 1.0, "se": 0.005},
+        {"chromosome": "4", "position": 72618335, "reference": "A", "alt": "C",
+         "beta": 1.0, "se": 0.005},                     # derived p underflows too
+        {"chromosome": "4", "position": 72618336, "reference": "A", "alt": "C",
+         "pValue": 1e-300, "beta": 1.0, "se": 0.1},     # tiny but nonzero: untouched
+    ]
+    out = build_associations(rows, guid="g", p_threshold=0.05)
+    assert [r["pValue"] for r in out] == [1e-323, 1e-323, 1e-300]
+    assert all(math.isfinite(-math.log10(r["pValue"])) for r in out)

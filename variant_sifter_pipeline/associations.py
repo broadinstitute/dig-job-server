@@ -8,6 +8,7 @@ records here carry only upload-derived fields.
 import math
 from collections.abc import Iterable
 
+from .credible_sets import MIN_P
 from .loci import variant_key
 
 _LOCUS_FIELDS = ("chromosome", "position", "reference", "alt")
@@ -32,14 +33,20 @@ def _beta_of(row: dict):
 
 
 def _pvalue_of(row: dict, beta, se):
-    """pValue from the upload, else a two-sided p derived from z = beta/se."""
+    """pValue from the upload, else a two-sided p derived from z = beta/se.
+
+    Never 0: GWAS files (and the erfc for a huge z) report p = 0 when the
+    true value underflows, and the portal plots -log10(p), which would be
+    Infinity. Stored as MIN_P, the smallest p the portal can represent and
+    the same floor uploaded credible sets get (job_server.credible_sets).
+    """
     p = _to_float(row.get("pValue"))
-    if p is not None:
-        return p
-    if beta is not None and se not in (None, 0):
+    if p is None and beta is not None and se not in (None, 0):
         z = beta / se
-        return math.erfc(abs(z) / math.sqrt(2))
-    return None
+        p = math.erfc(abs(z) / math.sqrt(2))
+    if p is None:
+        return None
+    return max(p, MIN_P)
 
 
 def build_associations(rows: Iterable[dict], guid: str,
