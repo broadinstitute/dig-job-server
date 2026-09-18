@@ -13,7 +13,13 @@ reference build.
 `--mode` selects what the job does: `full` (the default) builds associations
 and derived credible sets and syncs uploaded credible sets, indexing all of
 it; `credible-sets` only syncs uploaded credible sets and rebuilds the two
-credible-set indexes, leaving associations and derived sets untouched.
+credible-set indexes, leaving associations untouched.
+
+Derived credible sets (GCTA-COJO + ABF, the aggregator's fine-mapping recipe)
+are only produced for datasets with NO credible-set uploads attached: the
+user's own fine-mapped sets win, and the derived objects are written empty so
+the index drops any earlier derived rows. This applies in both modes, so a
+dataset that gains its first upload loses its derived sets on that ingest.
 """
 
 import argparse
@@ -28,11 +34,13 @@ import boto3
 
 from .associations import build_associations
 from .canonicalize import canonicalize
-from .credible_sets import write_derived_credible_sets
+from .credible_sets import (clear_derived_credible_sets,
+                            write_derived_credible_sets)
 from .index_build import (associations_key, index_associations,
                           index_credible_sets, index_credible_variants)
 from .reference import ReferenceGenome, ensure_local_reference, orient_records
-from .uploaded_credible_sets import sync_uploaded_credible_sets
+from .uploaded_credible_sets import (list_upload_metadata,
+                                     sync_uploaded_credible_sets)
 
 # Where GWAS-CE stores user uploads (same default as job_server.s3).
 USER_DATA_BUCKET = os.getenv("JOB_SERVER_BUCKET", "dig-ldsc-server")
@@ -118,6 +126,10 @@ def run(username: str, dataset: str, guid: str, mode: str = "full") -> int:
     meta = _read_metadata(s3, username, dataset)
     ancestry = meta.get("ancestry")
 
+    # Attached credible-set uploads decide whether derived sets exist at all
+    # (see the module docstring), so they are listed once, before either mode.
+    uploads = list_upload_metadata(s3, USER_DATA_BUCKET, username, dataset)
+
     # One reference genome for both associations and uploaded credible sets, so
     # their variant ids agree. None when orientation is switched off.
     genome_cm = ReferenceGenome(ensure_local_reference()) if ORIENT_ALLELES else contextlib.nullcontext()
@@ -126,16 +138,30 @@ def run(username: str, dataset: str, guid: str, mode: str = "full") -> int:
         if mode == "full":
             records = _build_and_index_associations(s3, meta, username, dataset, guid, genome)
             n = len(records)
-            # Derived credible sets are an enhancement (PLINK clumping + ABF, the
-            # portal's own recipe): any failure here must not take down the
-            # associations the user came for.
-            try:
-                n_cred = write_derived_credible_sets(
-                    s3, GWAS_CE_BUCKET, records, guid, dataset=dataset, ancestry=ancestry)
-                print(f"wrote {n_cred} derived credible-set variants for {guid}")
-            except Exception as exc:
-                print(f"WARNING: credible-set derivation failed; "
-                      f"associations are unaffected: {exc}")
+            if uploads:
+                clear_derived_credible_sets(s3, GWAS_CE_BUCKET, guid)
+                print(f"skipping derived credible sets: {len(uploads)} "
+                      f"credible-set upload(s) attached")
+            else:
+                # Derived credible sets are an enhancement (GCTA-COJO + ABF, the
+                # aggregator's fine-mapping recipe): any failure here must not
+                # take down the associations the user came for.
+                try:
+                    n_cred = write_derived_credible_sets(
+                        s3, GWAS_CE_BUCKET, records, guid, dataset=dataset,
+                        ancestry=ancestry, genome_build=meta.get("genome_build"))
+                    print(f"wrote {n_cred} derived credible-set variants for {guid}")
+                except Exception as exc:
+                    print(f"WARNING: credible-set derivation failed; "
+                          f"associations are unaffected: {exc}")
+        elif uploads:
+            # Re-deriving here would need the associations re-read from S3;
+            # clearing is enough to honour "uploads win" on an upload ingest.
+            clear_derived_credible_sets(s3, GWAS_CE_BUCKET, guid)
+            print(f"cleared derived credible sets: {len(uploads)} "
+                  f"credible-set upload(s) attached")
+        else:
+            print("derived credible sets left as-is; a full run re-derives them")
 
         # Uploaded sets are the user's own data, validated at upload time: a
         # failure here is a bug and must fail the job rather than vanish.

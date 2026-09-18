@@ -60,8 +60,9 @@ Parameters:
     Type: String
     Default: dig-analysis-bin
     Description: >-
-      Bucket with the aggregator's clumping assets the credible-set step
-      downloads at run time (PLINK 1.9, 1000G bfile panels, dbSNP-common map).
+      Bucket with the aggregator's fine-mapping assets the credible-set step
+      downloads at run time (cojo/bfiles 1000G LD panels per chromosome,
+      dbSNP-common map).
 
 Resources:
   Repository:
@@ -149,9 +150,12 @@ Resources:
         Image: !Sub '${Repository.RepositoryUri}:${ImageTag}'
         JobRoleArn: !GetAtt JobRole.Arn
         ExecutionRoleArn: !GetAtt JobRole.Arn
+        # 4 vCPU: the derived credible-set step runs one GCTA conditional
+        # analysis per COJO signal in parallel (VS_GCTA_WORKERS defaults to the
+        # vCPU count) and downloads a ~4 GB LD panel per chromosome.
         ResourceRequirements:
           - Type: VCPU
-            Value: '2'
+            Value: '4'
           - Type: MEMORY
             Value: '16384'
         # ENTRYPOINT is baked into the image; these are the args after it.
