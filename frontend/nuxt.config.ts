@@ -72,8 +72,9 @@ export default defineNuxtConfig({
             apiBaseUrl: "",
             skipAuth: false,
             phenotypesUrl: process.env.NUXT_PUBLIC_PHENOTYPES_URL || "",
-            // Portal Variant Sifter page for the postMessage token handoff
-            // (utils/sifter/portalHandoff.js). Empty hides the datasets-page button.
+            // Portal Variant Sifter page. The dataset id is passed as a `token`
+            // query parameter (utils/sifter/portalSifterLink.js). Empty hides
+            // the datasets-page button.
             portalSifterUrl: process.env.NUXT_PUBLIC_PORTAL_SIFTER_URL || "",
             // GWAS-Hub is gated by a role on the gwas-ce user, read from the
             // roles/permissions in the verify response

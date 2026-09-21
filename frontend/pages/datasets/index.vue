@@ -5,7 +5,7 @@ import { falconEligibility } from "~/utils/falcon/eligibility.js";
 import { buildFormData, isReady, describeUploadError } from "~/utils/upload/credibleSetForm.js";
 import { statusTag, hasFailed } from "~/utils/credibleSets/statusTag.js";
 import { createRefreshGuard } from "~/utils/credibleSets/refreshGuard.js";
-import { portalSifterOrigin, buildPortalSifterUrl, createTokenHandoff } from "~/utils/sifter/portalHandoff.js";
+import { buildPortalSifterUrl } from "~/utils/sifter/portalSifterLink.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -57,23 +57,16 @@ async function runVariantSifter(data) {
     });
 }
 
-// Open the portal's Variant Sifter and hand it the dataset id over postMessage
-// (utils/sifter/portalHandoff.js) so the id never appears in a URL. The
-// handoff listens for the portal's `ready` BEFORE the window is opened, which
-// is why the window reaches it through a holder rather than a value. Hidden
+// Open the portal's Variant Sifter for this dataset. The dataset id travels as
+// the `token` query parameter (utils/sifter/portalSifterLink.js). Hidden
 // entirely unless NUXT_PUBLIC_PORTAL_SIFTER_URL is configured.
 function openPortalSifter(data) {
-    const portalUrl = config.public.portalSifterUrl;
-    const holder = { win: null };
-    const handoff = createTokenHandoff({
-        getWin: () => holder.win,
-        origin: portalSifterOrigin(portalUrl),
-        payload: { token: data.id, dataset: data.dataset, ancestry: data.ancestry || null },
+    const url = buildPortalSifterUrl(config.public.portalSifterUrl, {
+        token: data.id,
+        ancestry: data.ancestry || undefined,
     });
     // No region: the user picks a locus on the portal's Welcome panel.
-    holder.win = window.open(buildPortalSifterUrl(portalUrl), "_blank");
-    if (!holder.win) {
-        handoff.cancel();
+    if (!window.open(url, "_blank")) {
         toast.add({
             severity: "warn",
             summary: "Pop-up blocked",
