@@ -30,11 +30,21 @@ describe("REQUIRED_FIELDS", () => {
     expect(values()).toEqual([
       "chromosome",
       "position",
-      "rsid",
       "reference",
       "alt",
       "pValue",
     ]);
+  });
+
+  it("does not require rsID", () => {
+    // No method in dig-ldsc-methods reads it: sLDSC keys variants by
+    // chromosome:position:ref:alt and MAGMA/PIGEAN by chromosome:position,
+    // each resolving rsIDs from its own snpmap. The sifter's credible-set step
+    // fills a missing rsID from the aggregator's dbSNP map, and FALCON
+    // auto-detects an rsID column and only needs one for GRCh38 (exit 10 with
+    // a message otherwise). Requiring it rejected GRCh37 GWAS files that ship
+    // without one, for a column nothing downstream depends on.
+    expect(values()).not.toContain("rsid");
   });
 
   it("does not require the effect size or the sample size", () => {
@@ -59,11 +69,16 @@ describe("missingRequiredFields", () => {
   });
 
   it("reports each unmapped field by its display name", () => {
-    const { pValue, rsid, ...rest } = OR_AND_P_ONLY;
+    const { pValue, reference, ...rest } = OR_AND_P_ONLY;
     expect(missingRequiredFields(rest).map((f) => f.name)).toEqual([
-      "rsID",
+      "other_allele",
       "pValue",
     ]);
+  });
+
+  it("accepts a GWAS with no rsID column", () => {
+    const { rsid, ...rest } = OR_AND_P_ONLY;
+    expect(missingRequiredFields(rest)).toEqual([]);
   });
 
   it("reports every field for an empty or absent col_map", () => {
