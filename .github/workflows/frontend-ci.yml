@@ -40,8 +40,7 @@ jobs:
               run: |
                   echo "NUXT_PUBLIC_API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env
                   echo "NUXT_PUBLIC_PHENOTYPES_URL=${{ secrets.PHENOTYPES_URL }}" >> .env
-                  # Portal Variant Sifter page for the postMessage token handoff
-                  # (frontend/utils/sifter/portalHandoff.js). Dev page id for now.
+                  # Portal Variant Sifter page; the dataset id is appended as ?token= (frontend/utils/sifter/portalSifterLink.js). Dev page id for now.
                   echo "NUXT_PUBLIC_PORTAL_SIFTER_URL=https://dev.hugeamp.org/research.html?pageid=kp_variant_sifter_26&project=gwas-ce" >> .env
                   echo "NUXT_PUBLIC_DEFAULT_USERNAME=defaultuser" >> .env
                   echo "NUXT_PUBLIC_DEFAULT_PASSWORD=defaultpass" >> .env
