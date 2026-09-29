@@ -838,14 +838,10 @@ async function confirmAndRunWorkflow(data, workflow) {
                 `${workflow.method} analysis will be performed on your dataset.`,
         },
         accept: async () => {
+            // No success toast here: each run* command adds its own, so one here
+            // showed every start twice. Same split as confirmAndRunBedWorkflow.
             try {
                 await workflow.command();
-                toast.add({
-                    severity: "success",
-                    summary: "Analysis Started",
-                    detail: `${workflow.method.toUpperCase()} analysis started successfully`,
-                    life: 5000,
-                });
             } catch (error) {
                 toast.add({
                     severity: "error",
