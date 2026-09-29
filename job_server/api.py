@@ -7,11 +7,12 @@ import logging
 import numpy as np
 import os
 import re
+import zipfile
 from asyncio import Queue
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Optional, TextIO
+from typing import Dict, Iterable, Optional, TextIO
 
 import fastapi
 import httpx
@@ -21,6 +22,7 @@ from fastapi import Depends, HTTPException, Header, UploadFile, Query, Backgroun
 from pydantic import BaseModel
 from sqlalchemy.exc import ProgrammingError
 from sse_starlette import EventSourceResponse
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
@@ -1078,9 +1080,59 @@ def get_s3_results_path(dataset: str, user: User, dataset_type: str, method_grou
     return f"userdata/{user.username}/{dataset_type}/{dataset}/{method_group}/{method}"
 
 
+FALCON_DOWNLOAD_KINDS = ("genes", "variants")
+
+
+def pick_falcon_download_files(names: Iterable[str]) -> list:
+    """The FALCON result objects a download carries: manifest.json, then per
+    kind the whole-genome `.wg.<kind>` aggregate, or every per-chromosome
+    `.<kind>` file when a run produced none. The same rule the results page
+    loads by (frontend/composables/useFalconDataSource.js::pickNames). The log
+    and v2g files are left out: the tables are what a user takes elsewhere."""
+    names = sorted(names)
+    picked = [n for n in names if n == "manifest.json"]
+    for kind in FALCON_DOWNLOAD_KINDS:
+        whole_genome = [n for n in names if n.endswith(f".wg.{kind}")]
+        picked += whole_genome[:1] or [n for n in names if n.endswith(f".{kind}")]
+    return picked
+
+
+def build_falcon_results_zip(username: str, dataset: str) -> bytes:
+    """Zip the picked FALCON results under a `<dataset>_falcon/` folder, the
+    tables renamed `.tsv` so they open as what they are. Blocking S3 reads:
+    call it from a thread. 404 when the dataset has no FALCON tables."""
+    prefix = s3.get_falcon_s3_prefix(username, dataset) + "/"
+    s3_client = boto3.client("s3")
+    names = [
+        obj["Key"][len(prefix):]
+        for page in s3_client.get_paginator("list_objects_v2").paginate(Bucket=s3.BUCKET_NAME, Prefix=prefix)
+        for obj in page.get("Contents", [])
+    ]
+    picked = pick_falcon_download_files(names)
+    if not any(name != "manifest.json" for name in picked):
+        raise fastapi.HTTPException(status_code=404, detail="No FALCON results for this dataset")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name in picked:
+            body = s3_client.get_object(Bucket=s3.BUCKET_NAME, Key=prefix + name)["Body"].read()
+            arcname = name if name == "manifest.json" else f"{name}.tsv"
+            zf.writestr(f"{dataset}_falcon/{arcname}", body)
+    return buffer.getvalue()
+
+
 @router.get("/download/{dataset}")
 async def download_hermes_file(dataset: str, result_type: str = Query('sldsc', description="Type of results to download"), user: User = Depends(get_current_user)):
     result_type_lower = result_type.lower()
+    if result_type_lower == 'falcon':
+        try:
+            content = await run_in_threadpool(build_falcon_results_zip, user.username, dataset)
+        except ClientError as e:
+            raise fastapi.HTTPException(status_code=500, detail="Failed to fetch FALCON results") from e
+        return Response(content=content,
+                        media_type='application/zip',
+                        headers={
+                            'Content-Disposition': f'attachment; filename="{dataset}_falcon_results.zip"'
+                        })
     if result_type_lower == 'magma':
         s3_path = get_s3_results_path(dataset, user, 'genetic', 'magma', 'genes')
         df = get_cached_results(s3_path, 'associations.genes.json.gz', 'magma', True)
