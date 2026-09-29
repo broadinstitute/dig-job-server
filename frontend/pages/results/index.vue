@@ -169,6 +169,7 @@
 <script setup>
 import { useResultsStore } from "~/stores/ResultsStore.js";
 import FalconResultsTab from "~/components/results/FalconResultsTab.vue";
+import { downloadResultType } from "~/utils/results/downloadResultType.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -261,16 +262,17 @@ const downloadButtonLabel = computed(() => {
 });
 
 const canDownloadCurrentTab = computed(() => {
-    if (activeTab.value === "magma") return hasMagmaResults.value;
-    if (activeTab.value === "pigean") return hasPigeanResults.value;
-    return hasSldscResults.value;
+    const hasResults = {
+        sldsc: hasSldscResults.value,
+        magma: hasMagmaResults.value,
+        pigean: hasPigeanResults.value,
+        falcon: shouldShowFalconTab.value,
+    };
+    return downloadResultType(activeTab.value) !== null && !!hasResults[activeTab.value];
 });
 
 const downloadUrl = computed(() => {
-    let resultTypeParam = "ldsc";
-    if (activeTab.value === "magma") resultTypeParam = "magma";
-    else if (activeTab.value === "pigean") resultTypeParam = "pigean";
-    return `${config.public.apiBaseUrl}/api/download/${dataset.value}?result_type=${resultTypeParam}`;
+    return `${config.public.apiBaseUrl}/api/download/${dataset.value}?result_type=${downloadResultType(activeTab.value)}`;
 });
 
 function openDownloadLink() {

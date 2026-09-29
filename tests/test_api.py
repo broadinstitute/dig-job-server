@@ -657,3 +657,62 @@ def test_falcon_result_urls_404_for_unknown_dataset(api_client: TestClient, auth
 def test_falcon_result_urls_requires_auth(api_client: TestClient):
     res = api_client.get("/api/falcon/anything/result-urls")
     assert res.status_code == 401
+
+
+def _put_falcon_objects(ds: str, objects: dict):
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    for name, body in objects.items():
+        s3_client.put_object(
+            Bucket=BUCKET, Key=f"userdata/{USER}/genetic/{ds}/falcon/{name}", Body=body,
+        )
+
+
+@mock_aws
+def test_download_falcon_zips_whole_genome_tables_and_manifest(api_client: TestClient, auth_token: str):
+    """result_type=falcon returns a zip of the whole-genome genes and variants
+    tables plus manifest.json -- not the per-chromosome files, v2g or the log."""
+    import zipfile
+    set_up_moto_bucket()
+    ds = "falcon_download"
+    _put_falcon_objects(ds, {
+        "manifest.json": b'{"schema_version": 1}',
+        "out.wg.genes": b"GENE\tPROBABILITY\nMYC\t0.9\n",
+        "out.wg.variants": b"SNP\tPIP\nrs1\t0.5\n",
+        "out.wg.log": b"Total Time: 1 seconds ---\n",
+        "out.1.genes": b"GENE\tPROBABILITY\nMYC\t0.9\n",
+        "out.1.v2g": b"SNP\tGENE\n",
+    })
+
+    res = api_client.get(
+        f"/api/download/{ds}?result_type=falcon",
+        headers={"Authorization": f"Bearer {auth_token}"},
+    )
+
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"] == "application/zip"
+    assert f'filename="{ds}_falcon_results.zip"' in res.headers["content-disposition"]
+    with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
+        assert sorted(zf.namelist()) == [
+            f"{ds}_falcon/manifest.json",
+            f"{ds}_falcon/out.wg.genes.tsv",
+            f"{ds}_falcon/out.wg.variants.tsv",
+        ]
+        assert zf.read(f"{ds}_falcon/out.wg.genes.tsv") == b"GENE\tPROBABILITY\nMYC\t0.9\n"
+
+
+@mock_aws
+def test_download_falcon_404_when_no_results(api_client: TestClient, auth_token: str):
+    set_up_moto_bucket()
+    res = api_client.get(
+        "/api/download/never_ran_falcon?result_type=falcon",
+        headers={"Authorization": f"Bearer {auth_token}"},
+    )
+    assert res.status_code == 404
+
+
+def test_pick_falcon_download_files_falls_back_to_per_chromosome():
+    """No `.wg.<kind>` aggregate (a single-chromosome run) means every
+    per-chromosome file of that kind -- the results page's own rule."""
+    from job_server.api import pick_falcon_download_files
+    names = ["trait-chr22.22.genes", "trait-chr22.22.variants", "trait-chr22.22.v2g", "trait-chr22.22.log"]
+    assert pick_falcon_download_files(names) == ["trait-chr22.22.genes", "trait-chr22.22.variants"]
