@@ -30,6 +30,17 @@ export function buildFormData(model, FormDataImpl = FormData) {
   return fd;
 }
 
+/** The key-safe form of a set name, as job_server/credible_sets.py::slugify
+ *  makes it. The server prefixes every uploaded credibleSetId with it, so this
+ *  is how the name reads in the Variant Sifter. Empty where the server would
+ *  reject the name. No 30-character cut: the name input is capped at 30 and a
+ *  slug is never longer than its name. */
+export function credibleSetSlug(name) {
+  return String(name ?? "").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export function summarizeReport(report) {

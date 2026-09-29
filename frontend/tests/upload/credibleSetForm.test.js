@@ -5,6 +5,7 @@ import {
   buildFormData,
   summarizeReport,
   describeUploadError,
+  credibleSetSlug,
 } from "../../utils/upload/credibleSetForm.js";
 
 const FULL_MAP = {
@@ -67,5 +68,25 @@ describe("describeUploadError", () => {
   });
   it("falls back to the error message", () => {
     expect(describeUploadError(new Error("Network Error"))).toBe("Network Error");
+  });
+});
+
+describe("credibleSetSlug", () => {
+  // Same cases as tests/test_credible_sets_pure.py::test_slugify: the form
+  // previews the prefix the server puts on every uploaded credibleSetId, so the
+  // two must agree.
+  it.each([
+    ["SuSiE v1", "susie-v1"],
+    ["  FINEMAP  ", "finemap"],
+    ["a__b--c", "a-b-c"],
+    ["-leading and trailing-", "leading-and-trailing"],
+    ["MixedCASE 42", "mixedcase-42"],
+  ])("slugs %j as %j, like the server", (name, slug) => {
+    expect(credibleSetSlug(name)).toBe(slug);
+  });
+  it("is empty for a name with no letter or digit, which the server rejects", () => {
+    expect(credibleSetSlug("---")).toBe("");
+    expect(credibleSetSlug("")).toBe("");
+    expect(credibleSetSlug(undefined)).toBe("");
   });
 });

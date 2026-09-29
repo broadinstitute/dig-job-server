@@ -16,6 +16,7 @@ import {
     buildFormData,
     summarizeReport,
     describeUploadError,
+    credibleSetSlug,
 } from "~/utils/upload/credibleSetForm";
 
 const props = defineProps({
@@ -36,6 +37,9 @@ const report = ref(null);
 const validating = ref(false);
 
 const colMap = computed(() => selectedFieldsToColMap(selectedFields.value));
+// The portal's set picker shows set ids, not this name: the server prefixes
+// each uploaded credibleSetId with the name's slug, so preview that.
+const slug = computed(() => credibleSetSlug(name.value));
 const model = computed(() => ({
     name: name.value,
     file: file.value,
@@ -123,7 +127,14 @@ defineExpose({ clear });
                 placeholder="e.g. SuSiE v1"
                 class="w-full"
             />
-            <small class="ml-2 text-surface-500">{{ name.length }}/30 · shown in the sifter's set picker</small>
+            <small class="ml-2 text-surface-500">
+                {{ name.length }}/30 characters ·
+                <template v-if="slug">
+                    the Variant Sifter lists these sets as
+                    <code>{{ slug }}:&lt;set id&gt;</code>
+                </template>
+                <template v-else>labels these sets in the Variant Sifter</template>
+            </small>
         </div>
 
         <div class="field mt-3">
