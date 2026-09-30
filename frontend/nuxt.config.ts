@@ -23,6 +23,15 @@ export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
     devtools: { enabled: process.env.NUXT_DEVTOOLS === "true" },
     ssr: false,
+    experimental: {
+        // Every deploy wipes the previous /_nuxt/<Date.now()>/ build dir, so a
+        // tab opened before it 404s on the first page chunk it lazy-loads. The
+        // default ("automatic") only reloads when a JS chunk fails; Nuxt
+        // swallows a failed CSS chunk, so the page rendered unstyled (e.g. the
+        // upload progress overlay fell to the bottom of the page). Reload on
+        // any chunk error instead. reloadNuxtApp's 10 s guard prevents loops.
+        emitRouteChunkError: "automatic-immediate",
+    },
     components: [
         {
             path: "~/components",
