@@ -1644,6 +1644,8 @@ function openBedResultsInNewTab(dataset) {
                         size="small"
                         outlined
                     ></Button>
+                </div>
+                <div class="flex items-center gap-2 mx-4">
                     <MultiSelect
                         v-if="userStore.user.username !== 'demo'"
                         v-model="visibleColumns"
@@ -1661,14 +1663,13 @@ function openBedResultsInNewTab(dataset) {
                             <i class="pi pi-sliders-h" />
                         </template>
                     </MultiSelect>
+                    <Button
+                        @click="router.push('/upload')"
+                        icon="pi pi-upload"
+                        label="Upload GWAS"
+                        size="small"
+                    ></Button>
                 </div>
-                <Button
-                    @click="router.push('/upload')"
-                    icon="pi pi-upload"
-                    label="Upload GWAS"
-                    size="small"
-                    class="mx-4"
-                ></Button>
             </div>
 
             <Popover ref="helpPopover">
