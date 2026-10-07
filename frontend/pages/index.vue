@@ -148,19 +148,6 @@ const isLoggedIn = ref(false);
 
 useHead({
     title: "GWAS-CE - Genomic Analysis Platform",
-    // Fonts from the GWAS-CE landing mock-up (HuGeAMP Knowledge Portal type).
-    link: [
-        { rel: "preconnect", href: "https://fonts.googleapis.com" },
-        {
-            rel: "preconnect",
-            href: "https://fonts.gstatic.com",
-            crossorigin: "",
-        },
-        {
-            rel: "stylesheet",
-            href: "https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&family=Roboto:wght@300;400;700&display=swap",
-        },
-    ],
     meta: [
         {
             name: "description",

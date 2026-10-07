@@ -88,6 +88,21 @@ export default defineNuxtConfig({
                 lang: "en",
             },
             title: "GWAS-CE",
+            // Oswald (headings) and Roboto (body) from the GWAS-CE mock-ups
+            // (HuGeAMP Knowledge Portal type). Used by the landing and guide
+            // pages.
+            link: [
+                { rel: "preconnect", href: "https://fonts.googleapis.com" },
+                {
+                    rel: "preconnect",
+                    href: "https://fonts.gstatic.com",
+                    crossorigin: "",
+                },
+                {
+                    rel: "stylesheet",
+                    href: "https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&family=Roboto:wght@300;400;500;700&display=swap",
+                },
+            ],
         },
     },
     primevue: {

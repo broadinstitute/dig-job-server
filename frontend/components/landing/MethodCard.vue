@@ -2,10 +2,10 @@
     <NuxtLink
         :to="methodPath(method.slug)"
         class="method-card flex h-full flex-col border border-t-[3px] border-x-surface-200 border-b-surface-200 bg-surface-0 px-3.5 pt-3.5 pb-3 no-underline transition-shadow duration-150 hover:shadow-md dark:border-x-surface-700 dark:border-b-surface-700 dark:bg-surface-900"
-        :class="method.accentClass"
+        :style="{ borderTopColor: method.accent }"
     >
         <!-- Only the side and bottom borders are themed so the accent top
-             edge (accentClass) shows in both light and dark mode. -->
+             edge shows in both light and dark mode. -->
         <h3 class="method-title text-surface-900 dark:text-surface-0">
             {{ method.title }}
         </h3>
@@ -18,8 +18,11 @@
         <p class="method-blurb flex-auto text-surface-600 dark:text-surface-300">
             {{ method.blurb }}
         </p>
-        <div v-if="!method.implemented" class="mt-3">
-            <Tag value="Coming soon" severity="secondary" />
+        <div v-if="!method.implemented || method.external" class="mt-3">
+            <Tag
+                :value="method.implemented ? 'External service' : 'Coming soon'"
+                severity="secondary"
+            />
         </div>
     </NuxtLink>
 </template>
@@ -34,7 +37,7 @@ defineProps({
 </script>
 
 <style scoped>
-/* Typography from the GWAS-CE landing mock-up (fonts loaded by pages/index.vue). */
+/* Typography from the GWAS-CE landing mock-up (fonts loaded in nuxt.config.ts). */
 .method-title {
     margin: 0 0 4px 0;
     font-family: "Oswald", "Roboto", Arial, sans-serif;

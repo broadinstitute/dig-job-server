@@ -1,10 +1,14 @@
 // Single source of truth for the GWAS post-processing methods shown on the
-// landing page (MethodCard) and described at /methods/<slug>.
+// landing page (MethodCard), the getting-started guide, and described at
+// /methods/<slug>.
 //
 // Tailwind v4 only generates classes it can see as literal strings, so the
 // color classes are spelled out in full here rather than assembled from a
-// color name at render time. accentClass colors the top edge of the landing
-// card and uses the GWAS-CE logo palette.
+// color name at render time. `accent` is a GWAS-CE logo color applied as an
+// inline style (landing card top edge, guide row left edge).
+//
+// `external` marks a method whose results open outside GWAS-CE (Variant
+// Sifter runs a prep job here, then opens in the HuGeAMP portal).
 
 export const METHODS = [
     {
@@ -15,7 +19,7 @@ export const METHODS = [
         icon: "pi pi-chart-line",
         iconWrapClass: "bg-blue-100 dark:bg-blue-900/20",
         iconClass: "text-blue-600 dark:text-blue-400",
-        accentClass: "border-t-[#6386c0]",
+        accent: "#6386c0",
         tags: [
             { value: "Heritability", severity: "primary" },
             { value: "SNP-based", severity: "info" },
@@ -30,7 +34,7 @@ export const METHODS = [
         icon: "pi pi-sitemap",
         iconWrapClass: "bg-green-100 dark:bg-green-900/20",
         iconClass: "text-green-600 dark:text-green-400",
-        accentClass: "border-t-[#a2c756]",
+        accent: "#a2c756",
         tags: [
             { value: "Gene-based", severity: "success" },
             { value: "Pathway", severity: "info" },
@@ -45,7 +49,7 @@ export const METHODS = [
         icon: "pi pi-sparkles",
         iconWrapClass: "bg-orange-100 dark:bg-orange-900/20",
         iconClass: "text-orange-600 dark:text-orange-400",
-        accentClass: "border-t-[#f2b444]",
+        accent: "#f2b444",
         tags: [
             { value: "Gene Priors", severity: "warn" },
             { value: "Annotation", severity: "info" },
@@ -61,7 +65,7 @@ export const METHODS = [
         icon: "pi pi-bolt",
         iconWrapClass: "bg-rose-100 dark:bg-rose-900/20",
         iconClass: "text-rose-600 dark:text-rose-400",
-        accentClass: "border-t-[#6f415c]",
+        accent: "#6f415c",
         tags: [
             { value: "Gene sets", severity: "danger" },
             { value: "Multi-omic", severity: "info" },
@@ -76,12 +80,13 @@ export const METHODS = [
         icon: "pi pi-filter",
         iconWrapClass: "bg-teal-100 dark:bg-teal-900/20",
         iconClass: "text-teal-600 dark:text-teal-400",
-        accentClass: "border-t-[#726b45]",
+        accent: "#726b45",
         tags: [
             { value: "Variants", severity: "info" },
             { value: "Epigenomic", severity: "secondary" },
         ],
-        implemented: false,
+        implemented: true,
+        external: true,
     },
 ];
 

@@ -38,7 +38,7 @@ describe("METHODS catalog", () => {
             expect(m.icon).toMatch(/^pi pi-/);
             expect(typeof m.iconWrapClass).toBe("string");
             expect(typeof m.iconClass).toBe("string");
-            expect(m.accentClass).toMatch(/^border-t-/);
+            expect(m.accent).toMatch(/^#[0-9a-f]{6}$/i);
             expect(m.fullName === null || typeof m.fullName === "string").toBe(
                 true,
             );
@@ -51,15 +51,23 @@ describe("METHODS catalog", () => {
         }
     });
 
-    // Variant Sifter has no workflow in the app yet; the card must say so.
-    it("marks Variant Sifter as not implemented", () => {
-        expect(getMethod("variant-sifter").implemented).toBe(false);
-    });
-
-    it("marks the methods with a results tab as implemented", () => {
-        for (const slug of ["sldsc", "magma", "pigean", "falcon"]) {
+    it("marks every method that runs from the Datasets page as implemented", () => {
+        for (const slug of [
+            "sldsc",
+            "magma",
+            "pigean",
+            "falcon",
+            "variant-sifter",
+        ]) {
             expect(getMethod(slug).implemented).toBe(true);
         }
+    });
+
+    // Variant Sifter results open in the HuGeAMP portal, not in GWAS-CE.
+    it("marks only Variant Sifter as external", () => {
+        expect(METHODS.filter((m) => m.external).map((m) => m.slug)).toEqual([
+            "variant-sifter",
+        ]);
     });
 });
 
