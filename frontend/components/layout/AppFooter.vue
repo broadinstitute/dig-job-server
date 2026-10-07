@@ -29,23 +29,22 @@ const { isDarkMode, toggleDarkMode } = useTheme();
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem 0 1rem 0;
+    padding: 0.5rem 0;
     gap: 0.5rem;
     border-top: 1px solid var(--p-content-border-color);
-    font-size: small;
+    font-size: 14px;
 }
 
 .theme-toggle-btn.sun-icon :deep(.pi-sun) {
     color: #ffd700;
 }
 
-/* Light theme: coral banner matching the header (GWAS-CE guide). */
+/* Light theme: coral banner matching the header (GWAS-CE guide). Only colors
+   change between themes; size and spacing come from .layout-footer. */
 html:not(.dark) .layout-footer {
     background-color: var(--gwas-theme);
     border-top: none;
-    padding: 0.5rem 0;
     color: #fff;
-    font-size: 14px;
 }
 
 html:not(.dark) .theme-toggle-btn {

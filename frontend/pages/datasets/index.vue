@@ -1084,6 +1084,15 @@ function openAttach(row) {
     attachTarget.value = row;
 }
 
+// Credible-sets count button: same effect as the row's expander arrow.
+// Replace the object so DataTable sees the change (it watches expandedRows).
+function toggleCredibleSets(row) {
+    const next = { ...expandedRows.value };
+    if (next[row.id]) delete next[row.id];
+    else next[row.id] = true;
+    expandedRows.value = next;
+}
+
 function closeAttach() {
     attachTarget.value = null;
     attachModel.value = null;
@@ -1784,27 +1793,35 @@ function openBedResultsInNewTab(dataset) {
                         </Column>
                         <Column header="Credible sets" :style="{ width: '7rem' }">
                             <template #body="{ data }">
-                                <div class="flex items-center gap-1.5">
-                                    <span
-                                        class="min-w-5 text-center"
+                                <!-- Split control: the count toggles the row
+                                     expansion, the + opens the Attach dialog. -->
+                                <ButtonGroup>
+                                    <Button
+                                        :label="String((data.credible_sets || []).length)"
+                                        size="small"
+                                        outlined
+                                        rounded
+                                        severity="secondary"
+                                        :aria-expanded="Boolean(expandedRows[data.id])"
+                                        :aria-label="`${expandedRows[data.id] ? 'Hide' : 'Show'} credible sets`"
+                                        @click="toggleCredibleSets(data)"
                                         v-tooltip.top="
                                             (data.credible_sets || []).length
-                                                ? 'Credible sets attached; expand the row to see them'
+                                                ? `${expandedRows[data.id] ? 'Hide' : 'Show'} attached credible sets`
                                                 : 'No credible sets attached'
                                         "
-                                        >{{ (data.credible_sets || []).length }}</span
-                                    >
+                                    />
                                     <Button
                                         icon="pi pi-plus"
                                         size="small"
-                                        text
+                                        outlined
                                         rounded
                                         severity="secondary"
                                         aria-label="Attach a credible set"
                                         @click="openAttach(data)"
                                         v-tooltip.top="'Attach a credible set to this GWAS'"
                                     />
-                                </div>
+                                </ButtonGroup>
                             </template>
                         </Column>
                         <Column

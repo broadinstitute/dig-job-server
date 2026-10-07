@@ -23,28 +23,24 @@
 </script>
 
 <style scoped>
+/* Layout is shared by both themes; only colors differ (light-theme overrides
+   at the bottom). */
 .layout-header {
     width: 100%;
-    padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--p-content-border-color);
-    margin-bottom: 1rem;
     background-color: var(--p-content-background);
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.12),
-        0 1px 2px rgba(0, 0, 0, 0.24);
 }
 
 .header-container {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
 }
 
 .brand-and-nav {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1rem;
     min-width: 0;
 }
 
@@ -63,45 +59,42 @@
     color: var(--p-text-color);
 }
 
-html:not(.dark) .logo-image {
-    color: #fff;
-}
-
-/* Light theme: coral banner (GWAS-CE guide). Dark theme keeps the
-   surface-colored header above. */
-html:not(.dark) .layout-header {
-    background-color: var(--gwas-theme);
-    border-bottom: 1px solid var(--gwas-plum);
-    box-shadow: none;
-    padding: 0;
-    margin-bottom: 0;
-}
-
-html:not(.dark) .header-container {
-    gap: 0;
-}
-
-html:not(.dark) .brand-and-nav {
-    gap: 1rem;
-}
-
 .portal-mark {
     display: inline-flex;
     align-items: center;
     line-height: 0;
-}
-
-html:not(.dark) .portal-mark {
     margin-left: 15px;
     padding: 5px 0;
 }
 
-/* Header buttons (auth controls and hub tabs): white text on the banner,
-   gold dividers between items. */
-html:not(.dark) .layout-header :deep(.p-button) {
-    color: #fff;
+/* Header buttons (auth controls and hub tabs): square, with dividers between
+   the auth controls. */
+.layout-header :deep(.p-button) {
     font-weight: 500;
     border-radius: 0;
+}
+
+.layout-header :deep(.auth-controls) {
+    margin-right: 15px;
+}
+
+.layout-header :deep(.auth-controls .p-button + .p-button) {
+    border-left: 1px solid var(--p-content-border-color);
+}
+
+/* Light theme colors: coral banner, white logo text and buttons, gold
+   dividers (GWAS-CE guide). */
+html:not(.dark) .layout-header {
+    background-color: var(--gwas-theme);
+    border-bottom-color: var(--gwas-plum);
+}
+
+html:not(.dark) .logo-image {
+    color: #fff;
+}
+
+html:not(.dark) .layout-header :deep(.p-button) {
+    color: #fff;
 }
 
 html:not(.dark) .layout-header :deep(.p-button:not(:disabled):hover) {
@@ -110,11 +103,7 @@ html:not(.dark) .layout-header :deep(.p-button:not(:disabled):hover) {
 }
 
 html:not(.dark) .layout-header :deep(.auth-controls .p-button + .p-button) {
-    border-left: 1px solid var(--gwas-gold);
-}
-
-html:not(.dark) .layout-header :deep(.auth-controls) {
-    margin-right: 15px;
+    border-left-color: var(--gwas-gold);
 }
 
 html:not(.dark) .layout-header :deep(.p-button:disabled) {

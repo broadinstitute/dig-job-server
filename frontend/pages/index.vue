@@ -1,8 +1,7 @@
 <template>
     <div class="landing-page">
-        <!-- Hero banner. In dark mode the header keeps its 1rem bottom margin;
-             pull the banner up so it still meets the header. -->
-        <section class="hero-banner dark:-mt-4">
+        <!-- Hero banner -->
+        <section class="hero-banner">
             <div class="landing-container">
                 <div class="hero-content">
                     <div class="hero-identity">
