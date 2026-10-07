@@ -6,6 +6,7 @@ import { buildFormData, isReady, describeUploadError } from "~/utils/upload/cred
 import { statusTag, hasFailed } from "~/utils/credibleSets/statusTag.js";
 import { createRefreshGuard } from "~/utils/credibleSets/refreshGuard.js";
 import { buildPortalSifterUrl } from "~/utils/sifter/portalSifterLink.js";
+import { resultButtonConfig, resultsUrl } from "~/utils/results/resultNavigation.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -32,6 +33,30 @@ const attachTarget = ref(null); // the dataset row the dialog is attaching to
 const attachModel = ref(null); // CredibleSetForm's v-model
 const attaching = ref(false);
 const csRefresh = createRefreshGuard();
+
+// Optional table columns the user can show from a "Columns" picker. Hidden by
+// default; each table's choice is remembered in localStorage under its own key.
+const OPTIONAL_COLUMNS = [{ label: "Uploader", value: "uploader" }];
+
+function useVisibleColumns(storageKey) {
+    const known = OPTIONAL_COLUMNS.map((c) => c.value);
+    let initial = [];
+    try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        if (Array.isArray(saved)) initial = saved.filter((v) => known.includes(v));
+    } catch {
+        // Corrupt or missing entry: fall back to the default (all hidden).
+    }
+    const cols = ref(initial);
+    watch(cols, (value) => localStorage.setItem(storageKey, JSON.stringify(value)));
+    return cols;
+}
+
+const visibleColumns = useVisibleColumns("datasets.visibleColumns");
+const visibleBedColumns = useVisibleColumns("datasets.visibleBedColumns");
+
+const showColumn = (key) => visibleColumns.value.includes(key);
+const showBedColumn = (key) => visibleBedColumns.value.includes(key);
 
 async function runFalcon(data) {
     const { job_id } = await userStore.startAnalysis(data.dataset, "falcon");
@@ -547,17 +572,7 @@ function getAllWorkflowOptions(data) {
             disabled: true,
         });
     } else if (sifterStatus === "SUCCEEDED") {
-        if (config.public.portalSifterUrl) {
-            options.push({
-                label: "Open in Variant Sifter",
-                icon: "pi pi-external-link",
-                method: "variant-sifter",
-                status: "succeeded",
-                severity: "success",
-                command: () => openPortalSifter(data),
-                disabled: false,
-            });
-        }
+        // Opening the portal lives in the Results column (canOpenPortalSifter).
         // A SUCCEEDED dataset must stay re-runnable: the pipeline's output
         // changes underneath it (the per-dataset index layout did, the VEP join
         // will), and every such change needs existing datasets rebuilt. Without
@@ -659,27 +674,24 @@ function getSuccessfulWorkflows(data) {
     return workflows;
 }
 
-function getResultButtonConfig(data) {
-    const hasSuccessfulWorkflow = ["sldsc", "magma", "pigean", "falcon"].some(
-        (method) => getJobStatus(data, method) === "SUCCEEDED",
+// The portal Variant Sifter is reachable once the prep job succeeded and a
+// portal URL is configured.
+function canOpenPortalSifter(data) {
+    return (
+        Boolean(config.public.portalSifterUrl) &&
+        getJobStatus(data, "variant-sifter") === "SUCCEEDED"
     );
+}
 
-    if (!hasSuccessfulWorkflow) {
-        return null;
-    }
-
-    return {
-        label: "View Results",
-        icon: "pi pi-eye",
-        command: () => viewResults(data.dataset),
-        dropdownItems: [
-            {
-                label: "Open in new tab",
-                icon: "pi pi-external-link",
-                command: () => openInNewTab(data.dataset),
-            },
-        ],
-    };
+// The latest successful result is the primary action; older results remain
+// reachable from the dropdown, with the matching method tab in their URL.
+function getResultButtonConfig(data) {
+    return resultButtonConfig(data, {
+        includeSifter: canOpenPortalSifter(data),
+        view: viewResults,
+        openNewTab: openInNewTab,
+        openSifter: openPortalSifter,
+    });
 }
 
 async function runSldsc(data) {
@@ -932,12 +944,12 @@ function progress(data) {
     return 0; // Default
 }
 
-function viewResults(dataset) {
-    router.push(`/results?dataset=${encodeURIComponent(dataset)}`);
+function viewResults(dataset, method) {
+    router.push(resultsUrl(dataset, method));
 }
 
-function openInNewTab(dataset) {
-    window.open(`/results?dataset=${encodeURIComponent(dataset)}`, "_blank");
+function openInNewTab(dataset, method) {
+    window.open(resultsUrl(dataset, method), "_blank");
 }
 
 function goToWorkflowResults(dataset, method) {
@@ -1623,6 +1635,23 @@ function openBedResultsInNewTab(dataset) {
                         size="small"
                         outlined
                     ></Button>
+                    <MultiSelect
+                        v-if="userStore.user.username !== 'demo'"
+                        v-model="visibleColumns"
+                        :options="OPTIONAL_COLUMNS"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Columns"
+                        :showToggleAll="false"
+                        :maxSelectedLabels="0"
+                        selectedItemsLabel="Columns ({0})"
+                        size="small"
+                        aria-label="Show optional columns"
+                    >
+                        <template #dropdownicon>
+                            <i class="pi pi-sliders-h" />
+                        </template>
+                    </MultiSelect>
                 </div>
                 <Button
                     @click="router.push('/upload')"
@@ -1753,16 +1782,25 @@ function openBedResultsInNewTab(dataset) {
                                 {{ data.genome_build }}
                             </template>
                         </Column>
-                        <Column header="Credible sets" :style="{ width: '9rem' }">
+                        <Column header="Credible sets" :style="{ width: '7rem' }">
                             <template #body="{ data }">
-                                <div class="flex items-center gap-2">
-                                    <span>{{ (data.credible_sets || []).length }}</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span
+                                        class="min-w-5 text-center"
+                                        v-tooltip.top="
+                                            (data.credible_sets || []).length
+                                                ? 'Credible sets attached; expand the row to see them'
+                                                : 'No credible sets attached'
+                                        "
+                                        >{{ (data.credible_sets || []).length }}</span
+                                    >
                                     <Button
                                         icon="pi pi-plus"
-                                        label="Attach"
                                         size="small"
-                                        outlined
+                                        text
+                                        rounded
                                         severity="secondary"
+                                        aria-label="Attach a credible set"
                                         @click="openAttach(data)"
                                         v-tooltip.top="'Attach a credible set to this GWAS'"
                                     />
@@ -1771,7 +1809,7 @@ function openBedResultsInNewTab(dataset) {
                         </Column>
                         <Column
                             header="Uploader"
-                            v-if="userStore.user.username !== 'demo'"
+                            v-if="showColumn('uploader') && userStore.user.username !== 'demo'"
                         >
                             <template #body="{ data }">
                                 {{ data.uploaded_by }}
@@ -2021,7 +2059,7 @@ function openBedResultsInNewTab(dataset) {
                             <template #body="{ data }">
                                 <div class="flex gap-2 flex-wrap">
                                     <SplitButton
-                                        v-if="getResultButtonConfig(data)"
+                                        v-if="getResultButtonConfig(data)?.dropdownItems.length"
                                         :label="
                                             getResultButtonConfig(data).label
                                         "
@@ -2039,6 +2077,22 @@ function openBedResultsInNewTab(dataset) {
                                             getResultButtonConfig(data)
                                                 .dropdownItems
                                         "
+                                    />
+                                    <Button
+                                        v-else-if="getResultButtonConfig(data)"
+                                        :label="
+                                            getResultButtonConfig(data).label
+                                        "
+                                        :icon="getResultButtonConfig(data).icon"
+                                        class="whitespace-nowrap"
+                                        size="small"
+                                        outlined
+                                        @click="
+                                            getResultButtonConfig(
+                                                data,
+                                            ).command()
+                                        "
+                                        v-tooltip.top="'Open this dataset in the HuGeAMP Variant Sifter'"
                                     />
                                 </div>
                             </template>
@@ -2138,13 +2192,31 @@ function openBedResultsInNewTab(dataset) {
                 <template #title>
                     <div class="flex items-center justify-between">
                         <span>Annotation Files</span>
-                        <Button
-                            label="Upload Annotation"
-                            icon="pi pi-upload"
-                            @click="router.push('/bed-upload')"
-                            size="small"
-                            severity="primary"
-                        />
+                        <div class="flex items-center gap-2">
+                            <MultiSelect
+                                v-model="visibleBedColumns"
+                                :options="OPTIONAL_COLUMNS"
+                                optionLabel="label"
+                                optionValue="value"
+                                placeholder="Columns"
+                                :showToggleAll="false"
+                                :maxSelectedLabels="0"
+                                selectedItemsLabel="Columns ({0})"
+                                size="small"
+                                aria-label="Show optional annotation columns"
+                            >
+                                <template #dropdownicon>
+                                    <i class="pi pi-sliders-h" />
+                                </template>
+                            </MultiSelect>
+                            <Button
+                                label="Upload Annotation"
+                                icon="pi pi-upload"
+                                @click="router.push('/bed-upload')"
+                                size="small"
+                                severity="primary"
+                            />
+                        </div>
                     </div>
                 </template>
                 <template #content>
@@ -2182,6 +2254,7 @@ function openBedResultsInNewTab(dataset) {
                         </Column>
 
                         <Column
+                            v-if="showBedColumn('uploader')"
                             field="uploader"
                             header="Uploader"
                             :style="{ width: '10rem' }"

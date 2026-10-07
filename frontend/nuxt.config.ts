@@ -92,6 +92,16 @@ export default defineNuxtConfig({
             // (HuGeAMP Knowledge Portal type). Used by the landing and guide
             // pages.
             link: [
+                // Favicon: the GWAS-CE mark (no wordmark), from GwasCeLogo.vue.
+                // PNGs are fallbacks for browsers without SVG favicon support.
+                { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+                {
+                    rel: "icon",
+                    type: "image/png",
+                    sizes: "48x48",
+                    href: "/favicon.png",
+                },
+                { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
                 { rel: "preconnect", href: "https://fonts.googleapis.com" },
                 {
                     rel: "preconnect",

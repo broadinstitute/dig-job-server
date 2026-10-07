@@ -170,6 +170,7 @@
 import { useResultsStore } from "~/stores/ResultsStore.js";
 import FalconResultsTab from "~/components/results/FalconResultsTab.vue";
 import { downloadResultType } from "~/utils/results/downloadResultType.js";
+import { successfulResultMethods } from "~/utils/results/resultNavigation.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -182,7 +183,7 @@ const pigeanTab = ref(null);
 
 // Core state
 const dataset = ref(route.query.dataset);
-const activeTab = ref(route.query.tab || "sldsc");
+const activeTab = ref(route.query.tab || "");
 const error = ref(null);
 
 // Workflow status tracking
@@ -406,6 +407,7 @@ const checkResultsAvailability = async () => {
     } catch (err) {
         console.error("Error checking results availability:", err);
         await checkResultsDirectly();
+        selectFirstAvailableTab();
     }
 };
 
@@ -474,15 +476,15 @@ const selectFirstAvailableTab = () => {
     if (activeTab.value === "pigean" && shouldShowPigeanTab.value) return;
     if (activeTab.value === "falcon" && shouldShowFalconTab.value) return;
 
-    if (shouldShowSldscTab.value) {
-        activeTab.value = "sldsc";
-    } else if (shouldShowMagmaTab.value) {
-        activeTab.value = "magma";
-    } else if (shouldShowPigeanTab.value) {
-        activeTab.value = "pigean";
-    } else if (shouldShowFalconTab.value) {
-        activeTab.value = "falcon";
-    }
+    const available = {
+        sldsc: shouldShowSldscTab.value,
+        magma: shouldShowMagmaTab.value,
+        pigean: shouldShowPigeanTab.value,
+        falcon: shouldShowFalconTab.value,
+    };
+    const latest = successfulResultMethods({ workflows: workflowStatus.value });
+    activeTab.value = latest.find((method) => available[method]) ||
+        Object.keys(available).find((method) => available[method]) || "";
 };
 
 // Event handlers from child components
@@ -516,6 +518,7 @@ watch(
     (newDataset) => {
         if (newDataset && newDataset !== dataset.value) {
             dataset.value = newDataset;
+            activeTab.value = route.query.tab || "";
             // Reset availability flags
             hasSldscResults.value = false;
             hasMagmaResults.value = false;
