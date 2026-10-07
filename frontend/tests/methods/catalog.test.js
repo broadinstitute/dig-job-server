@@ -18,9 +18,9 @@ describe("METHODS catalog", () => {
         expect(METHODS.map((m) => m.slug)).toEqual([
             "sldsc",
             "magma",
-            "cojo",
             "pigean",
             "falcon",
+            "variant-sifter",
         ]);
     });
 
@@ -38,6 +38,10 @@ describe("METHODS catalog", () => {
             expect(m.icon).toMatch(/^pi pi-/);
             expect(typeof m.iconWrapClass).toBe("string");
             expect(typeof m.iconClass).toBe("string");
+            expect(m.accentClass).toMatch(/^border-t-/);
+            expect(m.fullName === null || typeof m.fullName === "string").toBe(
+                true,
+            );
             expect(Array.isArray(m.tags)).toBe(true);
             expect(typeof m.implemented).toBe("boolean");
             for (const tag of m.tags) {
@@ -47,9 +51,9 @@ describe("METHODS catalog", () => {
         }
     });
 
-    // COJO has no workflow in the app yet; the card must say so.
-    it("marks COJO as not implemented", () => {
-        expect(getMethod("cojo").implemented).toBe(false);
+    // Variant Sifter has no workflow in the app yet; the card must say so.
+    it("marks Variant Sifter as not implemented", () => {
+        expect(getMethod("variant-sifter").implemented).toBe(false);
     });
 
     it("marks the methods with a results tab as implemented", () => {
@@ -61,7 +65,7 @@ describe("METHODS catalog", () => {
 
 describe("getMethod", () => {
     it("returns the entry for a known slug", () => {
-        expect(getMethod("sldsc").title).toBe("SLDSC");
+        expect(getMethod("sldsc").title).toBe("S-LDSC");
     });
 
     it("returns undefined for an unknown slug", () => {
