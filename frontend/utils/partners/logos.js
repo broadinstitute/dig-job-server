@@ -24,7 +24,7 @@ export const PARTNER_LOGOS = [
         href: "https://kpndataregistry.org/sgc",
         // The SVG's wordmark is white with no background rect; give it the
         // blue panel it was designed for.
-        bgClass: "rounded-md  px-4 py-2",
+        //bgClass: "rounded-md bg-[#2e6db4] px-4 py-2",
     },
     {
         name: "HERMES",

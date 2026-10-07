@@ -1,5 +1,17 @@
 /* Global styles for the application */
 
+/* GWAS-CE brand colors (from the portal banner and logo) */
+:root {
+    --gwas-theme: #f7835c;
+    --gwas-theme-deep: #dc4c34;
+    --gwas-gold: #f2b444;
+    --gwas-plum: #6f415c;
+    --gwas-body-bg: #f4f1ee;
+    --gwas-rule: #e4ddd8;
+    --gwas-ink: #636466;
+    --gwas-ink-strong: #2c2422;
+}
+
 /* Page shell shared by layouts/default.vue and layouts/gwas-hub.vue */
 .app-shell {
     display: flex;
@@ -7,6 +19,11 @@
     min-height: 100vh;
     background-color: var(--p-content-background);
     color: var(--p-text-color);
+}
+
+html:not(.dark) .app-shell {
+    background-color: var(--gwas-body-bg);
+    color: var(--gwas-ink-strong);
 }
 
 /* Tooltip styles */

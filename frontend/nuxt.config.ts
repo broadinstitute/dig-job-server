@@ -2,20 +2,51 @@
 import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import { rollup as unwasm } from "unwasm/plugin";
-const IndigoAura = definePreset(Aura, {
+// GWAS-CE coral palette, taken from the portal banner (#f7835c).
+const GwasCeAura = definePreset(Aura, {
     semantic: {
         primary: {
-            50: "{indigo.50}",
-            100: "{indigo.100}",
-            200: "{indigo.200}",
-            300: "{indigo.300}",
-            400: "{indigo.400}",
-            500: "{indigo.500}",
-            600: "{indigo.600}",
-            700: "{indigo.700}",
-            800: "{indigo.800}",
-            900: "{indigo.900}",
-            950: "{indigo.950}",
+            50: "#fff4ef",
+            100: "#ffe8df",
+            200: "#fecfbd",
+            300: "#fcb094",
+            400: "#fa9674",
+            500: "#f7835c",
+            600: "#dc4c34",
+            700: "#b83d29",
+            800: "#953325",
+            900: "#782d22",
+            950: "#41150f",
+        },
+        colorScheme: {
+            light: {
+                primary: {
+                    color: "{primary.600}",
+                    contrastColor: "#ffffff",
+                    hoverColor: "{primary.700}",
+                    activeColor: "{primary.800}",
+                },
+                highlight: {
+                    background: "{primary.100}",
+                    focusBackground: "{primary.200}",
+                    color: "#2c2422",
+                    focusColor: "#2c2422",
+                },
+                surface: {
+                    0: "#ffffff",
+                    50: "#f4f1ee",
+                    100: "#ece6e1",
+                    200: "#e4ddd8",
+                    300: "#cfc6c0",
+                    400: "#9a918c",
+                    500: "#636466",
+                    600: "#554d4a",
+                    700: "#443b38",
+                    800: "#2c2422",
+                    900: "#211b19",
+                    950: "#171211",
+                },
+            },
         },
     },
 });
@@ -63,7 +94,7 @@ export default defineNuxtConfig({
         options: {
             ripple: true,
             theme: {
-                preset: IndigoAura,
+                preset: GwasCeAura,
                 options: {
                     darkModeSelector: ".dark",
                     cssLayer: {

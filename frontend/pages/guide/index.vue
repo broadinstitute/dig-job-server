@@ -9,7 +9,7 @@
                 Getting Started
             </h1>
             <p class="text-xl text-surface-600 dark:text-surface-400">
-                A quick guide to using the GWAS Analysis Platform.
+                A quick guide to using the GWAS Collaborative Environment.
             </p>
         </div>
 

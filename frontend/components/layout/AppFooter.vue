@@ -1,6 +1,9 @@
 <template>
     <div class="layout-footer">
-        <span>Powered by KPN Data Registry </span>
+        <span
+            >GWAS Collaborative Environment&nbsp;&nbsp;|&nbsp;&nbsp;Powered by
+            the HuGeAMP</span
+        >
         <Button
             :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
             :aria-label="
@@ -34,5 +37,23 @@ const { isDarkMode, toggleDarkMode } = useTheme();
 
 .theme-toggle-btn.sun-icon :deep(.pi-sun) {
     color: #ffd700;
+}
+
+/* Light theme: coral banner matching the header (GWAS-CE guide). */
+html:not(.dark) .layout-footer {
+    background-color: var(--gwas-theme);
+    border-top: none;
+    padding: 0.5rem 0;
+    color: #fff;
+    font-size: 14px;
+}
+
+html:not(.dark) .theme-toggle-btn {
+    color: #fff;
+}
+
+html:not(.dark) .theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
 }
 </style>
