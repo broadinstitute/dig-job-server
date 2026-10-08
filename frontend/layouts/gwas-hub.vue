@@ -1,11 +1,7 @@
 <template>
     <div id="app" class="app-shell">
         <!-- Default #brand slot content: the shared GWAS-CE logo -->
-        <AppHeader>
-            <template #nav>
-                <HubNav v-if="showPage" />
-            </template>
-        </AppHeader>
+        <AppHeader />
 
         <main class="flex flex-1 flex-col">
             <div

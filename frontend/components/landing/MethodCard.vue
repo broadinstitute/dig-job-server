@@ -15,15 +15,17 @@
         >
             {{ method.fullName }}
         </div>
-        <p class="method-blurb flex-auto text-surface-600 dark:text-surface-300">
+        <p
+            class="method-blurb flex-auto text-surface-600 dark:text-surface-300"
+        >
             {{ method.blurb }}
         </p>
-        <div v-if="!method.implemented || method.external" class="mt-3">
+        <!-- <div v-if="!method.implemented || method.external" class="mt-3">
             <Tag
                 :value="method.implemented ? 'External service' : 'Coming soon'"
                 severity="secondary"
             />
-        </div>
+        </div> -->
     </NuxtLink>
 </template>
 

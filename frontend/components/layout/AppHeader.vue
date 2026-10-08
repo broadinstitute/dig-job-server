@@ -18,8 +18,8 @@
 
 <script setup>
 // App header shared by every layout. The default layout uses the default
-// slot content (GWAS-CE logo); the gwas-hub layout supplies its own brand
-// and a tab bar through the #brand and #nav slots.
+// slot content (GWAS-CE logo). A layout can override the brand and add a tab
+// bar through the #brand and #nav slots.
 </script>
 
 <style scoped>

@@ -1,8 +1,9 @@
 // Logo strips for the landing page ("proudly supported by") and the GWAS-Hub
 // page ("proudly trusted by").
 //
-// Shape: { name, src?, href? }
+// Shape: { name, fullName?, src?, href? }
 //   - name: always shown (alt text, or the label of the placeholder tile)
+//   - fullName: optional expanded name, shown on the GWAS-Hub partner cards
 //   - src:  path under public/, e.g. "/images/partners/hermes.png".
 //           When absent, LogoStrip renders a dashed placeholder tile.
 //   - href: optional external link wrapped around the logo.
@@ -28,6 +29,8 @@ export const PARTNER_LOGOS = [
     },
     {
         name: "HERMES",
+        fullName:
+            "Heart Failure Molecular Epidemiology for Therapeutic Targets",
         src: "/images/partners/hermes.png",
         href: "https://kpndataregistry.org/hermes",
         //bgClass: "rounded-md bg-[#313a7e] px-4 py-2",
