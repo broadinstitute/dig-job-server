@@ -10,11 +10,33 @@
         <header
             class="mb-10 border-b border-surface-200 pb-6 dark:border-surface-700"
         >
-            <h1
-                class="mb-2 text-4xl font-bold text-surface-900 dark:text-surface-0"
+            <div
+                class="mb-3 flex flex-col items-start gap-4 sm:flex-row sm:justify-between sm:gap-6"
             >
-                {{ method.title }}
-            </h1>
+                <!-- min-w-0 lets a long full name (FALCON) wrap instead of
+                     pushing the button onto its own line. -->
+                <div class="min-w-0 flex-1">
+                    <h1
+                        class="text-4xl font-bold text-surface-900 dark:text-surface-0"
+                    >
+                        {{ method.title }}
+                    </h1>
+                    <h2
+                        v-if="method.fullName"
+                        class="mt-1 text-lg font-medium text-surface-500 dark:text-surface-400"
+                    >
+                        {{ method.fullName }}
+                    </h2>
+                </div>
+                <Button
+                    v-if="method.implemented"
+                    label="Upload GWAS data to run this method"
+                    icon="pi pi-upload"
+                    class="shrink-0"
+                    @click="$router.push('/upload')"
+                    outlined
+                />
+            </div>
             <p class="text-xl text-surface-600 dark:text-surface-400">
                 {{ method.blurb }}
             </p>
@@ -50,10 +72,7 @@
                             >{{ EXAMPLE_DATASET.label }}</a
                         >
                     </p>
-                    <template
-                        v-for="(block, i) in section.blocks"
-                        :key="i"
-                    >
+                    <template v-for="(block, i) in section.blocks" :key="i">
                         <!-- Trusted, source-controlled copy from utils/methods/docs.js -->
                         <p v-if="typeof block === 'string'" v-html="block"></p>
                         <figure v-else class="py-2">
@@ -97,16 +116,6 @@
                     </ul>
                 </div>
             </section>
-        </div>
-
-        <div class="mt-12 text-center">
-            <Button
-                v-if="method.implemented"
-                label="Upload GWAS data to run this method"
-                icon="pi pi-upload"
-                size="large"
-                @click="$router.push('/upload')"
-            />
         </div>
     </div>
 </template>
