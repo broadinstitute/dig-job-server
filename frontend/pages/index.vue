@@ -30,14 +30,16 @@
         <div class="landing-container flex flex-col gap-5 pt-5 pb-8">
             <!-- Post-processing methods -->
             <section class="landing-card">
-                <div class="landing-card-header">
-                    <h2>GWAS Post-Processing Methods and Services</h2>
-                    <span class="landing-hint">
-                        Upload GWAS summary statistics to run downstream methods
-                        and services
-                    </span>
-                </div>
                 <div class="landing-card-body">
+                    <div class="landing-card-title">
+                        <h2 class="landing-heading text-2xl">
+                            GWAS Post-Processing Methods and Services
+                        </h2>
+                        <span class="landing-hint">
+                            Upload GWAS summary statistics to run downstream
+                            methods and services
+                        </span>
+                    </div>
                     <p class="section-lead">
                         Each method and service takes standard GWAS summary
                         statistics as input and returns results you can utilize
@@ -57,13 +59,16 @@
 
             <!-- Genomic annotation -->
             <section class="landing-card">
-                <div class="landing-card-header">
-                    <h2>Genomic Annotation</h2>
-                    <span class="landing-hint">
-                        Annotate genomic regions for custom enrichment analysis
-                    </span>
-                </div>
                 <div class="landing-card-body">
+                    <div class="landing-card-title">
+                        <h2 class="landing-heading text-2xl">
+                            Genomic Annotation
+                        </h2>
+                        <span class="landing-hint">
+                            Annotate genomic regions for custom enrichment
+                            analysis
+                        </span>
+                    </div>
                     <p class="section-lead mb-0!">
                         Build and upload custom region sets, annotate them
                         against reference tracks, and feed the result into
@@ -100,9 +105,9 @@
                     class="landing-card-body flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8"
                 >
                     <div>
-                        <h2 class="landing-heading mb-1.5 text-2xl">
-                            GWAS-Hub
-                        </h2>
+                        <div class="landing-card-title">
+                            <h2 class="landing-heading text-2xl">GWAS-Hub</h2>
+                        </div>
                         <p class="landing-copy max-w-3xl">
                             Upload your own data to run quality control methods
                             and conduct meta-analyses for your traits of
@@ -122,13 +127,13 @@
 
             <!-- About -->
             <section class="landing-card">
-                <div class="landing-card-header justify-center!">
-                    <h2>About the workspace</h2>
-                </div>
-                <div class="landing-card-body py-6!">
-                    <p
-                        class="landing-copy mx-auto! max-w-4xl text-center leading-relaxed"
-                    >
+                <div class="landing-card-body">
+                    <div class="landing-card-title">
+                        <h2 class="landing-heading text-2xl">
+                            About the workspace
+                        </h2>
+                    </div>
+                    <p class="landing-copy leading-relaxed">
                         GWAS-CE is your unified workspace for GWAS analysis. Run
                         custom quality control and meta-analysis pipelines,
                         leverage cutting-edge post-processing methods, and
@@ -224,17 +229,26 @@ const handleGetStarted = async () => {
     color: #fff;
 }
 
+/* Stacked and centered: name, a short rule, then the tagline. */
 .hero-content {
     display: flex;
+    flex-direction: column;
     align-items: center;
+    text-align: center;
     padding: 44px 0 34px 0;
 }
 
 .hero-identity {
-    flex: 0 0 auto;
-    padding-right: 34px;
-    margin-right: 34px;
-    border-right: 1px solid rgba(255, 255, 255, 0.55);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero-identity::after {
+    content: "";
+    width: 96px;
+    margin: 22px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.55);
 }
 
 .portal-name {
@@ -252,7 +266,7 @@ const handleGetStarted = async () => {
 }
 
 .hero-tagline {
-    width: 470px;
+    width: 640px;
     max-width: 100%;
     font-size: 32px;
     font-weight: 300;
@@ -273,22 +287,16 @@ const handleGetStarted = async () => {
     border-radius: 3px;
 }
 
-.landing-card-header {
+/* Heading row inside the card body: title, with the hint pushed right. */
+.landing-card-title {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 4px 16px;
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--p-content-border-color);
-    background-color: var(--p-surface-50);
+    margin-bottom: 10px;
 }
 
-html.dark .landing-card-header {
-    background-color: var(--p-surface-800);
-}
-
-.landing-card-header h2,
 .landing-heading {
     margin: 0;
     font-family: "Oswald", "Roboto", Arial, sans-serif;
@@ -313,7 +321,6 @@ html.dark .landing-card-header {
     font-weight: 300;
     color: var(--p-text-muted-color);
     margin: 0 0 18px 0;
-    max-width: 820px;
 }
 
 .landing-copy {
@@ -333,14 +340,7 @@ html.dark .landing-card-header {
 
 @media (max-width: 820px) {
     .hero-content {
-        display: block;
         padding-top: 30px;
-    }
-
-    .hero-identity {
-        border-right: none;
-        margin: 0 0 20px 0;
-        padding: 0;
     }
 
     .portal-name {
@@ -348,7 +348,7 @@ html.dark .landing-card-header {
     }
 
     .hero-tagline {
-        width: auto;
+        font-size: 26px;
     }
 }
 </style>

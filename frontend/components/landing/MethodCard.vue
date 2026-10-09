@@ -1,11 +1,12 @@
 <template>
     <NuxtLink
         :to="methodPath(method.slug)"
-        class="method-card flex h-full flex-col border border-t-[3px] border-x-surface-200 border-b-surface-200 bg-surface-0 px-3.5 pt-3.5 pb-3 no-underline transition-shadow duration-150 hover:shadow-md dark:border-x-surface-700 dark:border-b-surface-700 dark:bg-surface-900"
+        class="method-card flex h-full flex-col border border-t-[3px] border-x-surface-200 border-b-surface-200 bg-surface-0 px-3.5 pt-3.5 pb-3 no-underline dark:border-x-surface-600 dark:border-b-surface-600 dark:bg-surface-800"
         :style="{ borderTopColor: method.accent }"
     >
         <!-- Only the side and bottom borders are themed so the accent top
              edge shows in both light and dark mode. -->
+        <MethodIcon :slug="method.slug" :accent="method.accent" class="mb-3 self-center" />
         <h3 class="method-title text-surface-900 dark:text-surface-0">
             {{ method.title }}
         </h3>
@@ -39,6 +40,47 @@ defineProps({
 </script>
 
 <style scoped>
+/* Elevation. In dark mode a shadow alone barely registers against the dark
+   page, so the card also sits on a lighter surface (surface-800, set in the
+   template) with a faint top highlight. */
+.method-card {
+    box-shadow:
+        0 1px 2px rgb(44 36 34 / 0.08),
+        0 3px 8px rgb(44 36 34 / 0.1);
+    transition:
+        box-shadow 150ms ease,
+        transform 150ms ease;
+}
+
+.method-card:hover {
+    box-shadow:
+        0 4px 8px rgb(44 36 34 / 0.12),
+        0 12px 24px rgb(44 36 34 / 0.14);
+    transform: translateY(-2px);
+}
+
+html.dark .method-card {
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.06),
+        0 2px 4px rgb(0 0 0 / 0.5),
+        0 6px 14px rgb(0 0 0 / 0.45);
+}
+
+html.dark .method-card:hover {
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.1),
+        0 6px 12px rgb(0 0 0 / 0.55),
+        0 16px 32px rgb(0 0 0 / 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .method-card,
+    .method-card:hover {
+        transition: none;
+        transform: none;
+    }
+}
+
 /* Typography from the GWAS-CE landing mock-up (fonts loaded in nuxt.config.ts). */
 .method-title {
     margin: 0 0 4px 0;
