@@ -39,10 +39,13 @@
                 Consortium partners
             </h2>
             <div class="grid gap-6 sm:grid-cols-2">
-                <div
+                <a
                     v-for="partner in PARTNER_LOGOS"
                     :key="partner.name"
-                    class="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                    :href="partner.website"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
                 >
                     <!-- White panel: both logos are drawn for a light background -->
                     <div
@@ -68,7 +71,7 @@
                             {{ partner.name }}
                         </p>
                     </div>
-                </div>
+                </a>
             </div>
         </section>
     </div>
@@ -76,11 +79,14 @@
 
 <script setup>
 // GWAS-Hub landing: a hero describing the initiative, then the consortia that
-// have a workspace. Partner cards are informational only (no outbound links);
-// the list is shared with demo.vue via utils/partners/logos.js.
+// have a workspace. Partner cards link out to each consortium's website; the
+// list is shared with demo.vue via utils/partners/logos.js.
+//
+// This page is informational, so it is public: it opts out of auth and uses
+// the default layout rather than the membership-gated "gwas-hub" layout.
 import { PARTNER_LOGOS } from "~/utils/partners/logos";
 
-definePageMeta({ layout: "gwas-hub" });
+definePageMeta({ requiresAuth: false });
 
 useHead({ title: "GWAS-Hub - GWAS-CE" });
 </script>
