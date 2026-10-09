@@ -5,9 +5,15 @@
             <div class="landing-container">
                 <div class="hero-content">
                     <div class="hero-identity">
+                        <!-- C and E are emphasized to spell out GWAS-CE -->
                         <div class="portal-name">
-                            GWAS <span class="font-light">Collaborative</span
-                            ><br />Environment
+                            GWAS
+                            <span class="font-light"
+                                ><span class="portal-initial">C</span
+                                >ollaborative<br /><span class="portal-initial"
+                                    >E</span
+                                >nvironment</span
+                            >
                         </div>
                     </div>
                     <div class="hero-tagline">
@@ -27,8 +33,8 @@
                 <div class="landing-card-header">
                     <h2>GWAS Post-Processing Methods and Services</h2>
                     <span class="landing-hint">
-                        Upload GWAS summary statistics to run downstream
-                        methods and services
+                        Upload GWAS summary statistics to run downstream methods
+                        and services
                     </span>
                 </div>
                 <div class="landing-card-body">
@@ -121,7 +127,7 @@
                 </div>
                 <div class="landing-card-body py-6!">
                     <p
-                        class="landing-copy mx-auto max-w-4xl text-center leading-relaxed"
+                        class="landing-copy mx-auto! max-w-4xl text-center leading-relaxed"
                     >
                         GWAS-CE is your unified workspace for GWAS analysis. Run
                         custom quality control and meta-analysis pipelines,
@@ -239,6 +245,10 @@ const handleGetStarted = async () => {
     letter-spacing: 0.015em;
     text-transform: uppercase;
     max-width: 520px;
+}
+
+.portal-initial {
+    font-weight: 400;
 }
 
 .hero-tagline {

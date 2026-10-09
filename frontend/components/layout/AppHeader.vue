@@ -4,9 +4,9 @@
             <div class="brand-and-nav">
                 <div class="logo-container">
                     <slot name="brand">
-                        <a href="/datasets" class="portal-mark">
+                        <NuxtLink to="/" class="portal-mark">
                             <GwasCeLogo class="logo-image" />
-                        </a>
+                        </NuxtLink>
                     </slot>
                 </div>
                 <slot name="nav" />

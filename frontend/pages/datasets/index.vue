@@ -1796,12 +1796,11 @@ function openBedResultsInNewTab(dataset) {
                             <template #body="{ data }">
                                 <!-- Split control: the count toggles the row
                                      expansion, the + opens the Attach dialog. -->
-                                <ButtonGroup>
+                                <ButtonGroup class="pill-group">
                                     <Button
                                         :label="String((data.credible_sets || []).length)"
                                         size="small"
                                         outlined
-                                        rounded
                                         severity="secondary"
                                         :aria-expanded="Boolean(expandedRows[data.id])"
                                         :aria-label="`${expandedRows[data.id] ? 'Hide' : 'Show'} credible sets`"
@@ -1816,7 +1815,6 @@ function openBedResultsInNewTab(dataset) {
                                         icon="pi pi-plus"
                                         size="small"
                                         outlined
-                                        rounded
                                         severity="secondary"
                                         aria-label="Attach a credible set"
                                         @click="openAttach(data)"
@@ -2662,6 +2660,23 @@ function openBedResultsInNewTab(dataset) {
     50% {
         opacity: 0.5;
     }
+}
+
+/* Pill-shaped split button (credible sets count + attach). ButtonGroup and
+   the Button `rounded` prop fight over corner radii and leave mismatched
+   corners, so the radii are set here instead: round outer ends, square seam. */
+.pill-group :deep(.p-button) {
+    border-radius: 0;
+}
+
+.pill-group :deep(.p-button:first-child) {
+    border-top-left-radius: 2rem;
+    border-bottom-left-radius: 2rem;
+}
+
+.pill-group :deep(.p-button:last-child) {
+    border-top-right-radius: 2rem;
+    border-bottom-right-radius: 2rem;
 }
 
 /* Add additional styling for the popover itself */
