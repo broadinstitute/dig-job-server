@@ -1,18 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { METHODS, getMethod, methodPath } from "../../utils/methods/catalog.js";
 
-// PrimeVue 4 Tag severities. An unknown severity renders unstyled, which is
-// easy to miss visually.
-const TAG_SEVERITIES = [
-    "primary",
-    "secondary",
-    "success",
-    "info",
-    "warn",
-    "danger",
-    "contrast",
-];
-
 describe("METHODS catalog", () => {
     it("lists the methods in the order the landing page shows them", () => {
         expect(METHODS.map((m) => m.slug)).toEqual([
@@ -35,19 +23,11 @@ describe("METHODS catalog", () => {
             expect(m.title.length).toBeGreaterThan(0);
             expect(typeof m.blurb).toBe("string");
             expect(m.blurb.length).toBeGreaterThan(0);
-            expect(m.icon).toMatch(/^pi pi-/);
-            expect(typeof m.iconWrapClass).toBe("string");
-            expect(typeof m.iconClass).toBe("string");
             expect(m.accent).toMatch(/^#[0-9a-f]{6}$/i);
             expect(m.fullName === null || typeof m.fullName === "string").toBe(
                 true,
             );
-            expect(Array.isArray(m.tags)).toBe(true);
             expect(typeof m.implemented).toBe("boolean");
-            for (const tag of m.tags) {
-                expect(typeof tag.value).toBe("string");
-                expect(TAG_SEVERITIES).toContain(tag.severity);
-            }
         }
     });
 

@@ -8,37 +8,16 @@
         </NuxtLink>
 
         <header
-            class="mb-10 flex items-start gap-5 border-b border-surface-200 pb-6 dark:border-surface-700"
+            class="mb-10 border-b border-surface-200 pb-6 dark:border-surface-700"
         >
-            <div
-                class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
-                :class="method.iconWrapClass"
+            <h1
+                class="mb-2 text-4xl font-bold text-surface-900 dark:text-surface-0"
             >
-                <i class="text-3xl" :class="[method.icon, method.iconClass]"></i>
-            </div>
-            <div>
-                <h1
-                    class="mb-2 text-4xl font-bold text-surface-900 dark:text-surface-0"
-                >
-                    {{ method.title }}
-                </h1>
-                <p class="text-xl text-surface-600 dark:text-surface-400">
-                    {{ method.blurb }}
-                </p>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <Tag
-                        v-for="tag in method.tags"
-                        :key="tag.value"
-                        :value="tag.value"
-                        :severity="tag.severity"
-                    />
-                    <Tag
-                        v-if="!method.implemented"
-                        value="Coming soon"
-                        severity="secondary"
-                    />
-                </div>
-            </div>
+                {{ method.title }}
+            </h1>
+            <p class="text-xl text-surface-600 dark:text-surface-400">
+                {{ method.blurb }}
+            </p>
         </header>
 
         <Message
