@@ -18,9 +18,9 @@ describe("METHODS catalog", () => {
         expect(METHODS.map((m) => m.slug)).toEqual([
             "sldsc",
             "magma",
-            "cojo",
             "pigean",
             "falcon",
+            "variant-sifter",
         ]);
     });
 
@@ -38,6 +38,10 @@ describe("METHODS catalog", () => {
             expect(m.icon).toMatch(/^pi pi-/);
             expect(typeof m.iconWrapClass).toBe("string");
             expect(typeof m.iconClass).toBe("string");
+            expect(m.accent).toMatch(/^#[0-9a-f]{6}$/i);
+            expect(m.fullName === null || typeof m.fullName === "string").toBe(
+                true,
+            );
             expect(Array.isArray(m.tags)).toBe(true);
             expect(typeof m.implemented).toBe("boolean");
             for (const tag of m.tags) {
@@ -47,21 +51,29 @@ describe("METHODS catalog", () => {
         }
     });
 
-    // COJO has no workflow in the app yet; the card must say so.
-    it("marks COJO as not implemented", () => {
-        expect(getMethod("cojo").implemented).toBe(false);
-    });
-
-    it("marks the methods with a results tab as implemented", () => {
-        for (const slug of ["sldsc", "magma", "pigean", "falcon"]) {
+    it("marks every method that runs from the Datasets page as implemented", () => {
+        for (const slug of [
+            "sldsc",
+            "magma",
+            "pigean",
+            "falcon",
+            "variant-sifter",
+        ]) {
             expect(getMethod(slug).implemented).toBe(true);
         }
+    });
+
+    // Variant Sifter results open in the HuGeAMP portal, not in GWAS-CE.
+    it("marks only Variant Sifter as external", () => {
+        expect(METHODS.filter((m) => m.external).map((m) => m.slug)).toEqual([
+            "variant-sifter",
+        ]);
     });
 });
 
 describe("getMethod", () => {
     it("returns the entry for a known slug", () => {
-        expect(getMethod("sldsc").title).toBe("SLDSC");
+        expect(getMethod("sldsc").title).toBe("S-LDSC");
     });
 
     it("returns undefined for an unknown slug", () => {

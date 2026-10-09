@@ -2,20 +2,51 @@
 import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import { rollup as unwasm } from "unwasm/plugin";
-const IndigoAura = definePreset(Aura, {
+// GWAS-CE coral palette, taken from the portal banner (#f7835c).
+const GwasCeAura = definePreset(Aura, {
     semantic: {
         primary: {
-            50: "{indigo.50}",
-            100: "{indigo.100}",
-            200: "{indigo.200}",
-            300: "{indigo.300}",
-            400: "{indigo.400}",
-            500: "{indigo.500}",
-            600: "{indigo.600}",
-            700: "{indigo.700}",
-            800: "{indigo.800}",
-            900: "{indigo.900}",
-            950: "{indigo.950}",
+            50: "#fff4ef",
+            100: "#ffe8df",
+            200: "#fecfbd",
+            300: "#fcb094",
+            400: "#fa9674",
+            500: "#f7835c",
+            600: "#dc4c34",
+            700: "#b83d29",
+            800: "#953325",
+            900: "#782d22",
+            950: "#41150f",
+        },
+        colorScheme: {
+            light: {
+                primary: {
+                    color: "{primary.600}",
+                    contrastColor: "#ffffff",
+                    hoverColor: "{primary.700}",
+                    activeColor: "{primary.800}",
+                },
+                highlight: {
+                    background: "{primary.100}",
+                    focusBackground: "{primary.200}",
+                    color: "#2c2422",
+                    focusColor: "#2c2422",
+                },
+                surface: {
+                    0: "#ffffff",
+                    50: "#f4f1ee",
+                    100: "#ece6e1",
+                    200: "#e4ddd8",
+                    300: "#cfc6c0",
+                    400: "#9a918c",
+                    500: "#636466",
+                    600: "#554d4a",
+                    700: "#443b38",
+                    800: "#2c2422",
+                    900: "#211b19",
+                    950: "#171211",
+                },
+            },
         },
     },
 });
@@ -57,13 +88,38 @@ export default defineNuxtConfig({
                 lang: "en",
             },
             title: "GWAS-CE",
+            // Oswald (headings) and Roboto (body) from the GWAS-CE mock-ups
+            // (HuGeAMP Knowledge Portal type). Used by the landing and guide
+            // pages.
+            link: [
+                // Favicon: the GWAS-CE mark (no wordmark), from GwasCeLogo.vue.
+                // PNGs are fallbacks for browsers without SVG favicon support.
+                { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+                {
+                    rel: "icon",
+                    type: "image/png",
+                    sizes: "48x48",
+                    href: "/favicon.png",
+                },
+                { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+                { rel: "preconnect", href: "https://fonts.googleapis.com" },
+                {
+                    rel: "preconnect",
+                    href: "https://fonts.gstatic.com",
+                    crossorigin: "",
+                },
+                {
+                    rel: "stylesheet",
+                    href: "https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&family=Roboto:wght@300;400;500;700&display=swap",
+                },
+            ],
         },
     },
     primevue: {
         options: {
             ripple: true,
             theme: {
-                preset: IndigoAura,
+                preset: GwasCeAura,
                 options: {
                     darkModeSelector: ".dark",
                     cssLayer: {

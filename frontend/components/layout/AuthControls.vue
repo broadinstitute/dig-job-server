@@ -1,14 +1,6 @@
 <template>
     <div class="auth-controls">
         <Button
-            icon="pi pi-file"
-            label="Datasets"
-            class="p-button-text"
-            size="small"
-            as="a"
-            href="/datasets"
-        />
-        <Button
             v-if="!isLoggedIn"
             icon="pi pi-user"
             label="Login"
@@ -17,14 +9,23 @@
             as="a"
             href="/login"
         />
-        <Button
-            v-else
-            icon="pi pi-sign-out"
-            label="Sign out"
-            class="p-button-text"
-            @click="signOut"
-            size="small"
-        />
+        <template v-else>
+            <Button
+                icon="pi pi-file"
+                label="Datasets"
+                class="p-button-text"
+                size="small"
+                as="a"
+                href="/datasets"
+            />
+            <Button
+                icon="pi pi-sign-out"
+                label="Sign out"
+                class="p-button-text"
+                @click="signOut"
+                size="small"
+            />
+        </template>
     </div>
 </template>
 

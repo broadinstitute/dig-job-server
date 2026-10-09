@@ -58,9 +58,64 @@
                     {{ section.title }}
                 </h2>
                 <div
-                    class="rounded-lg border border-surface-200 bg-surface-0 p-6 text-surface-700 shadow-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+                    class="space-y-4 rounded-lg border border-surface-200 bg-surface-0 p-6 leading-relaxed text-surface-700 shadow-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
                 >
-                    <p>{{ section.placeholder }}</p>
+                    <p
+                        v-if="section.example"
+                        class="text-sm text-surface-500 dark:text-surface-400"
+                    >
+                        Example dataset:
+                        <a
+                            :href="EXAMPLE_DATASET.url"
+                            class="text-primary hover:underline"
+                            >{{ EXAMPLE_DATASET.label }}</a
+                        >
+                    </p>
+                    <template
+                        v-for="(block, i) in section.blocks"
+                        :key="i"
+                    >
+                        <!-- Trusted, source-controlled copy from utils/methods/docs.js -->
+                        <p v-if="typeof block === 'string'" v-html="block"></p>
+                        <figure v-else class="py-2">
+                            <a
+                                :href="block.src"
+                                target="_blank"
+                                rel="noopener"
+                                title="Open full-size image"
+                            >
+                                <img
+                                    :src="block.src"
+                                    :alt="block.alt"
+                                    loading="lazy"
+                                    class="w-full rounded-md border border-surface-200 bg-white dark:border-surface-700"
+                                />
+                            </a>
+                            <figcaption
+                                class="mt-2 text-center text-sm text-surface-500 dark:text-surface-400"
+                            >
+                                {{ block.caption }}
+                            </figcaption>
+                        </figure>
+                    </template>
+                    <ul v-if="section.references" class="space-y-2">
+                        <li
+                            v-for="ref in section.references"
+                            :key="ref.url"
+                            class="flex items-start gap-2"
+                        >
+                            <i
+                                class="pi pi-external-link mt-1 text-xs text-surface-400"
+                            ></i>
+                            <a
+                                :href="ref.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-primary hover:underline"
+                                >{{ ref.label }}</a
+                            >
+                        </li>
+                    </ul>
                 </div>
             </section>
         </div>
@@ -78,10 +133,10 @@
 </template>
 
 <script setup>
-// Description page for one post-processing method. Content is placeholder
-// text for now; the structure (Overview / Inputs / Outputs / References) is
-// what the final copy will slot into.
+// Description page for one post-processing method. Copy lives in
+// utils/methods/docs.js; card metadata in utils/methods/catalog.js.
 import { getMethod } from "~/utils/methods/catalog";
+import { EXAMPLE_DATASET, getMethodDocs } from "~/utils/methods/docs";
 
 definePageMeta({ requiresAuth: false });
 
@@ -98,22 +153,13 @@ if (!method) {
 
 useHead({ title: `${method.title} - GWAS-CE` });
 
-const SECTIONS = [
-    {
-        title: "Overview",
-        placeholder: `Placeholder: what ${method.title} does, the question it answers, and when to use it.`,
-    },
-    {
-        title: "Inputs",
-        placeholder: `Placeholder: the GWAS summary statistics columns and reference data ${method.title} requires.`,
-    },
-    {
-        title: "Outputs",
-        placeholder: `Placeholder: the result tables and plots produced by ${method.title} and how to read them.`,
-    },
-    {
-        title: "References",
-        placeholder: "Placeholder: primary publication and software links.",
-    },
-];
+const docs = getMethodDocs(method.slug);
+
+const SECTIONS = docs
+    ? [
+          { title: "Overview", blocks: docs.overview },
+          { title: "Example output", blocks: docs.output, example: true },
+          { title: "References", references: docs.references },
+      ]
+    : [];
 </script>
