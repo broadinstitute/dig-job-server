@@ -13,8 +13,8 @@
     },
     "dependencies": {
         "@pinia/nuxt": "1.0.2",
-        "@primeuix/themes": "3.0.1",
-        "@primevue/forms": "5.0.2",
+        "@openvue/themes": "1.0.0",
+        "@openvue/forms": "1.0.0",
         "axios": "1.20.0",
         "chart.js": "4.5.1",
         "nuxt": "4.6.1",
@@ -24,7 +24,7 @@
         "pinia": "4.0.3",
         "plotly.js-dist-min": "4.1.2",
         "primeicons": "8.0.2",
-        "primevue": "5.0.2",
+        "openvue": "1.0.0",
         "shiki": "4.5.0",
         "tailwindcss-primeui": "0.6.1",
         "vue": "3.5.44",
@@ -34,7 +34,7 @@
         "@bomb.sh/tab": "0.0.22"
     },
     "devDependencies": {
-        "@primevue/nuxt-module": "5.0.2",
+        "@openvue/nuxt-module": "1.0.0",
         "@tailwindcss/postcss": "4.3.3",
         "autoprefixer": "10.6.1",
         "cross-env": "10.1.0",

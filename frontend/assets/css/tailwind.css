@@ -1,4 +1,4 @@
-@layer theme, base, primevue, components, utilities;
+@layer theme, base, openvue, components, utilities;
 @import "tailwindcss";
 @import "tailwindcss-primeui";
 @custom-variant dark (&:where(.dark, .dark *));
