@@ -1,6 +1,6 @@
 <script setup>
 import { useUserStore } from "~/stores/UserStore.js";
-import pako from "pako";
+import * as pako from "pako";
 
 const { isDarkMode, toggleDarkMode } = useTheme();
 
