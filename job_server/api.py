@@ -483,8 +483,7 @@ async def finalize_upload(request: DatasetInfo, background_tasks: BackgroundTask
 
 @router.delete("/delete-dataset/{dataset}")
 async def delete_dataset(dataset: str, user: User = Depends(get_current_user)):
-    s3_path = get_s3_path(dataset, user).replace('/raw', '')
-    s3.clear_dir(s3_path)
+    s3.clear_dir(s3.get_dataset_s3_prefix(user.username, dataset))
     database_utils.delete_dataset(get_db(), user.username, dataset)
     return Response(status_code=200)
 
@@ -1162,8 +1161,22 @@ def get_dataframe(data: TextIO, file_type: str) -> pd.DataFrame:
         return pd.DataFrame.from_records(map(json.loads, data.readlines()))
 
 
-@lru_cache(maxsize=16)
 def get_cached_results(s3_path: str, file: str, file_type: str, is_compressed: bool) -> pd.DataFrame:
+    """A parsed result file, cached per S3 object version.
+
+    The cache key includes the object's ETag, so a dataset deleted and
+    re-created under the same name, or a method re-run, is read fresh instead
+    of being served whatever was loaded for the previous file at that key.
+    """
+    try:
+        etag = s3.get_results_etag(s3_path, file)
+    except ClientError as e:
+        raise fastapi.HTTPException(status_code=500, detail="Failed to fetch results") from e
+    return _load_results(s3_path, file, etag, file_type, is_compressed)
+
+
+@lru_cache(maxsize=16)
+def _load_results(s3_path: str, file: str, etag: str, file_type: str, is_compressed: bool) -> pd.DataFrame:
     try:
         if is_compressed:
             with gzip.open(s3.get_results(s3_path, file)['Body'], 'rt') as f:

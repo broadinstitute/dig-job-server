@@ -716,3 +716,40 @@ def test_pick_falcon_download_files_falls_back_to_per_chromosome():
     from job_server.api import pick_falcon_download_files
     names = ["trait-chr22.22.genes", "trait-chr22.22.variants", "trait-chr22.22.v2g", "trait-chr22.22.log"]
     assert pick_falcon_download_files(names) == ["trait-chr22.22.genes", "trait-chr22.22.variants"]
+
+
+@mock_aws
+def test_delete_dataset_leaves_sibling_dataset_with_same_name_prefix(api_client: TestClient, auth_token: str):
+    """Deleting "X" must not also wipe "X (from portal)" out of S3."""
+    set_up_moto_bucket()
+    client = boto3.client("s3", region_name="us-east-1")
+    for ds in ("Adiponectin adj BMI European", "Adiponectin adj BMI European (from portal)"):
+        client.put_object(Bucket=BUCKET, Key=f"userdata/{USER}/genetic/{ds}/raw/metadata", Body=b"{}")
+        client.put_object(Bucket=BUCKET, Key=f"userdata/{USER}/genetic/{ds}/magma/genes/metadata", Body=b"{}")
+
+    res = api_client.delete("/api/delete-dataset/Adiponectin adj BMI European",
+                            headers={"Authorization": f"Bearer {auth_token}"})
+    assert res.status_code == 200
+
+    remaining = {o["Key"] for o in client.list_objects_v2(Bucket=BUCKET).get("Contents", [])}
+    assert remaining == {
+        f"userdata/{USER}/genetic/Adiponectin adj BMI European (from portal)/raw/metadata",
+        f"userdata/{USER}/genetic/Adiponectin adj BMI European (from portal)/magma/genes/metadata",
+    }
+
+
+@mock_aws
+def test_delete_dataset_whose_name_starts_with_raw_is_actually_deleted(api_client: TestClient, auth_token: str):
+    """The dataset directory must be built, not derived by stripping "/raw"
+    from the upload path: ".../genetic/rawdata/raw" would collapse to
+    ".../geneticdata" and the delete would silently remove nothing."""
+    set_up_moto_bucket()
+    client = boto3.client("s3", region_name="us-east-1")
+    for ds in ("foo", "rawdata"):
+        client.put_object(Bucket=BUCKET, Key=f"userdata/{USER}/genetic/{ds}/raw/metadata", Body=b"{}")
+
+    res = api_client.delete("/api/delete-dataset/rawdata", headers={"Authorization": f"Bearer {auth_token}"})
+    assert res.status_code == 200
+
+    remaining = {o["Key"] for o in client.list_objects_v2(Bucket=BUCKET).get("Contents", [])}
+    assert remaining == {f"userdata/{USER}/genetic/foo/raw/metadata"}

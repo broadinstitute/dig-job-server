@@ -55,3 +55,40 @@ class TestGetFalconS3Prefix:
             s3.get_falcon_s3_prefix("alice", "T2D_EUR", "run1.wg.genes")
             == "userdata/alice/genetic/T2D_EUR/falcon/run1.wg.genes"
         )
+
+
+@mock_aws
+class TestClearDir:
+    def _put(self, client, key: str) -> None:
+        client.put_object(Bucket=BUCKET, Key=key, Body=b"x")
+
+    def _keys(self, client) -> set:
+        resp = client.list_objects_v2(Bucket=BUCKET)
+        return {o["Key"] for o in resp.get("Contents", [])}
+
+    def test_does_not_delete_a_sibling_whose_name_starts_with_the_same_text(self):
+        # A dataset named "A" must not take "A (from portal)" down with it: an
+        # S3 prefix match is textual, so the directory must end at "/".
+        client = boto3.client("s3", region_name="us-east-1")
+        client.create_bucket(Bucket=BUCKET)
+        self._put(client, "userdata/u/genetic/A/raw/gwas.tsv")
+        self._put(client, "userdata/u/genetic/A/magma/genes/out")
+        self._put(client, "userdata/u/genetic/A (from portal)/raw/gwas.tsv")
+        self._put(client, "userdata/u/genetic/AB/raw/gwas.tsv")
+
+        s3.clear_dir("userdata/u/genetic/A")
+
+        assert self._keys(client) == {
+            "userdata/u/genetic/A (from portal)/raw/gwas.tsv",
+            "userdata/u/genetic/AB/raw/gwas.tsv",
+        }
+
+    def test_accepts_a_prefix_that_already_ends_with_a_slash(self):
+        client = boto3.client("s3", region_name="us-east-1")
+        client.create_bucket(Bucket=BUCKET)
+        self._put(client, "userdata/u/genetic/A/raw/gwas.tsv")
+        self._put(client, "userdata/u/genetic/A (from portal)/raw/gwas.tsv")
+
+        s3.clear_dir("userdata/u/genetic/A/")
+
+        assert self._keys(client) == {"userdata/u/genetic/A (from portal)/raw/gwas.tsv"}

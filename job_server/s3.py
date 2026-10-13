@@ -42,10 +42,22 @@ def get_results(path, file):
     return s3_client.get_object(Bucket=BUCKET_NAME, Key=f"{path}/{file}")
 
 
+def get_results_etag(path, file):
+    """The ETag of a result object: changes whenever the object is rewritten."""
+    s3_client = boto3.client('s3')
+    return s3_client.head_object(Bucket=BUCKET_NAME, Key=f"{path}/{file}")['ETag']
+
+
 def clear_dir(s3_path):
+    """Delete every object under the S3 "directory" s3_path.
+
+    The prefix is forced to end in "/" because an S3 prefix match is purely
+    textual: clearing "genetic/A" would otherwise also take out
+    "genetic/A (from portal)" and "genetic/AB".
+    """
     s3 = boto3.client('s3')
     paginator = s3.get_paginator('list_objects_v2')
-    page_iterator = paginator.paginate(Bucket=BUCKET_NAME, Prefix=s3_path)
+    page_iterator = paginator.paginate(Bucket=BUCKET_NAME, Prefix=s3_path.rstrip('/') + '/')
 
     for page in page_iterator:
         if "Contents" in page:
@@ -114,6 +126,13 @@ def compute_object_sha256(key: str) -> str:
     for chunk in obj['Body'].iter_chunks(chunk_size=_CHUNK_BYTES):
         h.update(chunk)
     return h.hexdigest()
+
+
+def get_dataset_s3_prefix(user: str, dataset: str) -> str:
+    """The directory holding everything about one genetic dataset: the raw
+    upload and every method's results. Built directly rather than derived
+    from the raw key, so a dataset name containing "raw" cannot skew it."""
+    return f"userdata/{user}/genetic/{dataset}"
 
 
 def get_gwas_s3_key(user: str, dataset: str, filename: str | None = None) -> str:
