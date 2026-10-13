@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import Aura from "@primeuix/themes/aura";
-import { definePreset } from "@primeuix/themes";
+import Aura from "@openvue/themes/aura";
+import { definePreset } from "@openvue/themes";
 import { rollup as unwasm } from "unwasm/plugin";
 // GWAS-CE coral palette, taken from the portal banner (#f7835c).
 const GwasCeAura = definePreset(Aura, {
@@ -75,11 +75,7 @@ export default defineNuxtConfig({
         "~/assets/css/shiki.css",
         "~/assets/css/global.css",
     ],
-    modules: [
-        "@pinia/nuxt",
-        "@primevue/nuxt-module",
-        "nuxt-shiki",
-    ],
+    modules: ["@pinia/nuxt", "@openvue/nuxt-module", "nuxt-shiki"],
 
     app: {
         buildAssetsDir: `/_nuxt/${Date.now()}/`,
@@ -123,8 +119,8 @@ export default defineNuxtConfig({
                 options: {
                     darkModeSelector: ".dark",
                     cssLayer: {
-                        name: "primevue",
-                        order: "theme, base, primevue, components, utilities",
+                        name: "openvue",
+                        order: "theme, base, openvue, components, utilities",
                     },
                 },
             },
@@ -144,7 +140,8 @@ export default defineNuxtConfig({
             // GWAS-Hub is gated by a role on the gwas-ce user, read from the
             // roles/permissions in the verify response
             // (utils/auth/hubMembership.js). Empty means nobody is a member.
-            gwasHubRole: process.env.NUXT_PUBLIC_GWAS_HUB_ROLE || "gwas-hub-user",
+            gwasHubRole:
+                process.env.NUXT_PUBLIC_GWAS_HUB_ROLE || "gwas-hub-user",
             // mailto target for the hub "Contact admin" button
             gwasHubContactEmail:
                 process.env.NUXT_PUBLIC_GWAS_HUB_CONTACT_EMAIL || "",
