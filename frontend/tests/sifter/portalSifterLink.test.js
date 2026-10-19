@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPortalSifterUrl } from "../../utils/sifter/portalSifterLink.js";
 
-const PORTAL = "https://dev.hugeamp.org/research.html?pageid=kp_variant_sifter_26&project=gwas-ce";
+const PORTAL = "https://hugeamp.org/research.html?pageid=kp_variant_sifter&project=gwas-ce";
 
 describe("buildPortalSifterUrl", () => {
   it("appends token to the configured URL and preserves existing params", () => {
