@@ -6,7 +6,7 @@ const PORTAL = "https://hugeamp.org/research.html?pageid=kp_variant_sifter&proje
 describe("buildPortalSifterUrl", () => {
   it("appends token to the configured URL and preserves existing params", () => {
     const url = new URL(buildPortalSifterUrl(PORTAL, { token: "3e9b2a5c" }));
-    expect(url.searchParams.get("pageid")).toBe("kp_variant_sifter_26");
+    expect(url.searchParams.get("pageid")).toBe("kp_variant_sifter");
     expect(url.searchParams.get("project")).toBe("gwas-ce");
     expect(url.searchParams.get("token")).toBe("3e9b2a5c");
   });
