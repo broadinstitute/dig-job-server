@@ -328,3 +328,63 @@ def test_cli_accepts_mode(monkeypatch):
     assert calls == [(("u", "d", "g"), {"mode": "credible-sets"})]
     run_mod.main(["--username", "u", "--dataset", "d", "--guid", "g"])
     assert calls[-1] == (("u", "d", "g"), {"mode": "full"})
+
+
+# ---- global-enrichment mode ------------------------------------------------
+
+_TISSUE = (b"Adipose\tadipose_tissue\tadipose\t1.5\t0.01\n"
+           b"Liver\tliver\tliver\t2.5\t0.2\n")
+
+
+def _ge_patches(s3):
+    names = ("list_upload_metadata", "build_associations",
+             "write_derived_credible_sets", "index_credible_sets")
+    return (patch.object(run_mod.boto3, "client", return_value=s3),
+            patch.object(run_mod, "index_global_enrichment"),
+            *(patch.object(run_mod, n) for n in names))
+
+
+def test_global_enrichment_mode_writes_and_indexes_only_enrichment():
+    from variant_sifter_pipeline.index_build import global_enrichment_key
+    meta = {**_META, "ancestry": "EUR"}
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(meta).encode()), _body(_TISSUE)]
+    client, idx, listing, assoc, derived, sets = _ge_patches(s3)
+    with client, idx as idx_mock, listing as l_mock, assoc as a_mock, \
+         derived as d_mock, sets as s_mock:
+        n = run_mod.run("u", "d", "guidG", mode="global-enrichment")
+    assert n == 2
+    assert s3.get_object.call_args_list[1].kwargs == {
+        "Bucket": run_mod.USER_DATA_BUCKET,
+        "Key": "userdata/u/genetic/d/sldsc/sldsc/tissue.output.tsv"}
+    kwargs = s3.put_object.call_args.kwargs
+    assert kwargs["Bucket"] == run_mod.GWAS_CE_BUCKET
+    assert kwargs["Key"] == global_enrichment_key("guidG")
+    recs = [json.loads(x) for x in kwargs["Body"].decode().splitlines()]
+    assert len(recs) == 2 and recs[0]["ancestry"] == "EUR"
+    idx_mock.assert_called_once_with("guidG")
+    for m in (l_mock, a_mock, d_mock, s_mock):
+        m.assert_not_called()
+
+
+def test_global_enrichment_mode_raises_when_tsv_missing():
+    from botocore.exceptions import ClientError
+    err = ClientError({"Error": {"Code": "NoSuchKey", "Message": "x"}}, "GetObject")
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(_META).encode()), err]
+    client, idx, *_ = _ge_patches(s3)
+    with client, idx as idx_mock:
+        with pytest.raises(ClientError):
+            run_mod.run("u", "d", "guidG", mode="global-enrichment")
+    idx_mock.assert_not_called()
+
+
+def test_global_enrichment_mode_with_no_usable_rows_writes_empty_and_indexes():
+    s3 = MagicMock()
+    s3.get_object.side_effect = [_body(json.dumps(_META).encode()), _body(b"junk\n")]
+    client, idx, *_ = _ge_patches(s3)
+    with client, idx as idx_mock:
+        n = run_mod.run("u", "d", "guidG", mode="global-enrichment")
+    assert n == 0
+    assert s3.put_object.call_args.kwargs["Body"] == b""
+    idx_mock.assert_called_once_with("guidG")

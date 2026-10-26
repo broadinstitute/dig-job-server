@@ -32,8 +32,8 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   GWAS-CE Variant Sifter Batch runtime: ECR repo, least-privilege task/execution
   role, and the Fargate Batch job definition that builds + indexes one uploaded
-  GWAS's associations and credible sets (derived + user-uploaded) into the
-  gwas_ce bioindex.
+  GWAS's associations and credible sets (derived + user-uploaded), or its
+  S-LDSC global (tissue) enrichment, into the gwas_ce bioindex.
 
 Parameters:
   ImageTag:

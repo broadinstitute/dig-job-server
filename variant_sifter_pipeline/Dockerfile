@@ -46,6 +46,6 @@ COPY variant_sifter_pipeline /app/variant_sifter_pipeline
 # a Batch job that fails on import wastes a Fargate start).
 RUN python -c "import boto3, variant_sifter_pipeline.run"
 
-# Batch supplies the args:  --username <u> --dataset <d> --guid <g>
+# Batch supplies the args:  --username <u> --dataset <d> --guid <g> --mode <m>
 # Config comes from env: BIOINDEX_S3_BUCKET, BIOINDEX_RDS_SECRET, BIOINDEX_BIO_SCHEMA.
 ENTRYPOINT ["python", "-m", "variant_sifter_pipeline.run"]

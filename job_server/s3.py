@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 BUCKET_NAME = os.getenv('JOB_SERVER_BUCKET', 'dig-ldsc-server')
 _S3_CONFIG = Config(signature_version='s3v4')
@@ -46,6 +47,18 @@ def get_results_etag(path, file):
     """The ETag of a result object: changes whenever the object is rewritten."""
     s3_client = boto3.client('s3')
     return s3_client.head_object(Bucket=BUCKET_NAME, Key=f"{path}/{file}")['ETag']
+
+
+def results_exist(path: str, file: str) -> bool:
+    """True if the result object exists; a 404 is False, any other error is raised."""
+    s3_client = boto3.client('s3')
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=f"{path}/{file}")
+    except ClientError as e:
+        if e.response.get('Error', {}).get('Code') in ('404', 'NoSuchKey', 'NotFound'):
+            return False
+        raise
+    return True
 
 
 def clear_dir(s3_path):

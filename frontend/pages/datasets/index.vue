@@ -7,6 +7,7 @@ import { statusTag, hasFailed } from "~/utils/credibleSets/statusTag.js";
 import { createRefreshGuard } from "~/utils/credibleSets/refreshGuard.js";
 import { buildPortalSifterUrl } from "~/utils/sifter/portalSifterLink.js";
 import { resultButtonConfig, resultsUrl } from "~/utils/results/resultNavigation.js";
+import { hasRunningJob } from "~/utils/datasets/runningJob.js";
 
 const userStore = useUserStore();
 const phenotypeStore = usePhenotypeStore();
@@ -185,7 +186,7 @@ onMounted(async () => {
 
     datasets.value = await userStore.retrieveDatasets();
     datasets.value.forEach((data) => {
-        if (data.status?.includes("RUNNING")) {
+        if (hasRunningJob(data)) {
             console.log(
                 `Connecting to running job for dataset: ${data.dataset}`,
             );

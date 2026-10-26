@@ -4,7 +4,7 @@ Reads one uploaded GWAS, builds the p-value-filtered `associations` records for
 that dataset, writes them to the gwas-ce bucket keyed by GUID, and indexes them
 in-process. Plan 1's API submits this via sifter_job_config:
 
-    python -m variant_sifter_pipeline.run --username U --dataset D --guid G
+    python -m variant_sifter_pipeline.run --username U --dataset D --guid G --mode M
 
 First slice = associations only. Harmonization/liftover and VEP annotation are
 deferred (see the design spec); this assumes the upload is already on the
@@ -13,12 +13,15 @@ reference build.
 `--mode` selects what the job does: `full` (the default) builds associations
 and derived credible sets and syncs uploaded credible sets, indexing all of
 it; `credible-sets` only syncs uploaded credible sets and rebuilds the two
-credible-set indexes, leaving associations untouched.
+credible-set indexes, leaving associations untouched; `global-enrichment`
+only reads the dataset's S-LDSC tissue results (sldsc/sldsc/tissue.output.tsv)
+and builds the global-enrichment index, touching nothing else.
 
 Derived credible sets (GCTA-COJO + ABF, the aggregator's fine-mapping recipe)
 are only produced for datasets with NO credible-set uploads attached: the
 user's own fine-mapped sets win, and the derived objects are written empty so
-the index drops any earlier derived rows. This applies in both modes, so a
+the index drops any earlier derived rows. This applies in both the `full` and
+`credible-sets` modes (`global-enrichment` leaves credible sets alone), so a
 dataset that gains its first upload loses its derived sets on that ingest.
 """
 
@@ -36,8 +39,10 @@ from .associations import build_associations
 from .canonicalize import canonicalize
 from .credible_sets import (clear_derived_credible_sets,
                             write_derived_credible_sets)
+from .global_enrichment import build_global_enrichment, write_global_enrichment
 from .index_build import (associations_key, index_associations,
-                          index_credible_sets, index_credible_variants)
+                          index_credible_sets, index_credible_variants,
+                          index_global_enrichment)
 from .reference import ReferenceGenome, ensure_local_reference, orient_records
 from .uploaded_credible_sets import (list_upload_metadata,
                                      sync_uploaded_credible_sets)
@@ -55,9 +60,10 @@ ORIENT_ALLELES = os.getenv("VS_ORIENT_ALLELES", "1") != "0"
 
 # `full`: associations + derived credible sets + attached uploads, all indexed.
 # `credible-sets`: attached uploads only; rebuilds just the credible-set indexes.
+# `global-enrichment`: only the S-LDSC tissue enrichment index.
 # Submitted by job_server.variant_sifter.sifter_job_config via the Batch `mode`
 # parameter (deploy/cloudformation/variant-sifter-batch.yaml).
-MODES = ("full", "credible-sets")
+MODES = ("full", "credible-sets", "global-enrichment")
 
 
 def _raw_prefix(username: str, dataset: str) -> str:
@@ -117,17 +123,36 @@ def _build_and_index_associations(s3, meta: dict, username: str, dataset: str,
     return records
 
 
+def run_global_enrichment(s3, meta: dict, username: str, dataset: str,
+                          guid: str) -> int:
+    """Read the S-LDSC tissue results, write + index them. Returns the record
+    count. A missing file raises: the API only submits this mode once it exists."""
+    # Must agree with job_server/api.py::_sldsc_results_path + SLDSC_TISSUE_FILE.
+    key = f"userdata/{username}/genetic/{dataset}/sldsc/sldsc/tissue.output.tsv"
+    obj = s3.get_object(Bucket=USER_DATA_BUCKET, Key=key)
+    text = io.TextIOWrapper(obj["Body"], encoding="utf-8")
+    records = build_global_enrichment(text, guid, meta.get("ancestry"))
+    write_global_enrichment(s3, GWAS_CE_BUCKET, records, guid)
+    index_global_enrichment(guid)
+    print(f"indexed {len(records)} global-enrichment records for {guid}")
+    return len(records)
+
+
 def run(username: str, dataset: str, guid: str, mode: str = "full") -> int:
     """Build + write + index the dataset's objects for `mode`. Returns the
-    number of association records written (0 in credible-sets mode)."""
+    number of association records written (0 in credible-sets mode), or in
+    global-enrichment mode the number of global-enrichment records."""
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
     s3 = boto3.client("s3")
     meta = _read_metadata(s3, username, dataset)
+    if mode == "global-enrichment":
+        return run_global_enrichment(s3, meta, username, dataset, guid)
     ancestry = meta.get("ancestry")
 
     # Attached credible-set uploads decide whether derived sets exist at all
-    # (see the module docstring), so they are listed once, before either mode.
+    # (see the module docstring), so they are listed once, before the `full` or
+    # `credible-sets` work.
     uploads = list_upload_metadata(s3, USER_DATA_BUCKET, username, dataset)
 
     # One reference genome for both associations and uploaded credible sets, so

@@ -92,3 +92,29 @@ class TestClearDir:
         s3.clear_dir("userdata/u/genetic/A/")
 
         assert self._keys(client) == {"userdata/u/genetic/A (from portal)/raw/gwas.tsv"}
+
+
+@mock_aws
+class TestResultsExist:
+    def test_true_when_object_present(self):
+        client = boto3.client("s3", region_name="us-east-1")
+        client.create_bucket(Bucket=BUCKET)
+        client.put_object(Bucket=BUCKET, Key="a/b/file.tsv", Body=b"x")
+
+        assert s3.results_exist("a/b", "file.tsv") is True
+
+    def test_false_when_object_missing(self):
+        client = boto3.client("s3", region_name="us-east-1")
+        client.create_bucket(Bucket=BUCKET)
+
+        assert s3.results_exist("a/b", "nope.tsv") is False
+
+    def test_other_client_errors_reraise(self):
+        from unittest.mock import patch
+        from botocore.exceptions import ClientError
+
+        err = ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "HeadObject")
+        with patch("job_server.s3.boto3.client") as mk:
+            mk.return_value.head_object.side_effect = err
+            with pytest.raises(ClientError):
+                s3.results_exist("a/b", "file.tsv")

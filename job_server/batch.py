@@ -54,7 +54,9 @@ def failure_detail(method: str, container: dict) -> str:
     meaning = FALCON_EXIT_MEANINGS.get(code)
     return f' ({meaning})' if meaning else ''
 
-async def submit_and_await_job(job_config, user, dataset, method, job_queues, prefix=""):
+async def await_job(job_config: dict) -> dict:
+    """Submit one Batch job and poll until it ends. Records nothing, so a caller
+    can chain several jobs and record a single outcome (see record_job_end)."""
     batch_client = boto3.client('batch', region_name=S3_REGION)
 
     response = batch_client.submit_job(**job_config)
@@ -71,19 +73,32 @@ async def submit_and_await_job(job_config, user, dataset, method, job_queues, pr
                 logStreamName=log_stream_name
             )
             log_messages = [event['message'] for event in log_events['events']]
-            complete_log = '\n'.join(log_messages)
-
-            container = response['jobs'][0].get('container', {})
-            status = f"{method} {job_status}{failure_detail(method, container)}"
-            database_utils.log_job_end(get_db(), user, dataset, status, complete_log, prefix=prefix)
-            job_id = database_utils.get_dataset_hash(dataset, user, prefix=prefix)
-            if job_id in job_queues:
-                await job_queues[job_id].put({
-                    "status": status,
-                    "dataset": dataset,
-                    "method": method
-                })
-            return
+            return {
+                "status": job_status,
+                "log": '\n'.join(log_messages),
+                "container": response['jobs'][0].get('container', {}),
+            }
 
         await asyncio.sleep(60)
+
+
+async def record_job_end(user, dataset, method, result: dict, job_queues, prefix="", extra_log="") -> str:
+    """Write a finished job's status and log to workflow_jobs and push the status
+    onto the dataset's job_queues entry, if one is listening. Returns the status."""
+    status = f"{method} {result['status']}{failure_detail(method, result.get('container', {}))}"
+    log = f"{result['log']}\n{extra_log}" if extra_log else result['log']
+    database_utils.log_job_end(get_db(), user, dataset, status, log, prefix=prefix)
+    job_id = database_utils.get_dataset_hash(dataset, user, prefix=prefix)
+    if job_id in job_queues:
+        await job_queues[job_id].put({
+            "status": status,
+            "dataset": dataset,
+            "method": method
+        })
+    return status
+
+
+async def submit_and_await_job(job_config, user, dataset, method, job_queues, prefix=""):
+    result = await await_job(job_config)
+    await record_job_end(user, dataset, method, result, job_queues, prefix)
 

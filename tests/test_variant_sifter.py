@@ -87,6 +87,23 @@ def test_sifter_job_config_shape():
     }
 
 
+def test_sifter_job_config_global_enrichment_mode():
+    assert variant_sifter.GE_MODE == "global-enrichment"
+    cfg = variant_sifter.sifter_job_config("u", "d", "g", mode="global-enrichment")
+    assert cfg["jobName"] == "gwas-ce-global-enrichment"
+    assert cfg["parameters"]["mode"] == "global-enrichment"
+
+
+def test_sifter_job_config_credible_sets_name_unchanged():
+    cfg = variant_sifter.sifter_job_config("u", "d", "g", mode="credible-sets")
+    assert cfg["jobName"] == "gwas-ce-credible-sets"
+
+
+def test_sifter_job_config_rejects_unknown_mode():
+    with pytest.raises(ValueError):
+        variant_sifter.sifter_job_config("u", "d", "g", mode="bogus")
+
+
 # ---- Task 2: run endpoint ----
 
 def test_run_requires_auth(api_client: TestClient):
@@ -102,20 +119,23 @@ def test_run_unknown_dataset_404(api_client: TestClient, auth_token: str):
 def test_run_starts_job_and_logs_running(api_client: TestClient, auth_token: str):
     ds = f"vs_run_{int(time.time())}"
     _insert_dataset(ds)
-    with patch("job_server.batch.submit_and_await_job", new=AsyncMock()) as mock_wait:
+    guid = database_utils.get_dataset_hash(ds, USER)
+    with patch("job_server.api.run_sifter_pipeline", new=AsyncMock()) as pipeline, \
+         patch("job_server.batch.submit_and_await_job", new=AsyncMock()) as submit:
         res = api_client.post(f"/api/variant-sifter/run/{ds}", headers=_auth(auth_token))
     assert res.status_code == 200
-    assert res.json()["job_id"] == database_utils.get_dataset_hash(ds, USER)
+    assert res.json() == {"job_id": guid}
     with get_db() as conn:
         from sqlalchemy import text
         row = conn.execute(text(
             "SELECT status FROM workflow_jobs WHERE id=:id AND method='variant-sifter'"
-        ), {"id": database_utils.get_dataset_hash(ds, USER)}).fetchone()
+        ), {"id": guid}).fetchone()
     assert row is not None and row[0] == "RUNNING"
-    assert mock_wait.await_count == 1
-    args, kwargs = mock_wait.await_args
-    assert args[0]["jobDefinition"] == "gwas-ce-variant-sifter"
-    assert args[3] == "variant-sifter"
+    # The whole run (full job, S-LDSC, global enrichment) is one pipeline task.
+    pipeline.assert_awaited_once()
+    user, dataset, run_guid = pipeline.await_args.args
+    assert (user.username, dataset, run_guid) == (USER, ds, guid)
+    submit.assert_not_awaited()
 
 
 # ---- Task 3: public dataset-metadata endpoint ----
@@ -246,3 +266,27 @@ def test_add_cors_allows_any_origin_and_no_credentials():
     res = TestClient(app).get("/ping", headers={"Origin": "https://portal.example"})
     assert res.headers["access-control-allow-origin"] == "*"
     assert "access-control-allow-credentials" not in res.headers
+
+
+class TestSldscSkipReason:
+    def test_beta_and_n_ok(self):
+        assert variant_sifter.sldsc_skip_reason({"col_map": {"beta": "B", "n": "N"}}) is None
+
+    def test_odds_ratio_with_effective_n_ok(self):
+        md = {"col_map": {"oddsRatio": "OR"}, "effective_n": 1000}
+        assert variant_sifter.sldsc_skip_reason(md) is None
+
+    def test_missing_sample_size(self):
+        reason = variant_sifter.sldsc_skip_reason({"col_map": {"beta": "B"}})
+        assert "sample size" in reason
+
+    def test_missing_effect_size(self):
+        reason = variant_sifter.sldsc_skip_reason({"col_map": {"n": "N"}})
+        assert "effect size" in reason
+
+    @pytest.mark.parametrize("md", [{}, {"col_map": {}}, {"col_map": None}])
+    def test_missing_col_map_gives_reason(self, md):
+        assert isinstance(variant_sifter.sldsc_skip_reason(md), str)
+
+    def test_wait_cap(self):
+        assert variant_sifter.SLDSC_WAIT_CAP_SECONDS == 4 * 3600
