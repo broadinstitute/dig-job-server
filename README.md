@@ -1,7 +1,7 @@
 # dig-job-server
 
 
-![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)
 
 
 

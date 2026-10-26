@@ -124,3 +124,30 @@ def test_upload_slug_is_recoverable_from_the_key_and_derived_objects_are_not_upl
     assert index_build.upload_slug_of_key(index_build.upload_sets_key(GUID, "susie-v1")) == "susie-v1"
     assert index_build.upload_slug_of_key(index_build.credible_sets_key(GUID)) is None
     assert index_build.upload_slug_of_key(index_build.credible_variants_key(GUID)) is None
+
+
+# ---- global-enrichment index ------------------------------------------------
+
+def test_global_enrichment_names_prefix_and_key():
+    assert index_build.global_enrichment_index_name("G") == "global-enrichment-G"
+    table = index_build.global_enrichment_table_name(GUID)
+    assert table == "ge_" + GUID[:32]
+    assert len(table) <= 64
+    prefix = index_build.global_enrichment_prefix("G")
+    assert prefix == "global-enrichment/G/"
+    assert prefix.endswith("/")
+    key = index_build.global_enrichment_key("G")
+    assert key == "global-enrichment/G/enrichment.json"
+    assert key.startswith(index_build.global_enrichment_prefix("G"))
+
+
+def test_global_enrichment_schema_is_phenotype():
+    assert index_build.GLOBAL_ENRICHMENT_SCHEMA == "phenotype"
+
+
+def test_index_global_enrichment_creates_and_builds_with_those_values(monkeypatch):
+    calls = []
+    monkeypatch.setattr(index_build, "_create_and_build", lambda *a: calls.append(a))
+    index_build.index_global_enrichment(GUID)
+    assert calls == [("global-enrichment-" + GUID, "ge_" + GUID[:32],
+                      f"global-enrichment/{GUID}/", "phenotype")]

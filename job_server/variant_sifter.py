@@ -38,8 +38,33 @@ def build_sifter_url(base_url: str, guid: str, region: str | None = None) -> str
 
 # `full` = associations + derived credible sets + every attached upload;
 # `credible-sets` = attached uploads only, rebuilding just the two credible-set
-# indexes. Both run the same job definition; the mode is a Batch parameter.
-SIFTER_MODES = ("full", "credible-sets")
+# indexes; `global-enrichment` = only the S-LDSC tissue enrichment index. All
+# three run the same job definition; the mode is a Batch parameter.
+GE_MODE = "global-enrichment"
+SIFTER_MODES = ("full", "credible-sets", GE_MODE)
+
+# How long the global-enrichment step waits for the S-LDSC result before giving up.
+SLDSC_WAIT_CAP_SECONDS = 4 * 3600
+
+
+def sldsc_skip_reason(metadata: dict) -> str | None:
+    """Why S-LDSC cannot run on this dataset, or None if it can."""
+    col_map = metadata.get("col_map") or {}
+    problems = []
+    if not col_map.get("n") and metadata.get("effective_n") is None:
+        problems.append("no sample size (N column or effective N)")
+    if not (col_map.get("beta") or col_map.get("oddsRatio")):
+        problems.append("no effect size (beta or odds ratio) column")
+    if not problems:
+        return None
+    return "S-LDSC skipped: " + "; ".join(problems)
+
+
+_JOB_NAMES = {
+    "full": "gwas-ce-variant-sifter",
+    "credible-sets": "gwas-ce-credible-sets",
+    GE_MODE: "gwas-ce-global-enrichment",
+}
 
 
 def sifter_job_config(username: str, dataset: str, guid: str, mode: str = "full") -> dict:
@@ -53,7 +78,7 @@ def sifter_job_config(username: str, dataset: str, guid: str, mode: str = "full"
     if mode not in SIFTER_MODES:
         raise ValueError(f"unknown sifter mode {mode!r}")
     return {
-        "jobName": "gwas-ce-variant-sifter" if mode == "full" else "gwas-ce-credible-sets",
+        "jobName": _JOB_NAMES[mode],
         "jobQueue": "indexer-job-queue",
         "jobDefinition": "gwas-ce-variant-sifter",
         "parameters": {

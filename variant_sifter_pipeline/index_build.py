@@ -139,6 +139,32 @@ def index_credible_variants(guid: str) -> None:
                       credible_variants_prefix(guid), CREDIBLE_VARIANTS_SCHEMA)
 
 
+# Global enrichment (S-LDSC tissue results) is one JSON-lines object per dataset.
+GLOBAL_ENRICHMENT_SCHEMA = "phenotype"
+
+
+def global_enrichment_index_name(guid: str) -> str:
+    return f"global-enrichment-{guid}"
+
+
+def global_enrichment_table_name(guid: str) -> str:
+    return f"ge_{guid[:_TABLE_GUID_CHARS]}"
+
+
+def global_enrichment_prefix(guid: str) -> str:
+    return f"global-enrichment/{guid}/"
+
+
+def global_enrichment_key(guid: str) -> str:
+    return f"{global_enrichment_prefix(guid)}enrichment.json"
+
+
+def index_global_enrichment(guid: str) -> None:
+    _create_and_build(global_enrichment_index_name(guid),
+                      global_enrichment_table_name(guid),
+                      global_enrichment_prefix(guid), GLOBAL_ENRICHMENT_SCHEMA)
+
+
 # User-uploaded credible sets are written as extra objects under the SAME
 # per-dataset prefixes, so the derived and uploaded sets share one index each.
 # The slug is recoverable from the key so a sync can delete orphaned uploads.

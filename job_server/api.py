@@ -840,22 +840,140 @@ async def start_analysis(request: AnalysisRequest, background_tasks: BackgroundT
     return {"job_id": job_id}
 
 
-async def start_sifter_job(user: User, dataset: str, background_tasks: BackgroundTasks):
-    """Kick off the variant-sifter prep pipeline for one dataset (Batch job).
+SLDSC_METHOD = "sldsc"
+SLDSC_TISSUE_FILE = "tissue.output.tsv"
+# How often to re-check an S-LDSC run that something else already started.
+SLDSC_POLL_SECONDS = 60
 
-    Mirrors start_job: log RUNNING synchronously, then submit + await in the
-    background. Uses the unprefixed dataset hash as both the GUID and the
-    job_queues key, so the existing /job-status/{job_id} SSE streams progress.
+
+def _sldsc_results_path(user: User, dataset: str) -> str:
+    # Must agree with variant_sifter_pipeline/run.py::run_global_enrichment's key.
+    return get_s3_results_path(dataset, user, 'genetic', SLDSC_METHOD, SLDSC_METHOD)
+
+
+def _sldsc_running(username: str, dataset: str) -> bool:
+    jobs = database_utils.get_workflow_jobs_for_dataset(
+        get_db(), database_utils.get_dataset_hash(dataset, username))
+    return any(j["method"] == SLDSC_METHOD and j["status"] == "RUNNING" for j in jobs)
+
+
+def _raw_metadata(username: str, dataset: str) -> dict:
+    """The upload's stored DatasetInfo, as finalize-upload wrote it."""
+    response = s3.get_results(s3.get_gwas_s3_key(username, dataset), "metadata")
+    return json.loads(response["Body"].read())
+
+
+async def _ensure_sldsc(user: User, dataset: str, notes: list) -> None:
+    """Have S-LDSC run for the dataset, unless its results exist or it cannot run.
+
+    An S-LDSC started here is tracked under its own `sldsc` workflow row and gets
+    no job queue: its SUCCEEDED/FAILED on the dataset's queue would end the sifter
+    run's status stream early.
+    """
+    username = user.username
+    if s3.results_exist(_sldsc_results_path(user, dataset), SLDSC_TISSUE_FILE):
+        return
+    reason = variant_sifter.sldsc_skip_reason(_raw_metadata(username, dataset))
+    if reason:
+        notes.append(reason)
+        return
+    if _sldsc_running(username, dataset):
+        notes.append("Waiting for the S-LDSC run already in progress for this dataset.")
+        while _sldsc_running(username, dataset):
+            await asyncio.sleep(SLDSC_POLL_SECONDS)
+        return
+    database_utils.log_job_start(get_db(), username, dataset, f"RUNNING {SLDSC_METHOD}")
+    try:
+        await batch.submit_and_await_job(
+            batch.job_config(SLDSC_METHOD, username, dataset), username, dataset, SLDSC_METHOD,
+            job_queues={})
+    except Exception as e:
+        # A Batch error never reaches the job's own end: close the row here, or
+        # the next run would wait the full cap on a row left RUNNING.
+        database_utils.log_job_end(get_db(), username, dataset, f"{SLDSC_METHOD} FAILED", repr(e))
+        raise
+
+
+async def _sldsc_ready(user: User, dataset: str, notes: list) -> bool:
+    """True once the dataset's S-LDSC tissue results exist.
+
+    Never raises: a skip, a failed or timed-out S-LDSC, or an unexpected error
+    all just mean no global enrichment this run, with the cause in `notes`.
+    """
+    cap = variant_sifter.SLDSC_WAIT_CAP_SECONDS
+    try:
+        try:
+            await asyncio.wait_for(_ensure_sldsc(user, dataset, notes), cap)
+        except asyncio.TimeoutError:
+            # Counted as an S-LDSC failure; the Batch job itself is left to finish.
+            note = f"S-LDSC did not finish within {cap} s; global enrichment skipped."
+            notes.append(note)
+            database_utils.log_job_end(get_db(), user.username, dataset, f"{SLDSC_METHOD} FAILED", note)
+            return False
+        return s3.results_exist(_sldsc_results_path(user, dataset), SLDSC_TISSUE_FILE)
+    except Exception as e:
+        logging.warning("S-LDSC stage of the sifter run failed for %s", dataset, exc_info=True)
+        notes.append(f"S-LDSC stage failed: {e!r}")
+        return False
+
+
+async def run_sifter_pipeline(user: User, dataset: str, guid: str) -> None:
+    """One variant-sifter run: the `full` job and S-LDSC side by side, then the
+    global-enrichment job once both are done.
+
+    The variant-sifter end is recorded exactly once, after the last stage, so the
+    run reads RUNNING until global enrichment is indexed or skipped. Without
+    S-LDSC results the global-enrichment job is not submitted, leaving any earlier
+    index untouched; only a failed `full` or global-enrichment job fails the run,
+    and so does an error awaiting either (a run left RUNNING blocks credible-set
+    indexing for good).
+    """
+    username = user.username
+    notes: list = []
+    logs: list = []
+    sldsc = asyncio.ensure_future(_sldsc_ready(user, dataset, notes))  # never raises
+    try:
+        final = await batch.await_job(
+            variant_sifter.sifter_job_config(username, dataset, guid, mode="full"))
+        logs.append(final["log"])
+        if final["status"] == "SUCCEEDED":
+            # Only global enrichment needs the S-LDSC outcome; a failed `full`
+            # is recorded at once, not after S-LDSC (up to the wait cap).
+            sldsc_ready = await sldsc
+            logs.extend(notes)
+            if sldsc_ready:
+                final = await batch.await_job(
+                    variant_sifter.sifter_job_config(username, dataset, guid, mode=variant_sifter.GE_MODE))
+                logs.append(final["log"])
+            else:
+                logs.append("Global enrichment not indexed: no S-LDSC tissue results.")
+    except Exception as e:
+        logging.warning("Variant sifter run failed for %s", dataset, exc_info=True)
+        logs.append(f"Variant sifter run failed: {e!r}")
+        final = {"status": "FAILED", "container": {}}
+    await batch.record_job_end(
+        username, dataset, variant_sifter.SIFTER_METHOD,
+        {"status": final["status"], "log": "\n".join(logs), "container": final["container"]},
+        job_queues,
+    )
+    # Not cancelled on failure (a FAILED `full` job or an error): once S-LDSC
+    # has logged `RUNNING sldsc`, only its own poller can end that row. Already
+    # done on every other path.
+    await sldsc
+
+
+async def start_sifter_job(user: User, dataset: str, background_tasks: BackgroundTasks):
+    """Kick off a variant-sifter run for one dataset (see run_sifter_pipeline).
+
+    Mirrors start_job: log RUNNING synchronously, then run in the background.
+    Uses the unprefixed dataset hash as both the GUID and the job_queues key, so
+    the existing /job-status/{job_id} SSE streams progress.
     """
     database_utils.log_job_start(
         get_db(), user.username, dataset, f"RUNNING {variant_sifter.SIFTER_METHOD}",
     )
     guid = database_utils.get_dataset_hash(dataset, user.username)
-    background_tasks.add_task(
-        batch.submit_and_await_job,
-        variant_sifter.sifter_job_config(user.username, dataset, guid),
-        user.username, dataset, variant_sifter.SIFTER_METHOD, job_queues, "",
-    )
+    background_tasks.add_task(run_sifter_pipeline, user, dataset, guid)
 
 
 @router.post("/variant-sifter/run/{dataset}")
