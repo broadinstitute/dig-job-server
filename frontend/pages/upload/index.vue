@@ -204,7 +204,9 @@
                                         style="color: darkred"
                                         >^</span
                                     >, and any optional field to upload
-                                    file.</small
+                                    file. If running FALCON, it is
+                                    <i>required</i> that the uploaded file
+                                    contains the rsID column.</small
                                 >
                                 <div
                                     class="card flex flex-wrap gap-1 required-card"
